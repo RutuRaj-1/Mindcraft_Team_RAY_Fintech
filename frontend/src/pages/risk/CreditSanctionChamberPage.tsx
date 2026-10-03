@@ -18,6 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { HumanReviewModal, HumanReviewAction } from '../../components/fintech/HumanReviewModal';
 import {
   Award, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight,
   RefreshCw, Gavel, Check, X, FileText, ChevronRight, Building2,
@@ -47,7 +48,11 @@ export const CreditSanctionChamberPage: React.FC = () => {
   const [packageAuditLogs, setPackageAuditLogs] = useState<any[]>([]);
   const [isPackageLoading, setIsPackageLoading] = useState(false);
 
-  // Action execution modal
+  // HumanReviewModal — canonical 5-outcome governance workflow
+  const [hrJourneyId, setHrJourneyId] = useState<string | null>(null);
+  const [hrInitialAction, setHrInitialAction] = useState<HumanReviewAction>('APPROVE');
+
+  // Legacy action execution modal (kept for non-governance informational actions)
   const [activeAction, setActiveAction] = useState<CommitteeActionType | null>(null);
   const [decisionReason, setDecisionReason] = useState('');
   const [sanctionedAmount, setSanctionedAmount] = useState<number>(0);
@@ -544,7 +549,7 @@ export const CreditSanctionChamberPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* The 4 Committee Actions (APPROVE, DECLINE, RETURN, ESCALATE) */}
+                {/* The 4 Committee Actions — APPROVE/DECLINE now route through HumanReviewModal */}
                 <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-3">
                   <Button
                     variant="outline"
@@ -567,7 +572,13 @@ export const CreditSanctionChamberPage: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setActiveAction('DECLINE')}
+                    onClick={() => {
+                      if (selectedCase) {
+                        setHrJourneyId(selectedCase.journey_id);
+                        setHrInitialAction('DECLINE');
+                        setIsPackageOpen(false);
+                      }
+                    }}
                     leftIcon={<X className="w-4 h-4 text-rose-600" />}
                   >
                     Decline Facility
@@ -576,10 +587,16 @@ export const CreditSanctionChamberPage: React.FC = () => {
                   <Button
                     variant="brutal"
                     size="sm"
-                    onClick={() => setActiveAction('APPROVE')}
+                    onClick={() => {
+                      if (selectedCase) {
+                        setHrJourneyId(selectedCase.journey_id);
+                        setHrInitialAction('APPROVE');
+                        setIsPackageOpen(false);
+                      }
+                    }}
                     leftIcon={<Check className="w-4 h-4 text-emerald-600" />}
                   >
-                    Sanction & Approve Facility
+                    Sanction &amp; Approve Facility
                   </Button>
                 </div>
               </div>
@@ -641,6 +658,25 @@ export const CreditSanctionChamberPage: React.FC = () => {
             </div>
           </form>
         </Modal>
+      )}
+      {/* HumanReviewModal — canonical 5-outcome governance workflow for APPROVE/DECLINE */}
+      {hrJourneyId && (
+        <HumanReviewModal
+          isOpen={true}
+          onClose={() => setHrJourneyId(null)}
+          journeyId={hrJourneyId}
+          initialAction={hrInitialAction}
+          onSuccess={() => {
+            const caseName = selectedCase?.business_name || hrJourneyId;
+            setSuccessToast(
+              hrInitialAction === 'APPROVE'
+                ? `Facility APPROVED for ${caseName}. Governance audit event recorded.`
+                : `Application ${hrJourneyId} DECLINED. Governance audit event recorded.`
+            );
+            setHrJourneyId(null);
+            loadData();
+          }}
+        />
       )}
     </div>
   );

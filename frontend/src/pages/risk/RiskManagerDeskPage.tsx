@@ -1,27 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { dashboardApi, reviewApi, actionsApi, decisionsApi, auditApi } from '../../api';
+import { dashboardApi, reviewApi, auditApi } from '../../api';
 import { QueueItem, HumanReview, AuditCase } from '../../types';
 import { MetricCard } from '../../components/fintech/MetricCard';
 import { DataTable } from '../../components/fintech/DataTable';
 import { Button } from '../../components/ui/Button';
-import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { HumanReviewModal, HumanReviewAction } from '../../components/fintech/HumanReviewModal';
 import {
   Scale, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight,
-  RefreshCw, Check, X, FileText, ChevronRight, Gavel, AlertOctagon,
-  BookOpen, Compass, RotateCcw, Send, Layers, HelpCircle
+  RefreshCw, Check, FileText, Gavel, AlertOctagon,
+  Compass, RotateCcw
 } from 'lucide-react';
-
-type RiskManagerActionType =
-  | 'CONFIRM'
-  | 'RETURN_FOR_EVIDENCE'
-  | 'ESCALATE'
-  | 'RECOMMEND_APPROVAL'
-  | 'RECOMMEND_DECLINE'
-  | 'REQUIRE_ADDITIONAL_REVIEW';
 
 export const RiskManagerDeskPage: React.FC = () => {
   const { persona } = useAuth();
@@ -35,11 +27,9 @@ export const RiskManagerDeskPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Supervisory Review Action Modal
-  const [selectedCase, setSelectedCase] = useState<QueueItem | null>(null);
-  const [actionType, setActionType] = useState<RiskManagerActionType | null>(null);
-  const [actionNotes, setActionNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // HumanReviewModal state — one selected case + initial action
+  const [reviewJourneyId, setReviewJourneyId] = useState<string | null>(null);
+  const [reviewInitialAction, setReviewInitialAction] = useState<HumanReviewAction>('APPROVE');
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -69,78 +59,15 @@ export const RiskManagerDeskPage: React.FC = () => {
     setSearchParams({ tab: tabKey });
   };
 
-  const handleOpenAction = (caseItem: QueueItem, act: RiskManagerActionType) => {
-    setSelectedCase(caseItem);
-    setActionType(act);
-    setActionNotes('');
+  const handleOpenReview = (caseItem: QueueItem, action: HumanReviewAction) => {
+    setReviewJourneyId(caseItem.journey_id);
+    setReviewInitialAction(action);
   };
 
-  const handleExecuteAction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCase || !actionType) return;
-    setIsSubmitting(true);
-    try {
-      const ensureReviewId = async (jId: string): Promise<string> => {
-        const existing = reviews.find((r) => r.journeyId === jId || r.applicationId === selectedCase?.application_id);
-        if (existing?.reviewId) return existing.reviewId;
-        const created = await reviewApi.startReview(jId, 'Supervisory review initiated by Risk Manager');
-        return created.reviewId;
-      };
-
-      if (actionType === 'CONFIRM') {
-        const revId = await ensureReviewId(selectedCase.journey_id);
-        await reviewApi.submitReview(selectedCase.journey_id, revId, {
-          human_outcome: 'APPROVED',
-          reason_code: 'SUPERVISORY_SANCTION_CONFIRMED',
-          rationale_notes: actionNotes || 'Second-Line Risk Manager confirmed underwriting recommendation within Tier 2 delegated limits.',
-        });
-        setSuccessToast(`Case ${selectedCase.journey_id} confirmed and ratified.`);
-      } else if (actionType === 'RETURN_FOR_EVIDENCE') {
-        await actionsApi.executeSafeAction(selectedCase.journey_id, {
-          action_type: 'RETURN_FOR_INFORMATION',
-          audit_notes: `Risk Manager returned case for supplementary evidence: ${actionNotes}`,
-          reviewer_role: 'RISK_MANAGER',
-        });
-        setSuccessToast(`Case ${selectedCase.journey_id} returned to underwriter for supplementary evidence.`);
-      } else if (actionType === 'ESCALATE') {
-        await reviewApi.startReview(
-          selectedCase.journey_id,
-          actionNotes || 'Escalated to Credit Sanction Committee (> ₹1 Crore threshold or high-risk exposure).'
-        );
-        setSuccessToast(`Case ${selectedCase.journey_id} escalated to Credit Sanction Committee.`);
-      } else if (actionType === 'RECOMMEND_APPROVAL') {
-        const revId = await ensureReviewId(selectedCase.journey_id);
-        await reviewApi.submitReview(selectedCase.journey_id, revId, {
-          human_outcome: 'APPROVED',
-          reason_code: 'RECOMMEND_COMMITTEE_APPROVAL',
-          rationale_notes: actionNotes || 'Risk Manager formal recommendation for Committee sanction.',
-        });
-        setSuccessToast(`Approval recommendation submitted to Credit Committee.`);
-      } else if (actionType === 'RECOMMEND_DECLINE') {
-        const revId = await ensureReviewId(selectedCase.journey_id);
-        await reviewApi.submitReview(selectedCase.journey_id, revId, {
-          human_outcome: 'REJECTED',
-          reason_code: 'UNACCEPTABLE_SOLVENCY_RISK',
-          rationale_notes: actionNotes || 'Risk Manager formal recommendation to decline facility.',
-        });
-        setSuccessToast(`Decline recommendation registered in governance ledger.`);
-      } else if (actionType === 'REQUIRE_ADDITIONAL_REVIEW') {
-        await actionsApi.executeSafeAction(selectedCase.journey_id, {
-          action_type: 'REQUIRE_ADDITIONAL_REVIEW',
-          audit_notes: `Additional independent review mandated: ${actionNotes}`,
-          reviewer_role: 'RISK_MANAGER',
-        });
-        setSuccessToast(`Additional independent review order logged.`);
-      }
-
-      setActionType(null);
-      setSelectedCase(null);
-      await loadData();
-    } catch (err: any) {
-      alert(`Action error: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleReviewSuccess = (journeyId: string) => {
+    setSuccessToast(`Governance action recorded for case ${journeyId}. All backend states refreshed.`);
+    setReviewJourneyId(null);
+    loadData();
   };
 
   const tabs = [
@@ -211,28 +138,28 @@ export const RiskManagerDeskPage: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Manager Actions (Part 20)',
+      header: 'Manager Actions',
       align: 'right' as const,
       render: (row: QueueItem) => (
         <div className="flex items-center justify-end gap-1.5">
           <Button
             variant="outline"
             size="xs"
-            onClick={() => handleOpenAction(row, 'CONFIRM')}
+            onClick={() => handleOpenReview(row, 'APPROVE')}
           >
-            Confirm
+            Approve
           </Button>
           <Button
             variant="outline"
             size="xs"
-            onClick={() => handleOpenAction(row, 'RETURN_FOR_EVIDENCE')}
+            onClick={() => handleOpenReview(row, 'REQUEST_MORE_INFORMATION')}
           >
             Return
           </Button>
           <Button
             variant="outline"
             size="xs"
-            onClick={() => handleOpenAction(row, 'ESCALATE')}
+            onClick={() => handleOpenReview(row, 'ESCALATE')}
           >
             Escalate
           </Button>
@@ -455,40 +382,15 @@ export const RiskManagerDeskPage: React.FC = () => {
         </div>
       )}
 
-      {/* Action Modal (Confirm, Return, Escalate, Recommend Approval, Recommend Decline, Additional Review) */}
-      {actionType && selectedCase && (
-        <Modal
+      {/* HumanReviewModal — canonical 5-action governance workflow */}
+      {reviewJourneyId && (
+        <HumanReviewModal
           isOpen={true}
-          onClose={() => setActionType(null)}
-          title={`Risk Manager Action: ${actionType.replace(/_/g, ' ')}`}
-          subtitle={`Case: ${selectedCase.business_name} (${selectedCase.journey_id}) · Requested: ₹${(selectedCase.requested_amount / 100000).toFixed(1)}L`}
-          maxWidth="md"
-        >
-          <form onSubmit={handleExecuteAction} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[var(--brand-950)] mb-1">
-                Mandatory Supervisory Rationale / Notes
-              </label>
-              <textarea
-                value={actionNotes}
-                onChange={(e) => setActionNotes(e.target.value)}
-                placeholder="Enter detailed underwriter reasoning for this supervisory action..."
-                rows={4}
-                className="w-full text-xs p-3 rounded-xl border border-[var(--border)]"
-                required
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <Button variant="outline" size="sm" type="button" onClick={() => setActionType(null)}>
-                Cancel
-              </Button>
-              <Button variant="brutal" size="sm" type="submit" isLoading={isSubmitting}>
-                Execute & Log to Ledger
-              </Button>
-            </div>
-          </form>
-        </Modal>
+          onClose={() => setReviewJourneyId(null)}
+          journeyId={reviewJourneyId}
+          initialAction={reviewInitialAction}
+          onSuccess={() => handleReviewSuccess(reviewJourneyId)}
+        />
       )}
     </div>
   );

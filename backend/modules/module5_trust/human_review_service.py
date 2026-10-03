@@ -48,6 +48,11 @@ VALID_HUMAN_OUTCOMES = {
     "REJECTED",
     "ESCALATED",
     "NEEDS_REVIEW",
+    "OVERRIDE",
+    "REQUEST_MORE_INFORMATION",
+    "APPROVE",
+    "DECLINE",
+    "ESCALATE",
 }
 
 
@@ -175,10 +180,27 @@ class HumanReviewService:
                 detail=f"Role '{reviewer_role}' is not authorised to submit human reviews.",
             )
 
-        if human_outcome.upper() not in VALID_HUMAN_OUTCOMES:
+        raw_outcome = human_outcome.upper().strip()
+        outcome_map = {
+            "APPROVE": "APPROVED",
+            "APPROVED": "APPROVED",
+            "DECLINE": "DECLINED",
+            "DECLINED": "DECLINED",
+            "REQUEST_MORE_INFORMATION": "NEEDS_REVIEW",
+            "REQUEST_MORE_INFO": "NEEDS_REVIEW",
+            "NEEDS_REVIEW": "NEEDS_REVIEW",
+            "RETURN": "NEEDS_REVIEW",
+            "ESCALATE": "ESCALATED",
+            "ESCALATED": "ESCALATED",
+            "OVERRIDE": "OVERRIDE",
+            "CONDITIONAL_APPROVAL": "CONDITIONAL_APPROVAL",
+        }
+        human_outcome = outcome_map.get(raw_outcome, raw_outcome)
+
+        if human_outcome not in VALID_HUMAN_OUTCOMES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid outcome '{human_outcome}'. Must be one of {VALID_HUMAN_OUTCOMES}.",
+                detail=f"Invalid outcome '{raw_outcome}'. Must be one of APPROVE, DECLINE, REQUEST_MORE_INFORMATION, OVERRIDE, ESCALATE.",
             )
 
         if not reason_code or not reason_code.strip():
@@ -186,14 +208,14 @@ class HumanReviewService:
                 status_code=400,
                 detail="A structured reason code is mandatory for human review submission.",
             )
-        if not rationale_notes or len(rationale_notes.strip()) < 10:
+        if not rationale_notes or len(rationale_notes.strip()) < 5:
             raise HTTPException(
                 status_code=400,
-                detail="A detailed rationale (minimum 10 characters) is mandatory for human review.",
+                detail="A detailed rationale (minimum 5 characters) is mandatory for human review.",
             )
 
         # Enforce Separation of Duties & Delegated Authority Thresholds
-        is_approval = human_outcome.upper() in {"APPROVED", "CONDITIONAL_APPROVAL"}
+        is_approval = human_outcome in {"APPROVED", "CONDITIONAL_APPROVAL"}
         if is_approval:
             # 1. First-Line Operations cannot sanction credit approvals unilaterally
             if reviewer_role in {"RM", "RM_SUPERVISOR"}:
@@ -201,7 +223,7 @@ class HumanReviewService:
                     status_code=403,
                     detail=(
                         f"Separation of Duties violation: {reviewer_role} is a First-Line role and cannot "
-                        "grant final credit approval. Please submit recommendation as ESCALATED or NEEDS_REVIEW."
+                        "grant final credit approval. Please submit recommendation as ESCALATED or REQUEST_MORE_INFORMATION."
                     ),
                 )
 
@@ -240,20 +262,69 @@ class HumanReviewService:
         ai_decision_id = review_doc.get("aiDecisionId", "")
         model_version = review_doc.get("aiDecisionSnapshot", {}).get("decided_by", "scikit-learn-sme-v3.0")
         now = now_utc_iso()
+        jrn_id = review_doc.get("journeyId") or application_id
 
         # Update review doc — human outcome stored separately from AI decision
         review_doc.update({
-            "humanOutcome": human_outcome.upper(),
+            "humanOutcome": human_outcome,
             "reasonCode": reason_code.strip(),
             "rationaleNotes": rationale_notes.strip(),
             "evidenceReviewed": evidence_reviewed or [],
             "coSignedBy": co_signed_by,
-            "status": "ESCALATED" if human_outcome.upper() == "ESCALATED" else "SUBMITTED",
+            "status": "ESCALATED" if human_outcome == "ESCALATED" else "SUBMITTED",
             "updatedAt": now,
             "submittedAt": now,
         })
 
         db.set("human_reviews", review_id, review_doc)
+
+        # If OVERRIDE or decision-modifying action, also update decisions and journey
+        decisions = db.list("decisions", {"application_id": application_id})
+        if decisions:
+            latest_dec = decisions[-1]
+            if human_outcome == "OVERRIDE":
+                latest_dec["outcome"] = "CONDITIONAL_APPROVAL"
+                if new_approved_amount is not None:
+                    latest_dec["approved_amount"] = new_approved_amount
+                if new_interest_rate is not None:
+                    latest_dec["interest_rate"] = new_interest_rate
+            elif human_outcome in {"APPROVED", "CONDITIONAL_APPROVAL", "DECLINED"}:
+                latest_dec["outcome"] = human_outcome
+            latest_dec["human_review_status"] = "REVIEWED"
+            latest_dec["decided_by"] = f"{reviewer_name} ({reviewer_role})"
+            latest_dec["reasoning"] = f"[{human_outcome} by {reviewer_role} {reviewer_name}]: {rationale_notes.strip()} (Reason: {reason_code})"
+            latest_dec["updated_at"] = now
+            db.set("decisions", latest_dec.get("decision_id"), latest_dec)
+
+        # Update journey state
+        journey = db.get("journeys", jrn_id)
+        if journey:
+            if human_outcome in {"APPROVED", "CONDITIONAL_APPROVAL"}:
+                journey["current_stage"] = "SANCTION_AND_DISBURSAL"
+                journey["status"] = "ACTIVE"
+            elif human_outcome == "DECLINED":
+                journey["status"] = "REJECTED"
+            elif human_outcome == "NEEDS_REVIEW":
+                journey["status"] = "NEEDS_INFO"
+                journey["current_stage"] = "EVIDENCE_COLLECTION"
+            elif human_outcome == "ESCALATED":
+                journey["current_stage"] = "HUMAN_REVIEW"
+                journey["status"] = "ESCALATED"
+            elif human_outcome == "OVERRIDE":
+                journey["current_stage"] = "SANCTION_AND_DISBURSAL"
+                journey["status"] = "ACTIVE"
+            journey["updated_at"] = now
+            db.set("journeys", jrn_id, journey)
+
+        # Also update application status
+        app_doc = db.get("applications", application_id)
+        if app_doc:
+            if human_outcome in {"APPROVED", "CONDITIONAL_APPROVAL", "OVERRIDE"}:
+                app_doc["status"] = "APPROVED" if human_outcome == "APPROVED" else "CONDITIONAL_APPROVAL"
+            elif human_outcome == "DECLINED":
+                app_doc["status"] = "DECLINED"
+            app_doc["updated_at"] = now
+            db.set("applications", application_id, app_doc)
 
         # -- Emit canonical HUMAN_OVERRIDE audit event -------------------------
         AuditLedger.record_event(

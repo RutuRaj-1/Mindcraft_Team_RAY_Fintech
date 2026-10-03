@@ -338,3 +338,227 @@
   .page-container { padding: 16px 12px; }
   .metric-value { font-size: 22px; }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   PART 44 — VISUAL IMPROVEMENT SYSTEM
+   ─────────────────────────────────────────────────────────────*/
+
+/* ── Table Readability ───────────────────────────────────── */
+.fin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.fin-table thead tr {
+  background: var(--surface-subtle);
+}
+
+.fin-table thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.fin-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.fin-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.fin-table tbody tr:hover {
+  background-color: var(--brand-50);
+}
+
+.fin-table tbody td {
+  padding: 11px 14px;
+  vertical-align: middle;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* ── Hover States ────────────────────────────────────────── */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 0 3px rgba(61,165,166,0.18);
+  border-color: var(--brand-400) !important;
+}
+
+.interactive-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.interactive-row:hover {
+  background-color: var(--brand-50);
+}
+.interactive-row:active {
+  background-color: var(--brand-100);
+}
+
+/* ── Status Badges (Dot Variants) ────────────────────────── */
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-dot::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.active::before   { background: var(--fin-green); box-shadow: 0 0 0 3px rgba(14,155,109,0.2); }
+.status-dot.pending::before  { background: var(--fin-amber); box-shadow: 0 0 0 3px rgba(201,138,16,0.2); }
+.status-dot.error::before    { background: var(--fin-coral); box-shadow: 0 0 0 3px rgba(204,75,62,0.2); }
+.status-dot.inactive::before { background: var(--text-muted); }
+.status-dot.review::before   { background: var(--fin-blue); box-shadow: 0 0 0 3px rgba(36,96,220,0.2); }
+.status-dot.escalated::before { background: var(--fin-violet); box-shadow: 0 0 0 3px rgba(106,73,198,0.2); }
+
+/* ── Loading State Ring ──────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(61,165,166,0.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(61,165,166,0); }
+  100% { box-shadow: 0 0 0 0 rgba(61,165,166,0); }
+}
+
+.loading-ring {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+/* ── Card Consistency ────────────────────────────────────── */
+.fin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-xs);
+}
+
+.fin-card-brutal {
+  background: var(--surface);
+  border: 2px solid var(--brand-950);
+  border-radius: 20px;
+  box-shadow: 4px 4px 0px #0A1F20;
+}
+
+.fin-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fin-card-body {
+  padding: 20px;
+}
+
+/* ── Typography Hierarchy ────────────────────────────────── */
+.display-xl { font-family: 'Outfit', sans-serif; font-size: 48px; font-weight: 900; line-height: 1.1; letter-spacing: -0.02em; }
+.display-lg { font-family: 'Outfit', sans-serif; font-size: 36px; font-weight: 800; line-height: 1.15; letter-spacing: -0.015em; }
+.heading-xl { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 800; line-height: 1.2; }
+.heading-lg { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; }
+.heading-md { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; line-height: 1.3; }
+.heading-sm { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.label-lg   { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.label-sm   { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.03em; }
+.mono-val   { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; font-weight: 600; }
+
+/* ── Mobile Behavior ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  .fin-table thead { display: none; }
+  .fin-table, .fin-table tbody, .fin-table tr, .fin-table td {
+    display: block;
+    width: 100%;
+  }
+  .fin-table tbody tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    padding: 4px 0;
+    background: var(--surface);
+  }
+  .fin-table tbody td {
+    padding: 8px 12px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .fin-table tbody td:last-child {
+    border-bottom: none;
+  }
+  .fin-table tbody td::before {
+    content: attr(data-label);
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    min-width: 90px;
+    padding-top: 2px;
+  }
+}
+
+/* ── Focus Rings (Accessibility) ─────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scrollable Containers ───────────────────────────────── */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-y { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Divider with Label ──────────────────────────────────── */
+.divider-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.divider-label::before,
+.divider-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Print Safety ────────────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; color: black; }
+  .fin-card, .fin-card-brutal { box-shadow: none; border: 1px solid #ccc; }
+}
+

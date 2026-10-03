@@ -696,7 +696,30 @@ class DecisionReplayService:
                 "evidenceUsed": []
             }
 
-        return list(events_by_id.values())
+        # Normalize and guarantee Part 38 canonical fields on every event
+        canonical_events: List[Dict[str, Any]] = []
+        for ev in events_by_id.values():
+            actor_val = ev.get("actor") or ev.get("actorId") or "system"
+            role_val = ev.get("role") or ev.get("actorType") or "SYSTEM"
+            event_val = ev.get("event") or ev.get("eventType") or "SYSTEM_EVENT"
+            source_val = ev.get("source") or ev.get("service") or "orchestrator"
+            meta_val = ev.get("metadata") or {
+                "references": ev.get("references", {}),
+                "modelVersion": ev.get("modelVersion"),
+                "stage": ev.get("stage"),
+                "summary": ev.get("payloadSummary"),
+                "input": ev.get("input", {}),
+                "output": ev.get("output", {}),
+            }
+
+            ev["actor"] = actor_val
+            ev["role"] = role_val
+            ev["event"] = event_val
+            ev["source"] = source_val
+            ev["metadata"] = meta_val
+            canonical_events.append(ev)
+
+        return canonical_events
 
     @classmethod
     def _normalize_raw_audit_log(cls, log: Dict[str, Any], application_id: str, journey_id: str) -> Optional[Dict[str, Any]]:

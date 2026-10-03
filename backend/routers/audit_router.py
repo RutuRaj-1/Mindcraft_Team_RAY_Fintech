@@ -185,3 +185,14 @@ def get_override_analytics(
         "byRole": by_role,
         "byReasonCode": by_reason,
     }
+
+
+@router.get("/replay/{journey_id}")
+def get_audit_decision_replay(journey_id: str) -> Dict[str, Any]:
+    """
+    Direct Audit Replay endpoint for independent assurance inspection.
+    Reconstructs chronological decision progression from audit ledger.
+    """
+    from backend.modules.module6_product.decision_replay import DecisionReplayService
+    return DecisionReplayService.replay_decision_state(journey_id)
+

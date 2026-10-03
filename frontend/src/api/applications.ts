@@ -1,5 +1,5 @@
 import { http } from './client';
-import { IntentPayload, IntentSubmitResponse, NormalizedIntent } from '../types';
+import { IntentPayload, IntentSubmitResponse, NormalizedIntent, ApplicationRecord } from '../types';
 
 export const applicationsApi = {
   submitIntent: (intentData: any) =>
@@ -12,5 +12,9 @@ export const applicationsApi = {
     http.post<{ status: string; journey_id: string }>(`/journeys/${journeyId}/intent/update`, updates),
 
   listApplications: () =>
-    http.get<any[]>('/applications'),
+    http.get<ApplicationRecord[]>('/applications'),
+
+  getApplication: (applicationId: string) =>
+    http.get<ApplicationRecord>(`/applications/${applicationId}`),
 };
+

@@ -27,53 +27,53 @@ export function Table<T extends Record<string, any>>({
 }: TableProps<T>) {
   if (isLoading) {
     return (
-      <div className="p-8 text-center text-xs text-[var(--text-muted)] animate-pulse bg-white border border-[var(--border)] rounded-xl">
-        Loading table records...
+      <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface)] border border-[var(--border)] rounded-2xl flex flex-col items-center justify-center gap-3">
+        <div className="w-6 h-6 rounded-full border-2 border-[var(--border)] border-t-[var(--brand-700)] animate-spin" />
+        <span className="font-semibold tracking-wide">Loading records...</span>
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-white border border-[var(--border)] rounded-xl">
-        {emptyMessage}
+      <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface)] border border-[var(--border)] rounded-2xl">
+        <p className="font-medium">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className={`overflow-x-auto rounded-xl border border-[var(--border)] bg-white shadow-xs ${className}`}>
-      <table className="w-full text-left text-xs border-collapse">
-        <thead className="bg-[var(--surface-subtle)] text-[var(--text-muted)] border-b border-[var(--border)]">
+    <div className={`overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs ${className}`}>
+      <table className="fin-table">
+        <thead>
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 style={{ width: col.width }}
-                className={`py-3 px-4 font-bold tracking-tight text-[11px] uppercase ${
+                className={
                   col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
-                }`}
+                }
               >
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--border)]">
+        <tbody>
           {data.map((row, idx) => (
             <tr
               key={idx}
               onClick={() => onRowClick?.(row)}
-              className={`transition-colors ${
-                onRowClick ? 'hover:bg-[var(--surface-subtle)] cursor-pointer' : 'hover:bg-[var(--surface-subtle)]/50'
-              }`}
+              className={onRowClick ? 'interactive-row' : ''}
             >
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`py-3 px-4 text-[var(--text-primary)] ${
+                  data-label={col.header}
+                  className={
                     col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
-                  }`}
+                  }
                 >
                   {col.render ? col.render(row) : String(row[col.key] ?? '')}
                 </td>

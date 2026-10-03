@@ -80,28 +80,34 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
         width="sm"
       >
         <div className="space-y-4">
-          {/* Benchmark Case Picker in Mobile Drawer */}
-          <div className="p-3 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-[var(--brand-700)]" /> Active Demo Case
-            </p>
-            <div className="space-y-1.5">
-              {BENCHMARK_CASES.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveJourneyId(c.id)}
-                  className={`w-full text-left p-2 rounded-lg text-xs font-semibold flex items-center justify-between border transition-all ${
-                    activeJourneyId === c.id
-                      ? 'bg-white border-[var(--brand-950)] text-[var(--brand-950)] font-bold shadow-xs'
-                      : 'bg-transparent border-transparent text-[var(--text-secondary)] hover:bg-white/50'
-                  }`}
-                >
-                  <span>{c.label}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{c.id}</span>
-                </button>
-              ))}
+          {/* Case Picker in Mobile Drawer (Role-aware) */}
+          {role !== 'ADMIN' && role !== 'SYS_ADMIN' && (
+            <div className="p-3 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-[var(--brand-700)]" />
+                {role === 'CUSTOMER' ? 'Active Application' : 'Active Benchmark Case'}
+              </p>
+              <div className="space-y-1.5">
+                {BENCHMARK_CASES.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setActiveJourneyId(c.id);
+                      onClose();
+                    }}
+                    className={`w-full text-left p-2 rounded-lg text-xs font-semibold flex items-center justify-between border transition-all ${
+                      activeJourneyId === c.id
+                        ? 'bg-white border-[var(--brand-950)] text-[var(--brand-950)] font-bold shadow-xs'
+                        : 'bg-transparent border-transparent text-[var(--text-secondary)] hover:bg-white/50'
+                    }`}
+                  >
+                    <span>{c.label}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono">{c.id}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Role-Authorized Navigation Links */}
           <div className="space-y-4">

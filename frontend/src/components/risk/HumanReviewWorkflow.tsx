@@ -30,12 +30,11 @@ const REASON_CODES = [
 ];
 
 const OUTCOMES: { value: HumanReviewOutcome; label: string; color: string; bg: string }[] = [
-  { value: 'APPROVED',             label: 'APPROVE',              color: 'var(--fin-green)',  bg: 'var(--fin-green-bg)' },
-  { value: 'CONDITIONAL_APPROVAL', label: 'CONDITIONAL APPROVAL', color: 'var(--fin-amber)',  bg: 'var(--fin-amber-bg)' },
-  { value: 'ESCALATED',            label: 'ESCALATE',             color: 'var(--fin-violet)', bg: '#f3f0ff' },
-  { value: 'DECLINED',             label: 'DECLINE',              color: 'var(--fin-coral)',  bg: 'var(--fin-coral-bg)' },
-  { value: 'REJECTED',             label: 'REJECT',               color: '#7f1d1d',           bg: '#fef2f2' },
-  { value: 'NEEDS_REVIEW',         label: 'SEND BACK FOR INFO',   color: '#92400e',           bg: '#fffbeb' },
+  { value: 'APPROVED',             label: 'APPROVE',                  color: 'var(--fin-green)',  bg: 'var(--fin-green-bg)' },
+  { value: 'DECLINED',             label: 'DECLINE',                  color: 'var(--fin-coral)',  bg: 'var(--fin-coral-bg)' },
+  { value: 'NEEDS_REVIEW',         label: 'REQUEST MORE INFORMATION', color: '#d97706',           bg: '#fef3c7' },
+  { value: 'CONDITIONAL_APPROVAL', label: 'OVERRIDE',                 color: '#dc2626',           bg: '#fee2e2' },
+  { value: 'ESCALATED',            label: 'ESCALATE',                 color: 'var(--fin-violet)', bg: '#f3f0ff' },
 ];
 
 const outcomeLabel = (o: string) =>
@@ -122,8 +121,16 @@ export const HumanReviewWorkflow: React.FC<HumanReviewWorkflowProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeReview) return;
-    if (!rationale.trim() || rationale.trim().length < 10) {
-      alert('A detailed mandatory rationale (min 10 chars) is required.');
+
+    // When OVERRIDE, require Reason
+    const isOverride = outcome === 'CONDITIONAL_APPROVAL';
+    if (isOverride && !reasonCode.trim()) {
+      alert('A Reason is strictly mandatory when performing an OVERRIDE.');
+      return;
+    }
+
+    if (!rationale.trim() || rationale.trim().length < 5) {
+      alert('A supporting note or rationale (min 5 chars) is required.');
       return;
     }
 
@@ -140,6 +147,16 @@ export const HumanReviewWorkflow: React.FC<HumanReviewWorkflowProps> = ({
       const updated = await api.submitReview(journeyId, activeReview.reviewId, req);
       setActiveReview(updated);
       setReviews(prev => prev.map(r => r.reviewId === updated.reviewId ? updated : r));
+
+      // Refresh all 5 backend states (decision, journey, next action, review state, audit timeline)
+      await Promise.all([
+        api.getDecision(journeyId).catch(() => null),
+        api.getJourney(journeyId).catch(() => null),
+        api.getNextBestActions(journeyId).catch(() => null),
+        api.getJourneyReviews(journeyId).catch(() => []),
+        api.replayDecision(journeyId).catch(() => null),
+      ]);
+
       await load();
       onRefresh();
     } catch (e: any) {

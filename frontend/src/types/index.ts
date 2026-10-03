@@ -55,6 +55,22 @@ export interface JourneyStep {
   notes?: string;
 }
 
+export interface ApplicationRecord {
+  application_id: string;
+  user_id?: string;
+  business_name: string;
+  requested_amount: number;
+  tenor_months?: number;
+  product_type?: string;
+  status: string;
+  current_stage?: string;
+  risk_score?: number;
+  risk_band?: string;
+  decision_outcome?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface JourneyRecord {
   journey_id: string;
   applicant_id: string;
@@ -695,6 +711,13 @@ export interface DecisionReplayEvent {
   input: Record<string, any>;
   output: Record<string, any>;
   evidenceUsed: any[];
+
+  // Canonical Part 38 Fields
+  actor?: string;
+  role?: string;
+  event?: string;
+  source?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface DecisionReplayResponse {

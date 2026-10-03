@@ -25,8 +25,9 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { UserRole, AuthenticatedUser } from '../types';
+import { UserRole, AuthenticatedUser, JourneyRecord, ApplicationRecord } from '../types';
 import {
+  api,
   setActiveRole,
   getActiveRole,
   setStoredToken,
@@ -34,6 +35,35 @@ import {
   clearTokenProvider,
   ROLE_DEMO_TOKEN,
 } from '../api/client';
+
+export function computeRolePermissions(role: UserRole): Record<string, boolean> {
+  const isCust = role === 'CUSTOMER';
+  const isRM = role === 'RM';
+  const isRMSup = role === 'RM_SUPERVISOR';
+  const isRiskOff = role === 'RISK_OFFICER';
+  const isRiskMgr = role === 'RISK_MANAGER';
+  const isApprover = role === 'CREDIT_APPROVER';
+  const isAudit = role === 'AUDIT_OFFICER';
+  const isAdmin = role === 'SYS_ADMIN' || role === 'ADMIN';
+
+  return {
+    canCreateApplication: isCust,
+    canUploadDocuments: isCust || isRM,
+    canViewEvidence: true,
+    canTriggerVerification: isRM || isRiskOff || isRiskMgr,
+    canModifyRiskScore: false,
+    canApproveCredit: isApprover || isRiskMgr,
+    canRejectCredit: isApprover || isRiskOff || isRiskMgr,
+    canOverrideDecision: isRiskOff || isRiskMgr || isApprover,
+    canRequestMoreInfo: isRM || isRiskOff || isRiskMgr,
+    canEscalateCase: isRM || isRMSup || isRiskOff || isRiskMgr,
+    canInspectDecisionReplay: true,
+    canViewAuditFindings: isAudit || isRiskMgr || isApprover || isAdmin,
+    canManageUsers: isAdmin,
+    canViewOtherCustomers: !isCust,
+    canViewInternalRiskNotes: !isCust,
+  };
+}
 import {
   firebaseAuth,
   firestoreDb,
@@ -189,6 +219,14 @@ export interface AuthContextType {
   activeJourneyId: string;
   setActiveJourneyId: (id: string) => void;
 
+  // ── Part 43 Application-Level State ─────────────────────────────────────────
+  selectedApplicationId: string;
+  selectedApplication: ApplicationRecord | null;
+  journey: JourneyRecord | null;
+  permissions: Record<string, boolean>;
+  setSelectedApplicationId: (id: string) => void;
+  refreshAppState: () => Promise<void>;
+
   /** Sign in with email/password (Firebase mode or demo fallback) */
   signInWithEmail: (email: string, password: string) => Promise<void>;
   /** Register new account with email/password */
@@ -207,6 +245,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRoleState] = useState<UserRole>(() => getActiveRole());
   const [loading, setLoading] = useState<boolean>(FIREBASE_ENABLED);
   const [activeJourneyId, setActiveJourneyId] = useState<string>('jrn_priya_001');
+  const [selectedApplicationId, setSelectedApplicationIdState] = useState<string>('app_priya_001');
+  const [selectedApplication, setSelectedApplication] = useState<ApplicationRecord | null>(null);
+  const [journey, setJourney] = useState<JourneyRecord | null>(null);
+
+  const permissions = React.useMemo(() => computeRolePermissions(role), [role]);
+
+  const refreshAppState = useCallback(async () => {
+    try {
+      const [jrn, app] = await Promise.all([
+        api.getJourney(activeJourneyId).catch(() => null),
+        api.getApplication(selectedApplicationId).catch(() => null),
+      ]);
+      if (jrn) setJourney(jrn);
+      if (app) setSelectedApplication(app);
+    } catch (err) {
+      console.warn('Could not refresh application state:', err);
+    }
+  }, [activeJourneyId, selectedApplicationId]);
+
+  useEffect(() => {
+    refreshAppState();
+  }, [refreshAppState]);
+
+  const setSelectedApplicationId = useCallback((id: string) => {
+    setSelectedApplicationIdState(id);
+  }, []);
+
   const [customDemoUser, setCustomDemoUser] = useState<{ name: string; email: string } | null>(() => {
     try {
       const stored = localStorage.getItem('finflow_demo_user');
@@ -388,6 +453,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchRole,
         activeJourneyId,
         setActiveJourneyId,
+        selectedApplicationId,
+        selectedApplication,
+        journey,
+        permissions,
+        setSelectedApplicationId,
+        refreshAppState,
         signInWithEmail,
         signUpWithEmail,
         resetPassword,
@@ -404,3 +475,10 @@ export const useAuth = (): AuthContextType => {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
+
+/**
+ * Clean application-level state hook alias (Part 43)
+ * Provides: authenticated user, role, selected application, journey, permissions, and refreshAppState
+ */
+export const useAppState = useAuth;
+

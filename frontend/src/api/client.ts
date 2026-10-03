@@ -64,6 +64,69 @@ export class ApiError extends Error {
   get isServerError(): boolean {
     return this.statusCode >= 500;
   }
+
+  /**
+   * Sanitized, user-friendly error message compliant with Part 40:
+   * Never exposes raw Python/FastAPI tracebacks or internal exceptions to normal users.
+   */
+  get userMessage(): string {
+    if (this.isTimeout) {
+      return "The request timed out while waiting for the server to respond. Please try again.";
+    }
+    if (this.statusCode === 0) {
+      return "Unable to reach the server. Please check your internet connection and try again.";
+    }
+    switch (this.statusCode) {
+      case 401:
+        return "Your session has expired. Please sign in again.";
+      case 403:
+        return "You do not have permission to access this case.";
+      case 404:
+        return "The requested case or resource could not be found.";
+      case 409:
+        return "This action cannot be performed because the application is in a different journey state.";
+      case 422:
+        return "The submitted information could not be processed. Please check the required fields.";
+      case 429:
+        return "Too many requests. Please wait a moment before trying again.";
+      case 500:
+        return "Something went wrong while processing the request.";
+      case 502:
+        return "The underwriting gateway is temporarily unavailable. Please try again shortly.";
+      case 503:
+        return "Service is temporarily unavailable due to scheduled maintenance. Please retry in a few moments.";
+      default:
+        if (this.statusCode >= 500) {
+          return "Something went wrong while processing the request.";
+        }
+        if (this.message && !this.message.includes('Traceback') && !this.message.includes('{"detail"') && this.message.length < 120) {
+          return this.message;
+        }
+        return "An error occurred while processing your request. Please try again.";
+    }
+  }
+}
+
+/**
+ * Universal error formatter for components, preventing any raw stack traces or internal backend errors from reaching users.
+ */
+export function getUserFriendlyErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.userMessage;
+  }
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (error.name === 'AbortError' || msg.includes('timeout')) {
+      return "The request timed out while waiting for the server to respond. Please try again.";
+    }
+    if (msg.includes('network') || msg.includes('failed to fetch')) {
+      return "Unable to reach the server. Please check your internet connection and try again.";
+    }
+    if (!error.message.includes('Traceback') && error.message.length < 120) {
+      return error.message;
+    }
+  }
+  return "Something went wrong while processing the request.";
 }
 
 // ── Demo-mode Token & Role Helpers ───────────────────────────────────────────

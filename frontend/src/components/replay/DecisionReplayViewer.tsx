@@ -29,12 +29,38 @@ export const DecisionReplayViewer: React.FC<DecisionReplayViewerProps> = ({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1); // 1x, 2x, 4x
   const [activeCategory, setActiveCategory] = useState<EventCategory>('ALL');
+  const [viewMode, setViewMode] = useState<'TIMELINE' | 'STREAM'>('TIMELINE');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [activeInspectorTab, setActiveInspectorTab] = useState<'INPUT' | 'OUTPUT' | 'EVIDENCE' | 'ALL'>('ALL');
 
   const playbackTimerRef = useRef<any>(null);
 
+  // 12 Canonical Milestones according to Part 38 Specification
+  const CANONICAL_MILESTONES = useMemo(() => [
+    { key: 'intent', title: 'Intent Captured', description: 'Borrower credit requirements & vintage parameters registered', eventTypes: ['INTENT_RECEIVED', 'INTENT_CAPTURED'] },
+    { key: 'app', title: 'Application Created', description: 'Orchestrator created formal journey and state machine', eventTypes: ['JOURNEY_CREATED', 'APPLICATION_CREATED'] },
+    { key: 'doc_up', title: 'Document Uploaded', description: 'Financial statements, GST returns, and identity documents uploaded', eventTypes: ['DOCUMENT_UPLOADED'] },
+    { key: 'ocr', title: 'OCR Processed', description: 'Multi-page visual OCR & layout parser extracted verifiable data', eventTypes: ['OCR_COMPLETED', 'OCR_STARTED', 'OCR_PROCESSED'] },
+    { key: 'evidence_gen', title: 'Evidence Generated', description: 'Cryptographic facts anchored to immutable ledger', eventTypes: ['EVIDENCE_CREATED', 'EVIDENCE_GENERATED'] },
+    { key: 'evidence_ver', title: 'Evidence Verified', description: 'Cross-document reconciliations and tax/banking consistency verified', eventTypes: ['EVIDENCE_VERIFIED'] },
+    { key: 'conflict', title: 'Conflict Detected', description: 'Variance checks or cross-application discrepancy flagging', eventTypes: ['INCONSISTENCY_DETECTED', 'CONFLICT_DETECTED'] },
+    { key: 'risk_calc', title: 'Risk Calculated', description: '10 hard policy gates, DSCR cash flow & ML risk scoring evaluated', eventTypes: ['RISK_ASSESSED', 'CASHFLOW_CALCULATED', 'SHAP_GENERATED', 'RISK_CALCULATED'] },
+    { key: 'decision_gen', title: 'Decision Generated', description: 'Explainable credit recommendation synthesized with policy citations', eventTypes: ['DECISION_GENERATED'] },
+    { key: 'human_review', title: 'Human Review', description: 'Credit Officer or Underwriter assigned for governed assessment', eventTypes: ['HUMAN_REVIEW_STARTED', 'HUMAN_REVIEW'] },
+    { key: 'approval_decline', title: 'Approval / Decline / Return', description: 'Underwriter action, institutional override or escalation executed', eventTypes: ['HUMAN_OVERRIDE', 'DECISION_OUTCOME', 'APPROVAL_DECLINE_RETURN', 'HUMAN_DECISION_OVERRIDE'] },
+    { key: 'final_res', title: 'Final Resolution', description: 'Digital sanction letter acceptance or immutable case seal', eventTypes: ['JOURNEY_RESOLVED', 'ACTION_EXECUTED', 'FINAL_RESOLUTION'] },
+  ], []);
+
+  // Map events to milestones
+  const milestoneEventsMap = useMemo(() => {
+    const map = new Map<string, DecisionReplayEvent>();
+    for (const m of CANONICAL_MILESTONES) {
+      const match = timeline.find(ev => m.eventTypes.includes(ev.eventType));
+      if (match) map.set(m.key, match);
+    }
+    return map;
+  }, [timeline, CANONICAL_MILESTONES]);
 
   // Keep selected event synced if data changes
   useEffect(() => {
@@ -404,115 +430,237 @@ export const DecisionReplayViewer: React.FC<DecisionReplayViewerProps> = ({
         {/* ── Left Column (5 cols): Chronological Timeline Stream ── */}
         <div className="lg:col-span-5 space-y-4">
           <div className="card p-4 border border-[var(--border)] bg-white rounded-2xl shadow-xs">
-            {/* Search & Category Filter */}
-            <div className="space-y-3 mb-3">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                <input
-                  type="text"
-                  placeholder="Filter events by keyword, stage, actor..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] focus:bg-white focus:outline-none focus:border-[var(--brand-700)]"
-                />
-              </div>
-
-              {/* Filter Pills */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { id: 'ALL', label: 'All Events' },
-                  { id: 'DOCS_OCR', label: 'Docs & OCR' },
-                  { id: 'RISK_ML', label: 'Risk & ML' },
-                  { id: 'POLICY_DECISION', label: 'Policy & Decision' },
-                  { id: 'GOVERNANCE', label: 'Governance' },
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveCategory(tab.id as EventCategory)}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                      activeCategory === tab.id
-                        ? 'bg-[var(--brand-950)] text-white shadow-xs'
-                        : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:bg-[var(--border)]'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+            {/* View Mode Toggle: 12-Stage Timeline vs Raw Stream */}
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+              <span className="text-xs font-black uppercase tracking-wider text-[var(--brand-950)]">
+                Audit Timeline
+              </span>
+              <div className="flex items-center gap-1 bg-[var(--surface-subtle)] p-1 rounded-xl border border-[var(--border)] text-[10px] font-bold">
+                <button
+                  onClick={() => setViewMode('TIMELINE')}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    viewMode === 'TIMELINE'
+                      ? 'bg-[var(--brand-950)] text-white font-black shadow-xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  12-Stage Flow (↓)
+                </button>
+                <button
+                  onClick={() => setViewMode('STREAM')}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    viewMode === 'STREAM'
+                      ? 'bg-[var(--brand-950)] text-white font-black shadow-xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  Raw Audit Stream
+                </button>
               </div>
             </div>
 
-            {/* Timeline Stream Scrollable Container */}
-            <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
-              {filteredEvents.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[var(--text-muted)]">
-                  No events match the selected filter.
-                </div>
-              ) : (
-                filteredEvents.map((ev, idx) => {
-                  const meta = getEventMeta(ev.eventType);
-                  const isSelected = ev.eventId === selectedEventId;
-                  const Icon = meta.icon;
+            {viewMode === 'TIMELINE' ? (
+              /* ── Canonical 12-Stage Timeline (Part 38) ── */
+              <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+                {CANONICAL_MILESTONES.map((milestone, idx) => {
+                  const ev = milestoneEventsMap.get(milestone.key);
+                  const isSelected = ev && ev.eventId === selectedEventId;
+                  const isLast = idx === CANONICAL_MILESTONES.length - 1;
 
                   return (
-                    <div
-                      key={ev.eventId || idx}
-                      onClick={() => {
-                        setSelectedEventId(ev.eventId);
-                        setIsPlaying(false);
-                      }}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left relative ${
-                        isSelected
-                          ? 'border-[var(--brand-950)] bg-white shadow-[3px_3px_0px_#0A1F20] translate-x-1 ring-1 ring-[var(--brand-950)]'
-                          : 'border-[var(--border)] bg-white hover:border-[var(--brand-400)] hover:bg-[var(--surface-subtle)]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: meta.bg, color: meta.color }}
-                          >
-                            <Icon className="w-3.5 h-3.5" />
+                    <div key={milestone.key} className="space-y-2">
+                      <div
+                        onClick={() => {
+                          if (ev) {
+                            setSelectedEventId(ev.eventId);
+                            setIsPlaying(false);
+                          }
+                        }}
+                        className={`p-3.5 rounded-xl border transition-all text-left relative ${
+                          ev ? 'cursor-pointer' : 'opacity-70 bg-[var(--surface-subtle)] cursor-default'
+                        } ${
+                          isSelected
+                            ? 'border-[var(--brand-950)] bg-white shadow-[3px_3px_0px_#0A1F20] translate-x-1 ring-1 ring-[var(--brand-950)]'
+                            : 'border-[var(--border)] bg-white hover:border-[var(--brand-400)]'
+                        }`}
+                      >
+                        {/* Header: Milestone & Stage Number */}
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-md bg-[var(--brand-950)] text-white flex items-center justify-center font-black text-[10px]">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-black text-[var(--brand-950)] tracking-tight">
+                              {milestone.title}
+                            </span>
                           </div>
-                          <span className="text-xs font-black text-[var(--brand-950)] tracking-tight">
-                            {ev.eventType.replace(/_/g, ' ')}
-                          </span>
+
+                          {ev ? (
+                            <div className="flex items-center gap-1 font-mono text-[10px] text-[var(--text-muted)]">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>{formatTime(ev.timestamp)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--text-muted)] border border-[var(--border)]">
+                              No Audit Record
+                            </span>
+                          )}
                         </div>
 
-                        {/* Clock Badge */}
-                        <div className="flex items-center gap-1 font-mono text-[10px] text-[var(--text-muted)]">
-                          <Clock className="w-2.5 h-2.5" />
-                          <span>{formatTime(ev.timestamp)}</span>
+                        {/* Description or Payload Summary */}
+                        <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium mb-2.5">
+                          {ev ? ev.payloadSummary : milestone.description}
+                        </p>
+
+                        {/* Part 38 Event Attributes: timestamp, actor, role, event, source, metadata */}
+                        {ev && (
+                          <div className="pt-2 border-t border-[var(--border)]/60 grid grid-cols-2 gap-1.5 text-[10px]">
+                            <div>
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Actor & Role:</span>
+                              <span className="font-bold text-[var(--brand-900)] truncate block">
+                                {ev.actor || ev.actorId} ({ev.role || ev.actorType})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Event & Source:</span>
+                              <span className="font-mono text-[var(--brand-800)] truncate block">
+                                {ev.event || ev.eventType} · {ev.source || ev.service}
+                              </span>
+                            </div>
+                            <div className="col-span-2 mt-0.5">
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Metadata:</span>
+                              <div className="text-[9px] font-mono text-[var(--text-muted)] truncate">
+                                {JSON.stringify(ev.metadata || ev.references || { stage: ev.stage })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stylized Down Arrow Between Milestones */}
+                      {!isLast && (
+                        <div className="flex justify-center my-0.5">
+                          <div className="w-5 h-5 rounded-full bg-[var(--surface-subtle)] border border-[var(--border)] flex items-center justify-center text-[var(--brand-800)] shadow-2xs">
+                            <span className="text-xs font-black leading-none">↓</span>
+                          </div>
                         </div>
-                      </div>
-
-                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed line-clamp-2 mb-2 font-medium">
-                        {ev.payloadSummary}
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--text-muted)] border border-[var(--border)] uppercase">
-                          {ev.stage}
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)]">
-                          {ev.actorType}: {ev.actorId}
-                        </span>
-                        {ev.modelVersion && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#166534] border border-[#bbf7d0]">
-                            {ev.modelVersion}
-                          </span>
-                        )}
-                        {ev.eventType === 'INCONSISTENCY_DETECTED' && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border border-[var(--fin-coral)]/30 animate-pulse">
-                            DISCREPANCY
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            ) : (
+              /* ── Raw Audit Stream ── */
+              <div className="space-y-3">
+                {/* Search & Category Filter */}
+                <div className="space-y-2 mb-3">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                    <input
+                      type="text"
+                      placeholder="Filter events by keyword, stage, actor..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] focus:bg-white focus:outline-none focus:border-[var(--brand-700)]"
+                    />
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: 'ALL', label: 'All Events' },
+                      { id: 'DOCS_OCR', label: 'Docs & OCR' },
+                      { id: 'RISK_ML', label: 'Risk & ML' },
+                      { id: 'POLICY_DECISION', label: 'Policy & Decision' },
+                      { id: 'GOVERNANCE', label: 'Governance' },
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveCategory(tab.id as EventCategory)}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                          activeCategory === tab.id
+                            ? 'bg-[var(--brand-950)] text-white shadow-xs'
+                            : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:bg-[var(--border)]'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Timeline Stream Scrollable Container */}
+                <div className="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+                  {filteredEvents.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-[var(--text-muted)]">
+                      No events match the selected filter.
+                    </div>
+                  ) : (
+                    filteredEvents.map((ev, idx) => {
+                      const meta = getEventMeta(ev.eventType);
+                      const isSelected = ev.eventId === selectedEventId;
+                      const Icon = meta.icon;
+
+                      return (
+                        <div
+                          key={ev.eventId || idx}
+                          onClick={() => {
+                            setSelectedEventId(ev.eventId);
+                            setIsPlaying(false);
+                          }}
+                          className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left relative ${
+                            isSelected
+                              ? 'border-[var(--brand-950)] bg-white shadow-[3px_3px_0px_#0A1F20] translate-x-1 ring-1 ring-[var(--brand-950)]'
+                              : 'border-[var(--border)] bg-white hover:border-[var(--brand-400)] hover:bg-[var(--surface-subtle)]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: meta.bg, color: meta.color }}
+                              >
+                                <Icon className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xs font-black text-[var(--brand-950)] tracking-tight">
+                                {ev.eventType.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+
+                            {/* Clock Badge */}
+                            <div className="flex items-center gap-1 font-mono text-[10px] text-[var(--text-muted)]">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>{formatTime(ev.timestamp)}</span>
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed line-clamp-2 mb-2 font-medium">
+                            {ev.payloadSummary}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--text-muted)] border border-[var(--border)] uppercase">
+                              {ev.stage}
+                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)]">
+                              {ev.role || ev.actorType}: {ev.actor || ev.actorId}
+                            </span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--text-secondary)] border border-[var(--border)]">
+                              {ev.source || ev.service}
+                            </span>
+                            {ev.eventType === 'INCONSISTENCY_DETECTED' && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border border-[var(--fin-coral)]/30 animate-pulse">
+                                DISCREPANCY
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -549,24 +697,42 @@ export const DecisionReplayViewer: React.FC<DecisionReplayViewerProps> = ({
                 </div>
               </div>
 
-              {/* Event Metadata Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[var(--surface-subtle)] p-3 rounded-xl border border-[var(--border)] text-[11px]">
+              {/* Event Canonical Fields Strip (Part 38) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 bg-[var(--surface-subtle)] p-3 rounded-xl border border-[var(--border)] text-[11px]">
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-[var(--text-muted)] block">Stage</span>
-                  <span className="font-bold text-[var(--brand-950)]">{selectedEvent.stage}</span>
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Timestamp</span>
+                  <span className="font-mono font-bold text-[var(--brand-950)] text-[10px] truncate block">
+                    {formatTime(selectedEvent.timestamp)}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-[var(--text-muted)] block">Actor Type</span>
-                  <span className="font-bold text-[var(--brand-950)]">{selectedEvent.actorType}</span>
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Actor</span>
+                  <span className="font-bold text-[var(--brand-950)] truncate block" title={selectedEvent.actor || selectedEvent.actorId}>
+                    {selectedEvent.actor || selectedEvent.actorId}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-[var(--text-muted)] block">Service Subsystem</span>
-                  <span className="font-mono font-bold text-[var(--brand-900)] truncate block">{selectedEvent.service}</span>
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Role</span>
+                  <span className="font-bold text-[var(--brand-800)] truncate block">
+                    {selectedEvent.role || selectedEvent.actorType}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-[var(--text-muted)] block">Model / Version</span>
-                  <span className="font-mono font-bold text-[var(--fin-green)] truncate block">
-                    {selectedEvent.modelVersion || 'Deterministic Logic'}
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Event</span>
+                  <span className="font-mono text-[var(--brand-900)] truncate block" title={selectedEvent.event || selectedEvent.eventType}>
+                    {selectedEvent.event || selectedEvent.eventType}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Source</span>
+                  <span className="font-mono font-bold text-[var(--brand-700)] truncate block">
+                    {selectedEvent.source || selectedEvent.service}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold uppercase text-[var(--text-muted)] block">Model / Version</span>
+                  <span className="font-mono text-[var(--fin-green)] truncate block">
+                    {selectedEvent.modelVersion || 'Standard Gate'}
                   </span>
                 </div>
               </div>

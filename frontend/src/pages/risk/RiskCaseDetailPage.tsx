@@ -26,6 +26,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { HumanReviewModal, HumanReviewAction } from '../../components/fintech/HumanReviewModal';
 import {
   ShieldAlert, AlertTriangle, Network, Compass, ShieldCheck, ArrowRight,
   RotateCcw, Scale, CheckCircle2, TrendingUp, Cpu, BookOpen, Clock,
@@ -71,6 +72,10 @@ export const RiskCaseDetailPage: React.FC = () => {
 
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // HumanReviewModal state (canonical 5-outcome governance workflow)
+  const [showHumanReview, setShowHumanReview] = useState(false);
+  const [hrInitialAction, setHrInitialAction] = useState<HumanReviewAction>('APPROVE');
 
   const loadData = async () => {
     setIsLoading(true);
@@ -254,6 +259,16 @@ export const RiskCaseDetailPage: React.FC = () => {
             leftIcon={<Scale className="w-3.5 h-3.5" />}
           >
             Recommend Override
+          </Button>
+
+          {/* Human Review — canonical 5-outcome governance gateway */}
+          <Button
+            variant="primary"
+            size="xs"
+            onClick={() => { setHrInitialAction('APPROVE'); setShowHumanReview(true); }}
+            leftIcon={<CheckSquare className="w-3.5 h-3.5" />}
+          >
+            Human Review
           </Button>
         </div>
       </div>
@@ -720,6 +735,26 @@ export const RiskCaseDetailPage: React.FC = () => {
             </div>
           </form>
         </Modal>
+      )}
+      {/* HumanReviewModal — canonical 5-outcome governance workflow (Part 39) */}
+      {showHumanReview && (
+        <HumanReviewModal
+          isOpen={showHumanReview}
+          onClose={() => setShowHumanReview(false)}
+          journeyId={journeyId}
+          initialAction={hrInitialAction}
+          onSuccess={(refreshed) => {
+            setDecision(refreshed.decision || decision);
+            setJourney(refreshed.journey || journey);
+            setNextAction(refreshed.nextAction || nextAction);
+            setReviews(refreshed.reviewState || reviews);
+            if (refreshed.auditTimeline?.events) {
+              setAuditLogs(refreshed.auditTimeline.events);
+            }
+            setToastMessage('Human review action recorded. Decision, journey, and audit trail refreshed from backend.');
+            setShowHumanReview(false);
+          }}
+        />
       )}
     </div>
   );
