@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from backend.database.models import (
     HumanOverrideRequest, DecisionRecord, NextBestActionsResponse, AuditLog,
-    HumanOverrideRecord
+    HumanOverrideRecord, SafeActionExecutionRequest, SafeActionExecutionResult,
 )
 from backend.auth.firebase_auth import get_current_user, AuthenticatedUser, require_role
 from backend.auth.roles import UserRole
@@ -33,8 +33,42 @@ def submit_human_override(
     )
 
 @router.get("/journeys/{journey_id}/actions", response_model=NextBestActionsResponse)
-def get_next_best_actions(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):
-    return SafeActionAgent.recommend_actions(journey_id)
+def get_next_best_actions(
+    journey_id: str,
+    role: Optional[str] = Query(None, description="Optional role override for simulation or view"),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Retrieve ranked Next Best Actions determined by the NextBestActionService.
+    Considers current stage, missing documents, consistency flags, risk state,
+    decision state, human-review requirement, and actor role.
+    """
+    user_role = role or (user.role.value if hasattr(user.role, "value") else str(user.role))
+    return SafeActionAgent.recommend_actions(journey_id, user_role=user_role)
+
+
+@router.post("/journeys/{journey_id}/actions/execute", response_model=SafeActionExecutionResult)
+def execute_safe_action(
+    journey_id: str,
+    request: SafeActionExecutionRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Execute a safe operational action via SafeActionAgent.
+    Enforces authorization, records audit trail, and strictly prohibits
+    autonomous or irreversible financial disbursals and unverified sanctions.
+    """
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+
+    actor_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    return SafeActionAgent.execute_action(
+        journey_id=journey_id,
+        request=request,
+        actor_id=user.uid,
+        actor_role=actor_role,
+    )
 
 @router.get("/journeys/{journey_id}/audit", response_model=List[AuditLog])
 def get_audit_trail(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):

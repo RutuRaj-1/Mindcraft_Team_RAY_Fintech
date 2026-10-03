@@ -63,6 +63,18 @@ class ActionType(str, Enum):
     CO_SIGN_SANCTION = "CO_SIGN_SANCTION"
     ADD_COLLATERAL = "ADD_COLLATERAL"
 
+    # Candidate actions for Next Best Action Engine
+    UPLOAD_MISSING_DOCUMENT = "upload missing document"
+    REUPLOAD_LOW_CONFIDENCE_DOCUMENT = "re-upload low-confidence document"
+    RESOLVE_INCONSISTENCY = "resolve inconsistency"
+    CONTINUE_ASSESSMENT = "continue assessment"
+    OPEN_EXPLANATION = "open explanation"
+    CONTACT_RELATIONSHIP_MANAGER = "contact relationship manager"
+    SEND_TO_RISK_OFFICER = "send to risk officer"
+    REVIEW_CASE = "review case"
+    ACCEPT_CONFIGURED_NEXT_STEP = "accept configured next step"
+    COMPLETE_JOURNEY = "complete journey"
+
 def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -695,22 +707,102 @@ class DecisionRecord(BaseModel):
         return data
 
 class NextBestActionItem(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
     action_id: str
-    priority: int
+    priority: int = 1
     title: str
     description: str
-    action_type: ActionType
+    action_type: Union[ActionType, str]
     cta_label: str
     safe_guardrail_status: str = "SAFE"
     safety_confidence: float = 0.95
     target_persona: str = "CUSTOMER"
 
+    # Transparent Ranking & Prompt-specified Fields
+    recommendedAction: str = ""
+    reason: str = ""
+    actor: str = "CUSTOMER"
+    requiredInput: str = "None"
+    estimatedImpact: str = ""
+    status: str = "ACTIONABLE"
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_action_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Sync recommendedAction and action_type
+            if not data.get("recommendedAction") and data.get("action_type"):
+                act = data["action_type"]
+                data["recommendedAction"] = act.value if hasattr(act, "value") else str(act)
+            elif not data.get("action_type") and data.get("recommendedAction"):
+                data["action_type"] = data["recommendedAction"]
+
+            # Sync reason and description
+            if not data.get("reason") and data.get("description"):
+                data["reason"] = data["description"]
+            elif not data.get("description") and data.get("reason"):
+                data["description"] = data["reason"]
+
+            # Sync actor and target_persona
+            if not data.get("actor") and data.get("target_persona"):
+                data["actor"] = data["target_persona"]
+            elif not data.get("target_persona") and data.get("actor"):
+                data["target_persona"] = data["actor"]
+        return data
+
 class NextBestActionsResponse(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
     application_id: str
     primary_action: NextBestActionItem
     alternative_actions: List[NextBestActionItem] = []
+
+    # Top-level action fields mirroring recommendedAction
+    recommendedAction: Optional[str] = None
+    reason: Optional[str] = None
+    priority: Optional[int] = None
+    actor: Optional[str] = None
+    requiredInput: Optional[str] = None
+    estimatedImpact: Optional[str] = None
+    status: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_response_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            primary = data.get("primary_action")
+            if isinstance(primary, dict):
+                for f in ["recommendedAction", "reason", "priority", "actor", "requiredInput", "estimatedImpact", "status"]:
+                    if f not in data and f in primary:
+                        data[f] = primary[f]
+            elif hasattr(primary, "recommendedAction"):
+                for f in ["recommendedAction", "reason", "priority", "actor", "requiredInput", "estimatedImpact", "status"]:
+                    if f not in data and hasattr(primary, f):
+                        data[f] = getattr(primary, f)
+        return data
+
+class SafeActionExecutionRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    action_type: str  # CREATE_INTERNAL_TASK, UPDATE_JOURNEY_STAGE, REQUEST_EVIDENCE, ROUTE_TO_REVIEWER, CREATE_NOTIFICATION, RECORD_AUDIT_EVENT
+    target_stage: Optional[str] = None
+    task_details: Optional[Dict[str, Any]] = None
+    evidence_type: Optional[str] = None
+    reviewer_role: Optional[str] = None
+    notification_message: Optional[str] = None
+    audit_notes: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+
+class SafeActionExecutionResult(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    success: bool
+    action_type: str
+    application_id: str
+    actor_id: str
+    actor_role: str
+    timestamp: str
+    guardrail_status: str  # SAFE | BLOCKED_UNSAFE_OPERATION
+    message: str
+    details: Dict[str, Any] = {}
+    audit_event_id: str
 
 class TrustGraphNode(BaseModel):
     model_config = ConfigDict(extra="allow")

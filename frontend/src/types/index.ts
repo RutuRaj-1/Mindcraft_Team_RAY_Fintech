@@ -397,11 +397,19 @@ export interface NextBestActionItem {
   priority: number;
   title: string;
   description: string;
-  action_type: ActionType;
+  action_type: ActionType | string;
   cta_label: string;
   safe_guardrail_status: string;
   safety_confidence: number;
   target_persona?: string;
+
+  // Transparent Ranking & Execution Fields
+  recommendedAction?: string;
+  reason?: string;
+  actor?: string;
+  requiredInput?: string;
+  estimatedImpact?: string;
+  status?: string;
 }
 
 export type NextBestAction = NextBestActionItem;
@@ -410,6 +418,38 @@ export interface NextBestActionsResponse {
   application_id: string;
   primary_action: NextBestActionItem;
   alternative_actions: NextBestActionItem[];
+
+  recommendedAction?: string;
+  reason?: string;
+  priority?: number;
+  actor?: string;
+  requiredInput?: string;
+  estimatedImpact?: string;
+  status?: string;
+}
+
+export interface SafeActionExecutionRequest {
+  action_type: string;
+  target_stage?: string;
+  task_details?: Record<string, any>;
+  evidence_type?: string;
+  reviewer_role?: string;
+  notification_message?: string;
+  audit_notes?: string;
+  details?: Record<string, any>;
+}
+
+export interface SafeActionExecutionResult {
+  success: boolean;
+  action_type: string;
+  application_id: string;
+  actor_id: string;
+  actor_role: string;
+  timestamp: string;
+  guardrail_status: string;
+  message: string;
+  details: Record<string, any>;
+  audit_event_id: string;
 }
 
 export interface TrustGraphNode {

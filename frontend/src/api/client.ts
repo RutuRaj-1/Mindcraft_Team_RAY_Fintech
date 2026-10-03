@@ -15,7 +15,7 @@ import {
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
   TrustGraph, WhatIfRequest, WhatIfResponse, JourneyFrictionMetrics,
   QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
-  EvidenceProvenanceTrace
+  EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -187,8 +187,13 @@ export const api = {
     request<any>(`/journeys/${journeyId}/rag/explain`, { method: 'POST' }),
 
   // Oversight & Actions
-  getNextBestActions: (journeyId: string) =>
-    request<NextBestActionsResponse>(`/journeys/${journeyId}/actions`),
+  getNextBestActions: (journeyId: string, role?: string) =>
+    request<NextBestActionsResponse>(`/journeys/${journeyId}/actions${role ? `?role=${encodeURIComponent(role)}` : ''}`),
+  executeSafeAction: (journeyId: string, req: SafeActionExecutionRequest) =>
+    request<SafeActionExecutionResult>(`/journeys/${journeyId}/actions/execute`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
   submitOverride: (
     journeyId: string,
     overrideData: {
