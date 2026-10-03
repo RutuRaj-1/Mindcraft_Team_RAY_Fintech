@@ -1,37 +1,141 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# ==============================================================================
+# FinFlow AI — Comprehensive Git Ignore Specification
+# ==============================================================================
 
-# Pytest / Cache
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Local Uploads directory contents
-backend/uploads/*
-!backend/uploads/.gitkeep
-
-# Node / Frontend
-node_modules/
-dist/
-dist-ssr/
-*.local
-
-# Environment variables
+# ── 1. Environment & Sensitive Credentials ────────────────────────────────────
+# Never commit real secrets, private keys, or active credentials
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+*.env
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*service-account*.json
+*credentials*.json
+serviceAccountKey.json
 
-# Logs
+# ── 2. Node & JavaScript / TypeScript Dependencies ────────────────────────────
+node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.pnpm-store/
+.npm/
 
-# OS Files
+# Frontend Build & Compilation Outputs
+dist/
+**/dist/
+dist-ssr/
+build/
+**/build/
+out/
+.output/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+vite.config.js.timestamp-*
+
+# ── 3. Python Bytecode & Runtime ──────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Python Virtual Environments
+.venv/
+.venv*/
+venv/
+venv*/
+ENV/
+env/
+env*/
+
+# ── 4. Testing, Code Coverage & Linting ────────────────────────────────────────
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# ── 5. Firebase & Local Emulators ─────────────────────────────────────────────
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+hub-debug.log*
+.firebase/
+
+# ── 6. Local Uploads & Temporary Storage ──────────────────────────────────────
+# Exclude uploaded borrower PDFs & scans, but preserve directory structure
+backend/uploads/*
+!backend/uploads/.gitkeep
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ── 7. Operating System Artifacts ─────────────────────────────────────────────
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
 [Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Linux
+*~
+.directory
+
+# ── 8. IDE & Code Editor Artifacts ────────────────────────────────────────────
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*.swn
+.project
+.settings/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
