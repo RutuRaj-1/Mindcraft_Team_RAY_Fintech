@@ -1,108 +1,215 @@
-import numpy as np
+"""
+MLRiskModel v3 — Scikit-Learn GradientBoosting Risk Classifier
+===============================================================
+Architecture:
+  - GradientBoostingClassifier (n=200, depth=4) for stable PD curves
+  - 15-feature vector from RiskFeatureEngineer
+  - Trained on 800-sample synthetic SME dataset with realistic defaults
+  - Probability of Default (PD) output in [0, 1]
+  - FinFlow Trust Score mapped from PD: score = round((1 - PD) * 1000)
+  - Risk bands: LOW (<18% PD), MEDIUM (18–38%), HIGH (>38%)
+  - Model version string stored on every RiskAssessment
+  - Singleton pattern ensures one model instance per process
+
+Reproducibility:
+  - numpy.random.seed(42) for synthetic data generation
+  - sklearn random_state=42 for training
+  - Same feature vector always produces same PD
+"""
+
 import logging
-from typing import Dict, Any, Tuple
-from sklearn.ensemble import RandomForestClassifier
+import hashlib
+import json
+from datetime import datetime, timezone
+from typing import Dict, Tuple
+
+import numpy as np
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
 from backend.database.models import RiskBand
+from backend.modules.module4_decision.risk_feature_engineer import (
+    FEATURE_NAMES,
+    FEATURE_DEFAULTS,
+    FEATURE_DISPLAY,
+)
 
 logger = logging.getLogger(__name__)
 
-FEATURE_NAMES = [
-    "vintage_months",
-    "annual_turnover",
-    "dscr",
-    "buffer_days",
-    "bounces_6m",
-    "volatility_index",
-    "profit_margin"
-]
+MODEL_VERSION = "scikit-learn-gbm-sme-v3.0"
 
-FEATURE_DISPLAY_NAMES = {
-    "vintage_months": "Operational Vintage (Months)",
-    "annual_turnover": "Annual Sales Turnover (₹)",
-    "dscr": "Debt Service Coverage Ratio (DSCR)",
-    "buffer_days": "Working Capital Buffer (Days)",
-    "bounces_6m": "Inward Cheque Bounces (6M)",
-    "volatility_index": "Cash Flow Volatility",
-    "profit_margin": "Net Profit Margin (%)"
-}
+# PD thresholds for band assignment
+PD_LOW_MAX    = 0.18   # < 18% PD → LOW_RISK
+PD_MEDIUM_MAX = 0.38   # 18–38% PD → MEDIUM_RISK
+                       # > 38% PD → HIGH_RISK
+
 
 class MLRiskModel:
-    _instance = None
+    """
+    Singleton ML risk model.  Call MLRiskModel.get_instance() to access.
 
-    def __init__(self):
-        self.model = RandomForestClassifier(n_estimators=60, random_state=42, max_depth=5)
+    Exposes:
+        predict_risk(feature_dict)   → (pd, trust_score, risk_band, x_vector)
+        model_signature()            → sha256 of training data seed string
+    """
+    _instance: "MLRiskModel | None" = None
+
+    def __init__(self) -> None:
         self.feature_names = FEATURE_NAMES
-        self._train_synthetic_base_model()
+        self.model_version = MODEL_VERSION
+        self._pipeline: Pipeline = self._build_and_train()
+        self._trained_at = datetime.now(timezone.utc).isoformat()
+        logger.info("FinFlow ML Risk Model %s trained successfully.", MODEL_VERSION)
 
+    # ── Singleton access ─────────────────────────────────────────────────────
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls) -> "MLRiskModel":
         if cls._instance is None:
             cls._instance = MLRiskModel()
         return cls._instance
 
-    def _train_synthetic_base_model(self):
-        """Trains an initial calibrated model on synthetic SME historical loan outcomes."""
+    @classmethod
+    def reset_instance(cls) -> None:
+        """For testing — force a fresh model next call."""
+        cls._instance = None
+
+    # ── Model architecture ───────────────────────────────────────────────────
+    def _build_and_train(self) -> Pipeline:
+        X, y = self._generate_synthetic_training_data()
+        pipeline = Pipeline([
+            ("scaler", StandardScaler()),
+            ("clf", GradientBoostingClassifier(
+                n_estimators=200,
+                max_depth=4,
+                learning_rate=0.08,
+                subsample=0.85,
+                random_state=42,
+                min_samples_split=10,
+            )),
+        ])
+        pipeline.fit(X, y)
+        return pipeline
+
+    def _generate_synthetic_training_data(self):
+        """
+        800-sample synthetic SME dataset.
+        Ground-truth default label derived from a calibrated logistic formula
+        that respects realistic MSME credit dynamics:
+          - Long vintage + high DSCR → very low PD
+          - High bounces + low surplus → high PD
+          - High exposure ratio → moderate PD uplift
+        """
         np.random.seed(42)
-        n_samples = 300
+        n = 800
 
-        # Features
-        vintages = np.random.uniform(12, 120, n_samples)
-        turnovers = np.random.uniform(2000000, 50000000, n_samples)
-        dscrs = np.random.uniform(0.8, 3.5, n_samples)
-        buffers = np.random.uniform(5, 75, n_samples)
-        bounces = np.random.choice([0, 0, 0, 1, 1, 2, 3, 4], n_samples)
-        volatilities = np.random.uniform(0.05, 0.65, n_samples)
-        margins = np.random.uniform(0.04, 0.28, n_samples)
+        # Feature sampling ranges (realistic Indian SME distributions)
+        annual_turnover        = np.random.uniform(1_500_000,  60_000_000, n)
+        monthly_inflow         = annual_turnover / 12 * np.random.uniform(0.85, 1.15, n)
+        revenue_consistency    = np.random.uniform(0.40, 0.98, n)
+        dscr                   = np.random.uniform(0.60, 4.00, n)
+        net_monthly_surplus    = monthly_inflow * np.random.uniform(-0.05, 0.35, n)
+        operating_margin       = net_monthly_surplus / np.maximum(monthly_inflow, 1.0)
+        surplus_after_obl      = net_monthly_surplus * np.random.uniform(0.50, 0.95, n)
+        debt_burden_pct        = np.random.uniform(5.0, 70.0, n)
+        existing_emi           = monthly_inflow * np.random.uniform(0.0, 0.35, n)
+        exposure_ratio         = np.random.uniform(0.05, 1.20, n)
+        buffer_days            = np.random.uniform(3.0,  90.0, n)
+        volatility_index       = np.random.uniform(0.02, 0.65, n)
+        cheque_bounces         = np.random.choice([0, 0, 0, 0, 1, 1, 2, 3, 4, 5], n)
+        vintage_months         = np.random.uniform(6.0, 144.0, n)
+        avg_doc_confidence     = np.random.uniform(0.45, 0.99, n)
 
-        X = np.column_stack([vintages, turnovers, dscrs, buffers, bounces, volatilities, margins])
+        X = np.column_stack([
+            annual_turnover,
+            monthly_inflow,
+            revenue_consistency,
+            dscr,
+            net_monthly_surplus,
+            operating_margin,
+            surplus_after_obl,
+            debt_burden_pct,
+            existing_emi,
+            exposure_ratio,
+            buffer_days,
+            volatility_index,
+            cheque_bounces,
+            vintage_months,
+            avg_doc_confidence,
+        ])
 
-        # Deterministic ground truth default probability formula
+        # Ground-truth log-odds from domain expertise:
         log_odds = (
-            - 0.03 * (vintages - 24)
-            - 0.00000008 * turnovers
-            - 1.8 * (dscrs - 1.25)
-            - 0.04 * (buffers - 15)
-            + 1.2 * bounces
-            + 2.5 * volatilities
-            - 4.0 * margins
+            -0.025  * (vintage_months - 24)
+            -0.00000004 * annual_turnover
+            -2.00   * (dscr - 1.25)
+            -0.035  * (buffer_days - 15)
+            +1.50   * cheque_bounces
+            +2.80   * volatility_index
+            -3.00   * revenue_consistency
+            -4.00   * operating_margin
+            +0.80   * exposure_ratio
+            +0.03   * debt_burden_pct
+            -0.20   * avg_doc_confidence
         )
         probs = 1.0 / (1.0 + np.exp(-log_odds))
-        y = (probs > 0.45).astype(int)
+        y = (probs > 0.42).astype(int)
 
-        self.model.fit(X, y)
-        logger.info("FinFlow Scikit-Learn Risk Model trained successfully on SME baseline dataset.")
+        logger.debug(
+            "Synthetic training data: %d samples, default rate=%.1f%%",
+            n, y.mean() * 100,
+        )
+        return X, y
 
-    def predict_risk(self, feature_dict: Dict[str, float]) -> Tuple[float, int, RiskBand, np.ndarray]:
+    # ── Prediction ────────────────────────────────────────────────────────────
+    def predict_risk(
+        self,
+        feature_dict: Dict[str, float],
+    ) -> Tuple[float, int, RiskBand, np.ndarray]:
         """
+        Args:
+            feature_dict: from RiskFeatureEngineer.build_feature_vector()
+
         Returns:
-            probability_of_default: float (0.0 to 1.0)
-            trust_score: int (0 to 1000)
-            risk_band: RiskBand
-            feature_vector: np.ndarray
+            pd:           probability of default [0.0, 1.0]
+            trust_score:  FinFlow Trust Score [50, 950]
+            risk_band:    LOW_RISK | MEDIUM_RISK | HIGH_RISK
+            x_vector:     numpy array in feature-name order (for SHAP)
         """
-        x_vector = np.array([[
-            feature_dict.get("vintage_months", 36.0),
-            feature_dict.get("annual_turnover", 10000000.0),
-            feature_dict.get("dscr", 1.5),
-            feature_dict.get("buffer_days", 30.0),
-            feature_dict.get("bounces_6m", 0.0),
-            feature_dict.get("volatility_index", 0.15),
-            feature_dict.get("profit_margin", 0.12)
-        ]])
+        x_row = [
+            feature_dict.get(name, FEATURE_DEFAULTS[name])
+            for name in FEATURE_NAMES
+        ]
+        x_vector = np.array([x_row])
 
-        probs = self.model.predict_proba(x_vector)[0]
-        # probability of default is class 1
-        pd = float(probs[1]) if len(probs) > 1 else 0.1
+        proba = self._pipeline.predict_proba(x_vector)[0]
+        # index 1 = positive class (default)
+        pd_val = float(proba[1]) if len(proba) > 1 else float(proba[0])
+        pd_val = max(0.01, min(0.99, pd_val))  # keep away from hard boundaries
 
-        # FinFlow Trust Score 0 - 1000 (higher is better credit quality)
-        trust_score = int(round((1.0 - pd) * 1000))
+        trust_score = int(round((1.0 - pd_val) * 1000))
         trust_score = max(50, min(950, trust_score))
 
-        if pd < 0.18:
+        if pd_val < PD_LOW_MAX:
             band = RiskBand.LOW_RISK
-        elif pd < 0.38:
+        elif pd_val < PD_MEDIUM_MAX:
             band = RiskBand.MEDIUM_RISK
         else:
             band = RiskBand.HIGH_RISK
 
-        return pd, trust_score, band, x_vector
+        return pd_val, trust_score, band, x_vector
+
+    # ── Model metadata ────────────────────────────────────────────────────────
+    def model_signature(self) -> str:
+        """Deterministic hash of model config for audit trail."""
+        config_str = json.dumps({
+            "version": MODEL_VERSION,
+            "n_features": len(FEATURE_NAMES),
+            "features": FEATURE_NAMES,
+            "seed": 42,
+        }, sort_keys=True)
+        return hashlib.sha256(config_str.encode()).hexdigest()[:16]
+
+
+# ── Re-export for backward compat ────────────────────────────────────────────
+FEATURE_DISPLAY_NAMES = FEATURE_DISPLAY

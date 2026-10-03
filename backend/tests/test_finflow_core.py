@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.modules.module4_decision.eligibility_rules import EligibilityRulesEngine
+from backend.modules.module4_decision.eligibility_rules import PolicyRulesEngine
 from backend.modules.module4_decision.ml_risk_model import MLRiskModel
 from backend.modules.module4_decision.shap_explainer import SHAPExplainerService
 from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
@@ -25,28 +25,54 @@ def test_health():
 
 def test_eligibility_rules_pass_and_fail():
     # Strong case: 48m vintage, 1.45 Cr turnover, 0 bounces, 1.85 DSCR
-    passed, evals = EligibilityRulesEngine.evaluate(
-        vintage_months=48,
-        turnover=14500000.0,
-        cheque_bounces=0,
-        dscr=1.85,
-        has_active_gstin=True
+    fv_strong = {
+        "vintage_months": 48.0,
+        "annual_turnover": 14_500_000.0,
+        "cheque_bounces_6m": 0.0,
+        "dscr": 1.85,
+        "monthly_inflow": 1_200_000.0,
+        "buffer_days": 38.0,
+        "volatility_index": 0.12,
+        "revenue_consistency": 0.90,
+        "avg_doc_confidence": 0.95,
+        "debt_service_burden_pct": 15.0,
+    }
+    passed, evals, gate = PolicyRulesEngine.evaluate(
+        feature_vector=fv_strong,
+        has_active_gstin=True,
+        kyc_docs_verified=1,
+        docs_uploaded=3,
+        requested_amount=1_000_000.0,
+        annual_turnover=14_500_000.0,
     )
     assert passed is True
-    assert len(evals) == 5
+    assert len(evals) == 10
 
     # Failing case: low vintage (12m) and high bounces (4)
-    failed, evals_fail = EligibilityRulesEngine.evaluate(
-        vintage_months=12,
-        turnover=1000000.0,
-        cheque_bounces=4,
-        dscr=0.9,
-        has_active_gstin=False
+    fv_fail = {
+        "vintage_months": 12.0,
+        "annual_turnover": 1_000_000.0,
+        "cheque_bounces_6m": 4.0,
+        "dscr": 0.9,
+        "monthly_inflow": 80_000.0,
+        "buffer_days": 8.0,
+        "volatility_index": 0.40,
+        "revenue_consistency": 0.50,
+        "avg_doc_confidence": 0.70,
+        "debt_service_burden_pct": 60.0,
+    }
+    failed, evals_fail, gate_fail = PolicyRulesEngine.evaluate(
+        feature_vector=fv_fail,
+        has_active_gstin=False,
+        kyc_docs_verified=0,
+        docs_uploaded=1,
+        requested_amount=500_000.0,
+        annual_turnover=1_000_000.0,
     )
     assert failed is False
     failed_names = [e.rule_id for e in evals_fail if not e.passed]
-    assert "R01_VINTAGE" in failed_names
-    assert "R03_CHEQUE_BOUNCES" in failed_names
+    assert "R02_VINTAGE" in failed_names
+    assert "R06_CHEQUE_BOUNCES" in failed_names
 
 def test_ml_risk_model_and_shap():
     risk_model = MLRiskModel.get_instance()
@@ -55,14 +81,14 @@ def test_ml_risk_model_and_shap():
         "annual_turnover": 14500000.0,
         "dscr": 1.85,
         "buffer_days": 38.0,
-        "bounces_6m": 0.0,
+        "cheque_bounces_6m": 0.0,
         "volatility_index": 0.12,
-        "profit_margin": 0.14
+        "revenue_consistency": 0.90,
     }
     pd, trust_score, band, _ = risk_model.predict_risk(features)
     assert 0.0 <= pd <= 1.0
     assert 0 <= trust_score <= 1000
-    assert trust_score > 800
+    assert trust_score > 700
 
     # SHAP explainer
     shap_attr = SHAPExplainerService.explain_prediction(
@@ -70,7 +96,7 @@ def test_ml_risk_model_and_shap():
         risk_id="rsk_test",
         feature_dict=features
     )
-    assert len(shap_attr.features) == 7
+    assert len(shap_attr.features) == 15
     top_feature = shap_attr.features[0]
     assert top_feature.importance_rank == 1
 

@@ -529,16 +529,40 @@ class HardRuleEvaluation(BaseModel):
     failure_reason: Optional[str] = None
     policy_citation: str
 
+class PolicyGateResult(BaseModel):
+    """Summary of deterministic policy gate outcome — the authoritative guard against ML overrides."""
+    model_config = ConfigDict(extra="allow")
+    all_passed: bool
+    failed_rule_ids: List[str] = []
+    failed_rule_names: List[str] = []
+    hard_failure_count: int = 0
+    review_flag_count: int = 0
+    eligibility_status: str  # ELIGIBLE | NOT_ELIGIBLE | NEEDS_REVIEW
+
 class RiskAssessment(BaseModel):
     model_config = ConfigDict(extra="allow")
     risk_id: str
     application_id: str
+
+    # ── Policy Gate (deterministic — always evaluated first) ──────────────────
     all_hard_rules_passed: bool
     hard_rules: List[HardRuleEvaluation] = []
+    policy_gate: Optional[PolicyGateResult] = None
+
+    # ── Feature Engineering ───────────────────────────────────────────────────
+    feature_vector: Dict[str, float] = {}      # full engineered feature dict
+    feature_names: List[str] = []              # ordered list of feature names
+
+    # ── ML Model Output ───────────────────────────────────────────────────────
     probability_of_default: float = Field(..., ge=0.0, le=1.0)
     risk_score: int = Field(..., ge=0, le=1000)
     risk_band: RiskBand
-    model_version: str = "scikit-learn-sme-v2.1"
+    model_version: str = "scikit-learn-sme-v3.0"
+
+    # ── Decision Matrix Output ────────────────────────────────────────────────
+    decision_rationale: str = ""               # human-readable chain of reasoning
+    override_blocked: bool = False             # True if ML tried to approve but hard rule prevented it
+
     calculated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SHAPFeatureImpact(BaseModel):
