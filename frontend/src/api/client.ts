@@ -176,6 +176,14 @@ export const api = {
   replayDecision: (journeyId: string) =>
     request<Record<string, unknown>>(`/journeys/${journeyId}/replay`),
 
+  // Policy & RAG System
+  searchPolicies: (query: string, category?: string, limit: number = 4) =>
+    request<any[]>(`/policies/search?q=${encodeURIComponent(query)}${category ? `&category=${encodeURIComponent(category)}` : ''}&limit=${limit}`),
+  ingestPolicy: (payload: any) =>
+    request<any>('/admin/policies/ingest', { method: 'POST', body: JSON.stringify(payload) }),
+  getRAGExplanation: (journeyId: string) =>
+    request<any>(`/journeys/${journeyId}/rag/explain`, { method: 'POST' }),
+
   // Oversight & Actions
   getNextBestActions: (journeyId: string) =>
     request<NextBestActionsResponse>(`/journeys/${journeyId}/actions`),

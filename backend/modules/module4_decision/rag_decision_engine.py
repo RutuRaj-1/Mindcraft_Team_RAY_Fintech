@@ -44,6 +44,25 @@ CREDIT_POLICY_CORPUS = [
 class RAGDecisionEngine:
     @staticmethod
     def retrieve_relevant_policies(query_context: str) -> List[PolicyCitation]:
+        try:
+            from backend.modules.rag.retriever import Retriever
+            from backend.modules.rag.policy_ingestion import PolicyIngestionService
+            PolicyIngestionService.seed_default_policies()
+            passages = Retriever.retrieve(query_context, top_k=3)
+            if passages:
+                return [
+                    PolicyCitation(
+                        clause_id=p.policy_reference,
+                        title=p.section,
+                        excerpt=p.text,
+                        relevance_score=p.score,
+                    )
+                    for p in passages
+                ]
+        except Exception:
+            pass
+
+        # Static fallback if RAG index unavailable
         citations = []
         tokens = query_context.lower().split()
 
@@ -65,7 +84,6 @@ class RAGDecisionEngine:
                     relevance_score=relevance
                 ))
 
-        # Sort by relevance
         citations.sort(key=lambda x: x.relevance_score, reverse=True)
         return citations[:3]
 

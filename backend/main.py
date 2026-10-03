@@ -11,13 +11,16 @@ from backend.routers import (
     risk_decision_router,
     governance_router,
     demo_router,
-    intent_router
+    intent_router,
+    policy_rag_router,
 )
+from backend.modules.rag import PolicyIngestionService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Seed demo benchmark data for zero-config hackathon execution
+    # Startup: Seed demo benchmark data & institutional credit policies
     demo_router.seed_demo_data()
+    PolicyIngestionService.seed_default_policies()
     yield
 
 app = FastAPI(
@@ -48,6 +51,7 @@ app.include_router(risk_decision_router.router)
 app.include_router(governance_router.router)
 app.include_router(demo_router.router)
 app.include_router(intent_router.router)
+app.include_router(policy_rag_router.router)
 
 @app.get("/health", tags=["System"])
 def health_check():

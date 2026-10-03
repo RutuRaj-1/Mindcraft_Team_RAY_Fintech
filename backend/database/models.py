@@ -205,24 +205,48 @@ class AuditLogModel(BaseModel):
 # 10. policy_documents
 class PolicyDocumentModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
-    policyId: str = Field(..., alias="policy_id")
+    policyId: Optional[str] = Field(None, alias="policy_id")
+    documentId: Optional[str] = Field(None, alias="document_id")
     title: str
     category: str = "CREDIT_RISK"
     version: str = "2026.1"
     effectiveDate: str = Field(default_factory=now_utc_iso, alias="effective_date")
-    content: str
+    content: str = ""
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.documentId and self.policyId:
+            self.documentId = self.policyId
+        elif not self.policyId and self.documentId:
+            self.policyId = self.documentId
+
 
 # 11. policy_chunks
 class PolicyChunkModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
     chunkId: str = Field(..., alias="chunk_id")
-    policyId: str = Field(..., alias="policy_id")
-    clauseId: str = Field(..., alias="clause_id")
+    policyId: Optional[str] = Field(None, alias="policy_id")
+    documentId: Optional[str] = Field(None, alias="document_id")
+    clauseId: Optional[str] = Field(None, alias="clause_id")
+    section: str = Field("General", alias="section")
     text: str
+    policyReference: str = Field("POL-SME-GEN", alias="policy_reference")
+    effectiveDate: str = Field(default_factory=now_utc_iso, alias="effective_date")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     relevanceKeywords: List[str] = Field(default_factory=list, alias="relevance_keywords")
     embedding: Optional[List[float]] = None
     createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.documentId and self.policyId:
+            self.documentId = self.policyId
+        elif not self.policyId and self.documentId:
+            self.policyId = self.documentId
+        if not self.clauseId and self.policyReference:
+            self.clauseId = self.policyReference
+        elif not self.policyReference and self.clauseId:
+            self.policyReference = self.clauseId
 
 # 12. financial_snapshots
 class FinancialSnapshotModel(BaseModel):
