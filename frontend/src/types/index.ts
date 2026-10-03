@@ -731,3 +731,69 @@ export interface DecisionReplayResponse {
   overrides_applied: any[];
 }
 
+export interface LinkedApplicationInfo {
+  applicationId: string;
+  journeyId?: string;
+  businessName: string;
+  sharedField: string;
+  sharedValue: string;
+  reason: string;
+}
+
+export interface FraudSignal {
+  signalId: string;
+  applicationId: string;
+  journeyId?: string;
+  signalType: "SHARED_BANK_ACCOUNT" | "SHARED_GSTIN" | "SHARED_PHONE" | "REPEATED_DOCUMENT_HASH" | "SHARED_ADDRESS_CONFLICT" | "IDENTITY_CONFLICT" | string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  linkedApplications: LinkedApplicationInfo[];
+  evidenceReferences: string[];
+  explanation: string;
+  status: "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED" | "FALSE_POSITIVE" | string;
+  createdAt: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  resolutionNotes?: string;
+}
+
+export interface JourneyFraudSignalsResponse {
+  journeyId: string;
+  applicationId: string;
+  signals: FraudSignal[];
+  total: number;
+  hasSignals: boolean;
+  summary: string;
+}
+
+export interface FraudNetworkNode {
+  id: string;
+  label: string;
+  type: "APPLICATION" | "BANK_ACCOUNT" | "GSTIN" | "PHONE" | "EMAIL" | "ADDRESS" | "DOCUMENT_HASH" | "DIRECTOR" | "PAN" | string;
+  details: Record<string, any>;
+  isCurrent: boolean;
+  isSuspicious: boolean;
+  linkedCasesCount: number;
+}
+
+export interface FraudNetworkEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  type: string;
+  relationship?: string;
+  isCrossApplication?: boolean;
+  sharedIdentifier?: string;
+}
+
+export interface FraudNetworkResponse {
+  focusApplicationId?: string;
+  focusJourneyId?: string;
+  nodes: FraudNetworkNode[];
+  edges: FraudNetworkEdge[];
+  signals: FraudSignal[];
+  totalApplications: number;
+  totalSharedIdentifiers: number;
+  riskSummary: string;
+}
+

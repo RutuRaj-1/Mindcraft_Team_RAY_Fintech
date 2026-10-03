@@ -12,6 +12,7 @@ from backend.database.firestore_client import db
 from backend.modules.module3_financial.cashflow_engine import CashFlowEngine
 from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
 from backend.modules.module7_trust_intelligence.trust_graph_engine import TrustGraphEngine
+from backend.modules.module7_trust_intelligence.cross_application_intelligence import CrossApplicationIntelligence
 from backend.modules.module5_trust.audit_ledger import AuditLedger
 
 
@@ -71,6 +72,10 @@ def seed_demo_data():
         pan=c1_intent.pan,
         gstin=c1_intent.gstin,
         industry_sector=c1_intent.industry_sector,
+        phone="+91 98201 11223",
+        email="priya@sharmatextiles.in",
+        bank_account="00210200004921",
+        business_address="Plot 42, MIDC Industrial Area, Andheri East, Mumbai, Maharashtra 400093",
         created_at=now
     )
 
@@ -220,6 +225,10 @@ def seed_demo_data():
         pan=c2_intent.pan,
         gstin=c2_intent.gstin,
         industry_sector=c2_intent.industry_sector,
+        phone="+91 98334 55667",
+        email="contact@kavitaelectronics.com",
+        bank_account="50100234891102",
+        business_address="Shop 14, Lamington Road, Grant Road, Mumbai, Maharashtra 400007",
         created_at=now
     )
     db.set("journeys", c2_jrn_id, c2_journey.model_dump())
@@ -309,10 +318,44 @@ def seed_demo_data():
         pan=c3_intent.pan,
         gstin=c3_intent.gstin,
         industry_sector=c3_intent.industry_sector,
+        phone="+91 98765 43210",
+        email="info@apexlogistics.in",
+        bank_account="919010045678912",
+        business_address="Gala 108, Sagar Complex, Bhiwandi, Thane, Maharashtra 421302",
         created_at=now
     )
     db.set("journeys", c3_jrn_id, c3_journey.model_dump())
     db.set("applications", c3_app_id, c3_app.model_dump())
+
+    # Case 3 Documents with verifiable SHA256 hashes
+    doc_c3_bank = DocumentRecord(
+        document_id="doc_c3_bank",
+        application_id=c3_app_id,
+        doc_type=DocumentType.BANK_STATEMENT,
+        file_name="Axis_Bank_Statement_ApexLogistics.pdf",
+        file_url="/uploads/sample_bank_statement.pdf",
+        sha256_hash="c3_bank_hash_919010045678912",
+        status=DocumentStatus.VERIFIED,
+        page_count=8,
+        uploaded_at=now,
+        verified_at=now,
+        extracted_fields_count=5
+    )
+    doc_c3_gst = DocumentRecord(
+        document_id="doc_c3_gst",
+        application_id=c3_app_id,
+        doc_type=DocumentType.GST_RETURN,
+        file_name="GSTR3B_ApexLogistics.pdf",
+        file_url="/uploads/sample_gstr3b.pdf",
+        sha256_hash="c3_gst_hash_27cdefg9012m1z3",
+        status=DocumentStatus.VERIFIED,
+        page_count=3,
+        uploaded_at=now,
+        verified_at=now,
+        extracted_fields_count=4
+    )
+    db.set("documents", "doc_c3_bank", doc_c3_bank.model_dump())
+    db.set("documents", "doc_c3_gst", doc_c3_gst.model_dump())
 
     # Create deliberate discrepancy in evidence
     db.set("evidence_ledger", "evi_c3_gst", {
@@ -324,7 +367,7 @@ def seed_demo_data():
         "confidence": 0.95,
         "page_number": 1,
         "bounding_box": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.04},
-        "sha256_source_hash": "c3_gst_hash",
+        "sha256_source_hash": "c3_gst_hash_27cdefg9012m1z3",
         "extraction_engine": "FinFlow-OCR-v2",
         "timestamp": now.isoformat()
     })
@@ -337,7 +380,7 @@ def seed_demo_data():
         "confidence": 0.95,
         "page_number": 1,
         "bounding_box": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.04},
-        "sha256_source_hash": "c3_bank_hash",
+        "sha256_source_hash": "c3_bank_hash_919010045678912",
         "extraction_engine": "FinFlow-OCR-v2",
         "timestamp": now.isoformat()
     })
@@ -354,7 +397,7 @@ def seed_demo_data():
         interest_rate=14.50,
         tenor_months=24,
         confidence_score=0.82,
-        reasoning="Application for Apex Logistics & Freight Solutions is FLAGGED FOR RISK OFFICER REVIEW. A 37.5% discrepancy was detected between GST declared turnover (₹80 Lakhs) and Bank Statement total credits (₹50 Lakhs). Financial Trust Graph also flagged circular transactions with an affiliated LLP.",
+        reasoning="Application for Apex Logistics & Freight Solutions is FLAGGED FOR RISK OFFICER REVIEW. A 37.5% discrepancy was detected between GST declared turnover (₹80 Lakhs) and Bank Statement total credits (₹50 Lakhs). Cross-application risk intelligence also detected shared bank accounts and recycled documentation with affiliated synthetic entities.",
         policy_citations=[
             PolicyCitation(clause_id="POL-SME-7.1", title="Cross-Document Discrepancy & Anti-Fraud Governance", excerpt="Variance > 15% between GST returns and banking credits triggers mandatory manual underwriter review.", relevance_score=0.96)
         ],
@@ -363,6 +406,181 @@ def seed_demo_data():
         decided_at=now
     )
     db.set("decisions", "dec_c3_003", c3_decision.model_dump())
+
+    # ==========================================
+    # SYNTHETIC APPLICATIONS FOR CROSS-APP RISK INTELLIGENCE
+    # Shared identifiers derived from realistic portfolio data
+    # ==========================================
+    # Synthetic Case 4: SwiftTrans Freightways (shares bank account, phone, address, and doc hash with Apex)
+    c4_jrn_id = "jrn_swifttrans_004"
+    c4_app_id = "app_swifttrans_004"
+    c4_user_id = "usr_swifttrans_004"
+
+    c4_intent = IntentPayload(
+        product_type="sme_working_capital",
+        requested_amount=3500000.0,
+        tenor_months=18,
+        purpose="Procure additional intercity fleet chassis",
+        business_name="SwiftTrans Freightways Pvt Ltd",
+        annual_turnover=7200000.0,
+        vintage_months=28,
+        pan="BCDEF1122K",
+        gstin="27BCDEF1122K1Z8",
+        industry_sector="Logistics & Freight"
+    )
+
+    c4_journey = JourneyRecord(
+        journey_id=c4_jrn_id,
+        applicant_id=c4_user_id,
+        current_stage=JourneyStage.EVIDENCE_COLLECTION,
+        status=JourneyStatus.FLAGGED,
+        intent=c4_intent,
+        application_id=c4_app_id,
+        created_at=now - timedelta(days=2),
+        updated_at=now
+    )
+    c4_app = ApplicationRecord(
+        application_id=c4_app_id,
+        journey_id=c4_jrn_id,
+        user_id=c4_user_id,
+        business_name="SwiftTrans Freightways Pvt Ltd",
+        product_type="sme_working_capital",
+        requested_amount=3500000.0,
+        tenor_months=18,
+        vintage_months=28,
+        annual_turnover=7200000.0,
+        pan="BCDEF1122K",
+        gstin="27BCDEF1122K1Z8",
+        industry_sector="Logistics & Freight",
+        phone="+91 98765 43210", # Shares phone with Apex Logistics
+        email="billing@swifttrans.in",
+        bank_account="919010045678912", # Shares bank account with Apex Logistics
+        business_address="Gala 108, Sagar Complex, Bhiwandi, Thane, Maharashtra 421302", # Shared facility address
+        created_at=now - timedelta(days=2)
+    )
+    db.set("journeys", c4_jrn_id, c4_journey.model_dump())
+    db.set("applications", c4_app_id, c4_app.model_dump())
+
+    doc_c4_bank = DocumentRecord(
+        document_id="doc_c4_bank",
+        application_id=c4_app_id,
+        doc_type=DocumentType.BANK_STATEMENT,
+        file_name="Axis_Bank_Statement_Reused.pdf",
+        file_url="/uploads/sample_bank_statement.pdf",
+        sha256_hash="c3_bank_hash_919010045678912", # Repeated suspicious document hash!
+        status=DocumentStatus.VERIFIED,
+        page_count=8,
+        uploaded_at=now - timedelta(days=2),
+        verified_at=now - timedelta(days=2),
+        extracted_fields_count=4
+    )
+    db.set("documents", "doc_c4_bank", doc_c4_bank.model_dump())
+
+    # Synthetic Case 5: Zenith Cargo Carriers LLP (shares PAN and phone with Apex)
+    c5_jrn_id = "jrn_zenith_005"
+    c5_app_id = "app_zenith_005"
+    c5_user_id = "usr_zenith_005"
+
+    c5_intent = IntentPayload(
+        product_type="sme_working_capital",
+        requested_amount=5000000.0,
+        tenor_months=24,
+        purpose="Working capital for cold storage containers",
+        business_name="Zenith Cargo Carriers LLP",
+        annual_turnover=9500000.0,
+        vintage_months=32,
+        pan="CDEFG9012M",
+        gstin="27CDEFG9012M2Z1",
+        industry_sector="Logistics & Warehousing"
+    )
+
+    c5_journey = JourneyRecord(
+        journey_id=c5_jrn_id,
+        applicant_id=c5_user_id,
+        current_stage=JourneyStage.EVIDENCE_COLLECTION,
+        status=JourneyStatus.FLAGGED,
+        intent=c5_intent,
+        application_id=c5_app_id,
+        created_at=now - timedelta(days=5),
+        updated_at=now
+    )
+    c5_app = ApplicationRecord(
+        application_id=c5_app_id,
+        journey_id=c5_jrn_id,
+        user_id=c5_user_id,
+        business_name="Zenith Cargo Carriers LLP",
+        product_type="sme_working_capital",
+        requested_amount=5000000.0,
+        tenor_months=24,
+        vintage_months=32,
+        annual_turnover=9500000.0,
+        pan="CDEFG9012M", # Same PAN as Apex Logistics under conflicting entity name!
+        gstin="27CDEFG9012M2Z1",
+        industry_sector="Logistics & Warehousing",
+        phone="+91 98765 43210", # Shares phone with Apex Logistics
+        email="ops@zenithcargo.in",
+        bank_account="912020088771122",
+        business_address="Plot 5, Kalamboli Warehousing Zone, Navi Mumbai 410218",
+        created_at=now - timedelta(days=5)
+    )
+    db.set("journeys", c5_jrn_id, c5_journey.model_dump())
+    db.set("applications", c5_app_id, c5_app.model_dump())
+
+    # Synthetic Case 6: Omkar Trading Co (shares GSTIN with Apex Logistics under conflicting trade name)
+    c6_jrn_id = "jrn_omkar_006"
+    c6_app_id = "app_omkar_006"
+    c6_user_id = "usr_omkar_006"
+
+    c6_intent = IntentPayload(
+        product_type="sme_working_capital",
+        requested_amount=2000000.0,
+        tenor_months=12,
+        purpose="Wholesale seasonal grain purchases",
+        business_name="Omkar Multi-Commodity Trading",
+        annual_turnover=4500000.0,
+        vintage_months=18,
+        pan="ABCDE5566Z",
+        gstin="27CDEFG9012M1Z3",
+        industry_sector="Wholesale Trading"
+    )
+
+    c6_journey = JourneyRecord(
+        journey_id=c6_jrn_id,
+        applicant_id=c6_user_id,
+        current_stage=JourneyStage.INTENT_CAPTURE,
+        status=JourneyStatus.FLAGGED,
+        intent=c6_intent,
+        application_id=c6_app_id,
+        created_at=now - timedelta(days=7),
+        updated_at=now
+    )
+    c6_app = ApplicationRecord(
+        application_id=c6_app_id,
+        journey_id=c6_jrn_id,
+        user_id=c6_user_id,
+        business_name="Omkar Multi-Commodity Trading",
+        product_type="sme_working_capital",
+        requested_amount=2000000.0,
+        tenor_months=12,
+        vintage_months=18,
+        annual_turnover=4500000.0,
+        pan="ABCDE5566Z",
+        gstin="27CDEFG9012M1Z3", # Same GSTIN as Apex Logistics under conflicting business name!
+        industry_sector="Wholesale Trading",
+        phone="+91 98112 33445",
+        email="omkar@omkartrading.com",
+        bank_account="003310400019283",
+        business_address="Market Yard, APMC Vashi, Navi Mumbai 400703",
+        created_at=now - timedelta(days=7)
+    )
+    db.set("journeys", c6_jrn_id, c6_journey.model_dump())
+    db.set("applications", c6_app_id, c6_app.model_dump())
+
+    # Populate Cross-Application Risk Signals
+    CrossApplicationIntelligence.get_or_detect_signals(c1_app_id)
+    CrossApplicationIntelligence.get_or_detect_signals(c2_app_id)
+    CrossApplicationIntelligence.get_or_detect_signals(c3_app_id)
+    CrossApplicationIntelligence.get_or_detect_signals(c4_app_id)
 
     # ==========================================
     # Seed Immutable Chronological Decision Replay Audit Trails

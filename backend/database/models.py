@@ -304,14 +304,66 @@ class TrustGraphEdgeModel(BaseModel):
 # 15. fraud_signals
 class FraudSignalModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
-    signalId: str = Field(..., alias="signal_id")
-    applicationId: str = Field(..., alias="application_id")
-    signalType: str = Field(..., alias="signal_type") # CIRCULAR_INVOICE, IDENTITY_MISMATCH, DUPLICATE_GSTIN
+    signalId: str = Field(..., alias="signal_id", serialization_alias="signalId")
+    applicationId: str = Field(..., alias="application_id", serialization_alias="applicationId")
+    journeyId: Optional[str] = Field(None, alias="journey_id", serialization_alias="journeyId")
+    signalType: str = Field(..., alias="signal_type", serialization_alias="signalType") # SHARED_BANK_ACCOUNT, SHARED_GSTIN, SHARED_PHONE, REPEATED_DOCUMENT_HASH, IDENTITY_CONFLICT
     severity: str = "HIGH" # LOW, MEDIUM, HIGH, CRITICAL
-    description: str
-    evidenceIds: List[str] = Field(default_factory=list, alias="evidence_ids")
+    linkedApplications: List[Dict[str, Any]] = Field(default_factory=list, alias="linked_applications", serialization_alias="linkedApplications")
+    evidenceReferences: List[str] = Field(default_factory=list, alias="evidence_references", serialization_alias="evidenceReferences")
+    evidenceIds: List[str] = Field(default_factory=list, alias="evidence_ids", serialization_alias="evidenceIds")
+    explanation: str = Field("Potential linked-case risk detected.")
+    description: str = Field("")
+    status: str = Field("ACTIVE") # ACTIVE, ACKNOWLEDGED, RESOLVED, FALSE_POSITIVE
     details: Dict[str, Any] = Field(default_factory=dict)
-    detectedAt: str = Field(default_factory=now_utc_iso, alias="detected_at")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at", serialization_alias="createdAt")
+    detectedAt: str = Field(default_factory=now_utc_iso, alias="detected_at", serialization_alias="detectedAt")
+    resolvedBy: Optional[str] = Field(None, alias="resolved_by", serialization_alias="resolvedBy")
+    resolvedAt: Optional[str] = Field(None, alias="resolved_at", serialization_alias="resolvedAt")
+    resolutionNotes: Optional[str] = Field(None, alias="resolution_notes", serialization_alias="resolutionNotes")
+
+    @property
+    def signal_id(self) -> str:
+        return self.signalId
+
+    @property
+    def application_id(self) -> str:
+        return self.applicationId
+
+    @property
+    def journey_id(self) -> Optional[str]:
+        return self.journeyId
+
+    @property
+    def signal_type(self) -> str:
+        return self.signalType
+
+    @property
+    def linked_applications(self) -> List[Dict[str, Any]]:
+        return self.linkedApplications
+
+    @property
+    def evidence_references(self) -> List[str]:
+        return self.evidenceReferences
+
+    @property
+    def created_at(self) -> str:
+        return self.createdAt
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.description and self.explanation:
+            self.description = self.explanation
+        elif not self.explanation and self.description:
+            self.explanation = self.description
+        if not self.evidenceReferences and self.evidenceIds:
+            self.evidenceReferences = list(self.evidenceIds)
+        elif not self.evidenceIds and self.evidenceReferences:
+            self.evidenceIds = list(self.evidenceReferences)
+        if not self.detectedAt and self.createdAt:
+            self.detectedAt = self.createdAt
+        elif not self.createdAt and self.detectedAt:
+            self.createdAt = self.detectedAt
+
 
 # 16. what_if_scenarios
 class WhatIfScenarioModel(BaseModel):
@@ -1025,7 +1077,12 @@ class ApplicationRecord(BaseModel):
     pan: Optional[str] = None
     gstin: Optional[str] = None
     industry_sector: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_account: Optional[str] = None
+    business_address: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class JourneyRecord(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -1073,4 +1130,71 @@ class DecisionReplayResponse(BaseModel):
     decision_record: Dict[str, Any] = Field(default_factory=dict)
     overrides_applied: List[Dict[str, Any]] = Field(default_factory=list)
     summary: Dict[str, Any] = Field(default_factory=dict)
+
+class FraudSignalResolutionRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    status: str = Field(..., description="ACKNOWLEDGED, RESOLVED, FALSE_POSITIVE, UNDER_REVIEW")
+    notes: str = Field(..., description="Justification and notes for acknowledging or resolving the signal")
+    officer_name: Optional[str] = Field(None, alias="officer_name", serialization_alias="officerName")
+    officer_id: Optional[str] = Field(None, alias="officer_id", serialization_alias="officerId")
+    officerName: Optional[str] = None
+    officerId: Optional[str] = None
+
+class FraudNetworkNode(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    id: str
+    label: str
+    type: str # APPLICATION, BANK_ACCOUNT, GSTIN, PHONE, EMAIL, ADDRESS, DOCUMENT_HASH, DIRECTOR, PAN
+    details: Dict[str, Any] = Field(default_factory=dict)
+    isCurrent: bool = Field(False, alias="is_current", serialization_alias="isCurrent")
+    isSuspicious: bool = Field(False, alias="is_suspicious", serialization_alias="isSuspicious")
+    linkedCasesCount: int = Field(0, alias="linked_cases_count", serialization_alias="linkedCasesCount")
+
+    @property
+    def is_current(self) -> bool:
+        return self.isCurrent
+
+    @property
+    def is_suspicious(self) -> bool:
+        return self.isSuspicious
+
+    @property
+    def linked_cases_count(self) -> int:
+        return self.linkedCasesCount
+
+class FraudNetworkEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    id: str
+    source: str
+    target: str
+    label: str
+    type: str # USES_ACCOUNT, CLAIMS_GSTIN, CLAIMS_PAN, REUSES_PHONE, OPERATES_AT, SUBMITTED_HASH, LINKED_TO
+    relationship: Optional[str] = None
+    isCrossApplication: bool = Field(False, alias="is_cross_application", serialization_alias="isCrossApplication")
+    sharedIdentifier: Optional[str] = Field(None, alias="shared_identifier", serialization_alias="sharedIdentifier")
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.relationship:
+            self.relationship = self.type
+
+class FraudNetworkResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    focus_application_id: Optional[str] = Field(None, alias="focus_application_id", serialization_alias="focusApplicationId")
+    focus_journey_id: Optional[str] = Field(None, alias="focus_journey_id", serialization_alias="focusJourneyId")
+    nodes: List[FraudNetworkNode]
+    edges: List[FraudNetworkEdge]
+    signals: List[FraudSignalModel]
+    total_applications: int = Field(0, alias="total_applications", serialization_alias="totalApplications")
+    total_shared_identifiers: int = Field(0, alias="total_shared_identifiers", serialization_alias="totalSharedIdentifiers")
+    risk_summary: str = Field("Potential linked-case risk detected.", alias="risk_summary", serialization_alias="riskSummary")
+
+class JourneyFraudSignalsResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    journeyId: str = Field(..., alias="journey_id", serialization_alias="journeyId")
+    applicationId: str = Field(..., alias="application_id", serialization_alias="applicationId")
+    signals: List[FraudSignalModel]
+    total: int
+    hasSignals: bool = Field(False, alias="has_signals", serialization_alias="hasSignals")
+    summary: str = "Potential linked-case risk detected."
+
 

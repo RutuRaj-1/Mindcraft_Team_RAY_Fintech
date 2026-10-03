@@ -16,7 +16,7 @@ import {
   TrustGraph, WhatIfRequest, WhatIfResponse, WhatIfHistoryResponse, JourneyFrictionMetrics,
   QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
   EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
-  DecisionReplayResponse,
+  DecisionReplayResponse, FraudSignal, JourneyFraudSignalsResponse, FraudNetworkResponse,
 } from '../types';
 
 
@@ -221,6 +221,17 @@ export const api = {
     ),
   getPortfolioMetrics: () => request<Record<string, unknown>>('/dashboard/metrics'),
   getLearningStats:    () => request<Record<string, unknown>>('/feedback/learning-stats'),
+
+  // Cross-Application Risk Intelligence & Fraud Signals
+  getFraudSignals: (journeyId: string) =>
+    request<JourneyFraudSignalsResponse>(`/journeys/${journeyId}/fraud-signals`),
+  getFraudNetwork: (focusId?: string) =>
+    request<FraudNetworkResponse>(focusId ? `/fraud/network?focus_id=${encodeURIComponent(focusId)}` : '/fraud/network'),
+  resolveFraudSignal: (signalId: string, status: string, notes: string, officerName?: string) =>
+    request<FraudSignal>(`/fraud/signals/${signalId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, notes, officerName }),
+    }),
 
   // Demo
   seedDemo:    () => request<{ status: string; message: string; cases: unknown[] }>('/demo/seed', { method: 'POST' }),

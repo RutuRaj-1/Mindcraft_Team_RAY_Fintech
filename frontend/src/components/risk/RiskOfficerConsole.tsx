@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { TrustGraphVisual } from './TrustGraphVisual';
 import { DecisionReplayViewer } from '../replay/DecisionReplayViewer';
+import { CrossAppRiskIntelligence } from './CrossAppRiskIntelligence';
 
 
 interface RiskConsoleProps {
@@ -43,17 +44,19 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
   const [overrideNotes,        setOverrideNotes]        = useState<string>('');
   const [coSigner,             setCoSigner]             = useState<string>('Ananya Iyer (Chief Risk Officer)');
   const [isSubmittingOverride, setIsSubmittingOverride] = useState<boolean>(false);
-  const [activeTab,            setActiveTab]            = useState<'consistency' | 'trust_graph' | 'replay'>('consistency');
+  const [activeTab,            setActiveTab]            = useState<'consistency' | 'trust_graph' | 'fraud_signals' | 'replay'>('consistency');
+  const [fraudSignalsCount,    setFraudSignalsCount]    = useState<number>(0);
 
   const fetchRiskData = async () => {
     try {
-      const [rep, grp, dec, rsk, repSnapshot, stats] = await Promise.all([
+      const [rep, grp, dec, rsk, repSnapshot, stats, fraudSignalsRes] = await Promise.all([
         api.getConsistencyReport(journeyId).catch(() => null),
         api.getTrustGraph(journeyId).catch(() => null),
         api.getDecision(journeyId).catch(() => null),
         api.getRiskAssessment(journeyId).catch(() => null),
         api.replayDecision(journeyId).catch(() => null),
         api.getLearningStats().catch(() => null),
+        api.getFraudSignals(journeyId).catch(() => null),
       ]);
       setConsistency(rep);
       setTrustGraph(grp);
@@ -61,6 +64,13 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
       setRiskAssessment(rsk);
       setReplayData(repSnapshot);
       setLearningStats(stats);
+      if (fraudSignalsRes?.signals) {
+        setFraudSignalsCount(fraudSignalsRes.signals.length);
+        // Automatically default to fraud_signals tab if active risk signals exist
+        if (fraudSignalsRes.signals.length > 0 && activeTab === 'consistency') {
+          setActiveTab('fraud_signals');
+        }
+      }
 
       if (dec) {
         setOverrideAmount(dec.approved_amount || 1500000);
@@ -199,18 +209,26 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
       {/* ── Tab Navigation ── */}
       <div className="tab-bar animate-fadeInUp stagger-2">
         {[
-          { id: 'consistency' as const, label: 'Consistency Engine', Icon: FileWarning, color: 'var(--fin-coral)' },
-          { id: 'trust_graph' as const, label: 'Financial Trust Graph', Icon: GitBranch, color: 'var(--fin-violet)' },
-          { id: 'replay' as const, label: 'Decision Replay', Icon: RotateCcw, color: 'var(--brand-700)' },
-        ].map(({ id, label, Icon, color }) => (
+          { id: 'consistency' as const, label: 'Consistency Engine', Icon: FileWarning, color: 'var(--fin-coral)', badge: consistency && !consistency.is_consistent ? consistency.flagged_count : null },
+          { id: 'trust_graph' as const, label: 'Financial Trust Graph', Icon: GitBranch, color: 'var(--fin-violet)', badge: null },
+          { id: 'fraud_signals' as const, label: 'Cross-App Risk Signals', Icon: ShieldAlert, color: 'var(--fin-amber)', badge: fraudSignalsCount > 0 ? fraudSignalsCount : null },
+          { id: 'replay' as const, label: 'Decision Replay', Icon: RotateCcw, color: 'var(--brand-700)', badge: null },
+        ].map(({ id, label, Icon, color, badge }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`tab-item ${activeTab === id ? 'active' : ''}`}
+            className={`tab-item ${activeTab === id ? 'active' : ''} flex items-center gap-1.5`}
             style={activeTab === id ? { color } : {}}
           >
             <Icon className="w-3.5 h-3.5 shrink-0" />
-            {label}
+            <span>{label}</span>
+            {badge !== null && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                id === 'fraud_signals' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
+              }`}>
+                {badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -374,6 +392,17 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
               </div>
             )}
           </div>
+        )}
+
+        {/* Cross-Application Risk Intelligence & Fraud Signals */}
+        {activeTab === 'fraud_signals' && (
+          <CrossAppRiskIntelligence
+            journeyId={journeyId}
+            onRefresh={() => {
+              fetchRiskData();
+              onRefreshJourney();
+            }}
+          />
         )}
       </div>
 
