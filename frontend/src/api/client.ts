@@ -13,7 +13,7 @@ import {
   AuthenticatedUser, UserRole, JourneyRecord, IntentPayload,
   DocumentRecord, EvidenceItem, ConsistencyReport, CashFlowMetrics,
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
-  TrustGraph, WhatIfRequest, WhatIfResponse, JourneyFrictionMetrics,
+  TrustGraph, WhatIfRequest, WhatIfResponse, WhatIfHistoryResponse, JourneyFrictionMetrics,
   QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
   EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
 } from '../types';
@@ -171,10 +171,12 @@ export const api = {
   generateDecision:  (journeyId: string) =>
     request<DecisionRecord>(`/journeys/${journeyId}/decision/generate`, { method: 'POST' }),
   simulateWhatIf:    (journeyId: string, req: WhatIfRequest) =>
-    request<WhatIfResponse>(`/journeys/${journeyId}/simulate`, {
+    request<WhatIfResponse>(`/journeys/${journeyId}/what-if`, {
       method: 'POST',
       body: JSON.stringify(req),
     }),
+  getWhatIfHistory:  (journeyId: string) =>
+    request<WhatIfHistoryResponse>(`/journeys/${journeyId}/what-if`),
   replayDecision: (journeyId: string) =>
     request<Record<string, unknown>>(`/journeys/${journeyId}/replay`),
 

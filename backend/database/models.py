@@ -316,12 +316,87 @@ class FraudSignalModel(BaseModel):
 # 16. what_if_scenarios
 class WhatIfScenarioModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
-    scenarioId: str = Field(..., alias="scenario_id")
-    applicationId: str = Field(..., alias="application_id")
-    requestedInputs: Dict[str, Any] = Field(..., alias="requested_inputs")
-    simulatedOutputs: Dict[str, Any] = Field(..., alias="simulated_outputs")
+    scenarioId: str = Field(default="", description="Unique identifier for the simulated scenario")
+    applicationId: str = Field(default="", description="Associated application identifier")
+    baseApplicationValues: Dict[str, Any] = Field(default_factory=dict, description="Original application values")
+    modifiedValues: Dict[str, Any] = Field(default_factory=dict, description="Changed scenario inputs")
+    calculatedMetrics: Dict[str, Any] = Field(default_factory=dict, description="Calculated affordability metrics")
+    estimatedEMI: float = Field(0.0, description="Transparent reducing-balance monthly EMI")
+    cashFlowBurden: str = Field("MODERATE", description="LOW, MODERATE, HIGH, CRITICAL")
+    riskFeatureChanges: List[Dict[str, Any]] = Field(default_factory=list, description="Feature deltas")
+    riskScore: int = Field(750, description="Simulated FinFlow trust score (0-1000)")
+    riskBand: RiskBand = Field(RiskBand.LOW_RISK, description="Simulated risk band")
+    explanation: str = Field("", description="Narrative explanation of changed inputs and impacts")
+    disclaimer: str = Field(
+        "Hypothetical scenario for affordability analysis only. This does not guarantee credit approval.",
+        description="Mandatory compliance disclaimer",
+    )
+    createdAt: str = Field(default_factory=now_utc_iso)
+    requestedInputs: Dict[str, Any] = Field(default_factory=dict)
+    simulatedOutputs: Dict[str, Any] = Field(default_factory=dict)
     insights: List[str] = Field(default_factory=list)
-    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            mapping = {
+                "scenario_id": "scenarioId",
+                "application_id": "applicationId",
+                "base_application_values": "baseApplicationValues",
+                "modified_values": "modifiedValues",
+                "calculated_metrics": "calculatedMetrics",
+                "estimated_emi": "estimatedEMI",
+                "cash_flow_burden": "cashFlowBurden",
+                "risk_feature_changes": "riskFeatureChanges",
+                "risk_score": "riskScore",
+                "risk_band": "riskBand",
+                "created_at": "createdAt",
+            }
+            for snake, camel in mapping.items():
+                if snake in data and camel not in data:
+                    data[camel] = data[snake]
+        return data
+
+    @property
+    def scenario_id(self) -> str:
+        return self.scenarioId
+
+    @property
+    def application_id(self) -> str:
+        return self.applicationId
+
+    @property
+    def estimated_emi(self) -> float:
+        return self.estimatedEMI
+
+    @property
+    def cash_flow_burden(self) -> str:
+        return self.cashFlowBurden
+
+    @property
+    def risk_score(self) -> int:
+        return self.riskScore
+
+    @property
+    def risk_band(self) -> RiskBand:
+        return self.riskBand
+
+    @property
+    def base_application_values(self) -> Dict[str, Any]:
+        return self.baseApplicationValues
+
+    @property
+    def modified_values(self) -> Dict[str, Any]:
+        return self.modifiedValues
+
+    @property
+    def calculated_metrics(self) -> Dict[str, Any]:
+        return self.calculatedMetrics
+
+    @property
+    def risk_feature_changes(self) -> List[Dict[str, Any]]:
+        return self.riskFeatureChanges
 
 # 17. human_reviews
 class HumanReviewModel(BaseModel):
@@ -866,26 +941,66 @@ class HumanOverrideRecord(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class WhatIfRequest(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    requested_loan_amount: Optional[float] = None
+    loan_tenure: Optional[int] = None
+    estimated_interest_rate: Optional[float] = None
+    declared_revenue_adjustment: Optional[float] = None
+    existing_obligations: Optional[float] = None
+
+    # Backward-compatible fields
     revenue_delta_pct: float = 0.0
     tenor_months: Optional[int] = None
     buffer_days_delta: int = 0
     collateral_offered_amount: float = 0.0
 
-class WhatIfResponse(BaseModel):
-    model_config = ConfigDict(extra="allow")
-    original_dscr: float
-    simulated_dscr: float
-    original_risk_score: int
-    simulated_risk_score: int
-    original_risk_band: RiskBand
-    simulated_risk_band: RiskBand
-    original_approved_amount: float
-    simulated_approved_amount: float
-    original_interest_rate: float
-    simulated_interest_rate: float
-    outcome: DecisionOutcome
-    insights: List[str]
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_inputs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "requestedLoanAmount" in data and "requested_loan_amount" not in data:
+                data["requested_loan_amount"] = data["requestedLoanAmount"]
+            if "loanTenure" in data and "loan_tenure" not in data:
+                data["loan_tenure"] = data["loanTenure"]
+            if "estimatedInterestRate" in data and "estimated_interest_rate" not in data:
+                data["estimated_interest_rate"] = data["estimatedInterestRate"]
+            if "declaredRevenueAdjustment" in data and "declared_revenue_adjustment" not in data:
+                data["declared_revenue_adjustment"] = data["declaredRevenueAdjustment"]
+            if "existingObligations" in data and "existing_obligations" not in data:
+                data["existing_obligations"] = data["existingObligations"]
+        return data
+
+class WhatIfResponse(WhatIfScenarioModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    original_dscr: float = 1.5
+    simulated_dscr: float = 1.5
+    original_risk_score: int = 780
+    simulated_risk_score: int = 780
+    original_risk_band: RiskBand = RiskBand.LOW_RISK
+    simulated_risk_band: RiskBand = RiskBand.LOW_RISK
+    original_approved_amount: float = 1000000.0
+    simulated_approved_amount: float = 1000000.0
+    original_interest_rate: float = 11.5
+    simulated_interest_rate: float = 11.5
+    outcome: DecisionOutcome = DecisionOutcome.APPROVED
+
+class WhatIfHistoryResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    journeyId: str = ""
+    applicationId: str = ""
+    scenarios: List[WhatIfScenarioModel] = Field(default_factory=list)
+    latest: Optional[WhatIfScenarioModel] = None
+    count: int = 0
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_history_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "journey_id" in data and "journeyId" not in data:
+                data["journeyId"] = data["journey_id"]
+            if "application_id" in data and "applicationId" not in data:
+                data["applicationId"] = data["application_id"]
+        return data
 
 class JourneyFrictionMetrics(BaseModel):
     model_config = ConfigDict(extra="allow")

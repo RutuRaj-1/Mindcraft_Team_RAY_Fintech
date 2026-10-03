@@ -481,13 +481,93 @@ export interface TrustGraph {
 }
 
 export interface WhatIfRequest {
-  revenue_delta_pct: number;
+  requestedLoanAmount?: number;
+  requested_loan_amount?: number;
+  loanTenure?: number;
+  loan_tenure?: number;
+  estimatedInterestRate?: number;
+  estimated_interest_rate?: number;
+  declaredRevenueAdjustment?: number;
+  declared_revenue_adjustment?: number;
+  existingObligations?: number;
+  existing_obligations?: number;
+  revenue_delta_pct?: number;
   tenor_months?: number;
-  buffer_days_delta: number;
-  collateral_offered_amount: number;
+  buffer_days_delta?: number;
+  collateral_offered_amount?: number;
+}
+
+export interface RiskFeatureChange {
+  feature: string;
+  label: string;
+  baseValue: number;
+  simulatedValue: number;
+  delta: number;
+  impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  unit: string;
+}
+
+export interface BaseApplicationValues {
+  requestedLoanAmount: number;
+  loanTenure: number;
+  estimatedInterestRate: number;
+  annualTurnover: number;
+  monthlyInflow: number;
+  monthlyOutflow: number;
+  existingObligations: number;
+  estimatedEMI: number;
+  monthlySurplus: number;
+  obligationRatio: number;
+  dscr: number;
+  riskScore: number;
+  riskBand: string;
+}
+
+export interface ModifiedValues {
+  requestedLoanAmount: number;
+  loanTenure: number;
+  estimatedInterestRate: number;
+  declaredRevenueAdjustment: number;
+  annualTurnover: number;
+  monthlyInflow: number;
+  monthlyOutflow: number;
+  existingObligations: number;
+}
+
+export interface CalculatedAffordabilityMetrics {
+  estimatedEMI: number;
+  baseEMI: number;
+  emiDelta: number;
+  monthlySurplus: number;
+  baseSurplus: number;
+  surplusDelta: number;
+  obligationRatio: number;
+  baseObligationRatio: number;
+  obligationRatioDelta: number;
+  dscr: number;
+  baseDscr: number;
+  dscrDelta: number;
+  totalPayable: number;
+  totalInterest: number;
+  cashFlowBurden: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 }
 
 export interface WhatIfResponse {
+  scenarioId: string;
+  applicationId: string;
+  baseApplicationValues: BaseApplicationValues;
+  modifiedValues: ModifiedValues;
+  calculatedMetrics: CalculatedAffordabilityMetrics;
+  estimatedEMI: number;
+  cashFlowBurden: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  riskFeatureChanges: RiskFeatureChange[];
+  riskScore: number;
+  riskBand: RiskBand;
+  explanation: string;
+  disclaimer: string;
+  createdAt: string;
+
+  // Legacy fields
   original_dscr: number;
   simulated_dscr: number;
   original_risk_score: number;
@@ -500,6 +580,14 @@ export interface WhatIfResponse {
   simulated_interest_rate: number;
   outcome: DecisionOutcome;
   insights: string[];
+}
+
+export interface WhatIfHistoryResponse {
+  journeyId: string;
+  applicationId: string;
+  scenarios: WhatIfResponse[];
+  latest?: WhatIfResponse;
+  count: number;
 }
 
 export interface JourneyFrictionMetrics {

@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from backend.database.models import (
     RiskAssessment, SHAPAttribution, DecisionRecord,
-    WhatIfRequest, WhatIfResponse, JourneyStage,
+    WhatIfRequest, WhatIfResponse, WhatIfScenarioModel, WhatIfHistoryResponse, JourneyStage,
 )
 from backend.auth.firebase_auth import get_current_user, AuthenticatedUser
 from backend.modules.module4_decision.risk_orchestrator import RiskOrchestrator
@@ -260,7 +260,55 @@ def evaluate_risk_and_decision(
     return decision
 
 
-# ── POST /simulate ────────────────────────────────────────────────────────────
+# ── POST /what-if ─────────────────────────────────────────────────────────────
+@router.post("/what-if", response_model=WhatIfResponse)
+def run_what_if_simulation(
+    journey_id: str,
+    req: WhatIfRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Run a counterfactual What-If simulation without modifying the original application.
+    Recomputes transparent EMI, monthly surplus, obligation ratio, DSCR, and ML risk band.
+    """
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+    return WhatIfSimulator.simulate(app_id, req)
+
+
+# ── GET /what-if ──────────────────────────────────────────────────────────────
+@router.get("/what-if", response_model=WhatIfHistoryResponse)
+def get_what_if_scenarios(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Retrieve historical What-If scenarios for the journey's application.
+    If no scenarios exist yet, auto-computes a baseline simulation from application facts.
+    """
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+
+    scenarios = WhatIfSimulator.list_scenarios(app_id)
+    if not scenarios:
+        # Generate baseline simulation so client has immediate context
+        baseline_sim = WhatIfSimulator.simulate(app_id, WhatIfRequest())
+        scenarios = [baseline_sim]
+
+    return WhatIfHistoryResponse(
+        journey_id=journey_id,
+        application_id=app_id,
+        scenarios=scenarios,
+        latest=scenarios[0] if scenarios else None,
+        count=len(scenarios),
+    )
+
+
+# ── POST /simulate (legacy endpoint alias) ───────────────────────────────────
 @router.post("/simulate", response_model=WhatIfResponse)
 def simulate_counterfactual(
     journey_id: str,
