@@ -3,9 +3,10 @@
  *
  * Initialises the Firebase app once and exports typed handles.
  * Environment variables are injected by Vite at build time.
- * Falls back to safe defaults so the app runs in demo mode without a .env file.
+ * Configured for project: finflow-ray
  */
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import {
   getAuth,
   Auth,
@@ -23,23 +24,33 @@ import {
 import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
 // ── Firebase Configuration ──────────────────────────────────────────────────
-// Place your project config in frontend/.env as VITE_FIREBASE_* variables.
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || 'demo-api-key',
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN         || 'finflow-ai-demo.firebaseapp.com',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID          || 'finflow-ai-demo',
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET      || 'finflow-ai-demo.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID              || '',
+export const firebaseConfig = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || 'AIzaSyAT3oDaHzC-Q6kQxUc1abfcUCKo-1rz9s0',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN         || 'finflow-ray.firebaseapp.com',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID          || 'finflow-ray',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET      || 'finflow-ray.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '584333363655',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID              || '1:584333363655:web:c72686d13fe961d00fb1e2',
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID      || 'G-054455ESXC',
 };
 
 // Prevent duplicate initialisation (hot-reload safe)
-const app: FirebaseApp = getApps().length
+export const app: FirebaseApp = getApps().length
   ? getApps()[0]
   : initializeApp(firebaseConfig);
 
 export const firebaseAuth: Auth = getAuth(app);
 export const firestoreDb: Firestore = getFirestore(app);
+
+// Safe Analytics initialization (only in browser environment if supported)
+export let analytics: Analytics | null = null;
+if (typeof window !== 'undefined') {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  }).catch(() => {});
+}
 
 // Use auth emulator if VITE_FIREBASE_USE_EMULATOR=true
 if (import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'true') {
@@ -62,6 +73,7 @@ export {
   doc,
   setDoc,
   getDoc,
+  getAnalytics,
 };
 
 export default app;
