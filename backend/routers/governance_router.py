@@ -13,11 +13,28 @@ from backend.database.firestore_client import db
 
 router = APIRouter(prefix="/api/v1", tags=["Governance, Oversight & Next Best Actions"])
 
+INSTITUTIONAL_STAFF_ROLES = [
+    UserRole.RM,
+    UserRole.RM_SUPERVISOR,
+    UserRole.RISK_OFFICER,
+    UserRole.RISK_MANAGER,
+    UserRole.CREDIT_APPROVER,
+    UserRole.AUDIT_OFFICER,
+]
+
+OVERRIDE_ROLES = [
+    UserRole.RM,
+    UserRole.RM_SUPERVISOR,
+    UserRole.RISK_OFFICER,
+    UserRole.RISK_MANAGER,
+    UserRole.CREDIT_APPROVER,
+]
+
 @router.post("/journeys/{journey_id}/override", response_model=DecisionRecord)
 def submit_human_override(
     journey_id: str,
     req: HumanOverrideRequest,
-    user: AuthenticatedUser = Depends(require_role([UserRole.RM, UserRole.RISK_OFFICER, UserRole.ADMIN]))
+    user: AuthenticatedUser = Depends(require_role(OVERRIDE_ROLES))
 ):
     journey = db.get("journeys", journey_id)
     if not journey:
@@ -81,7 +98,7 @@ def get_audit_trail(journey_id: str, user: AuthenticatedUser = Depends(get_curre
 @router.get("/dashboard/queue")
 def get_officer_queue(
     status_filter: Optional[str] = None,
-    user: AuthenticatedUser = Depends(require_role([UserRole.RM, UserRole.RISK_OFFICER, UserRole.ADMIN]))
+    user: AuthenticatedUser = Depends(require_role(INSTITUTIONAL_STAFF_ROLES))
 ):
     journeys = db.list("journeys")
     queue_items = []
@@ -122,7 +139,7 @@ def get_officer_queue(
 
 @router.get("/dashboard/metrics")
 def get_portfolio_metrics(
-    user: AuthenticatedUser = Depends(require_role([UserRole.RM, UserRole.RISK_OFFICER, UserRole.ADMIN]))
+    user: AuthenticatedUser = Depends(require_role(INSTITUTIONAL_STAFF_ROLES + [UserRole.SYS_ADMIN]))
 ):
     journeys = db.list("journeys")
     decisions = db.list("decisions")

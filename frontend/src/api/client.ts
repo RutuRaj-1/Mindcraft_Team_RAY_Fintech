@@ -17,6 +17,7 @@ import {
   QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
   EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
   DecisionReplayResponse, FraudSignal, JourneyFraudSignalsResponse, FraudNetworkResponse,
+  AuditCase, AuditFinding, CreateFindingRequest, OverrideAnalytics,
 } from '../types';
 
 
@@ -263,6 +264,25 @@ export const api = {
     }),
   getFeedbackEvents: (journeyId: string) =>
     request<import('../types').FeedbackEvent[]>(`/journeys/${journeyId}/feedback`),
+
+  // Independent Audit & Governance
+  getAuditCases: (limit: number = 50) =>
+    request<AuditCase[]>(`/audit/cases?limit=${limit}`),
+  getAuditFindings: (status?: string, severity?: string) =>
+    request<AuditFinding[]>(
+      `/audit/findings${status ? `?status=${encodeURIComponent(status)}` : ''}${severity ? `${status ? '&' : '?'}severity=${encodeURIComponent(severity)}` : ''}`
+    ),
+  createAuditFinding: (req: CreateFindingRequest) =>
+    request<AuditFinding>('/audit/findings', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  getOverrideAnalytics: () =>
+    request<OverrideAnalytics>('/audit/override-analytics'),
+
+  // Auth / Institutional Personas
+  getPersonas: () =>
+    request<Record<string, unknown>>('/auth/personas'),
 };
 
 // ── Legacy alias for backward compat ─────────────────────────────────────────

@@ -350,7 +350,7 @@ export const HumanReviewWorkflow: React.FC<HumanReviewWorkflowProps> = ({
                       background: o.bg,
                       borderColor: outcome === o.value ? o.color : 'transparent',
                       color: o.color,
-                      ringColor: o.color,
+                      outlineColor: o.color,
                     }}
                   >
                     {o.label}

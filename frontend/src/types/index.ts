@@ -876,3 +876,56 @@ export interface FeedbackEvent {
   reviewerName: string;
   timestamp: string;
 }
+
+// -- Independent Audit & Governance Types --------------------------------------
+
+export interface AuditCase {
+  applicationId: string;
+  businessName: string;
+  requestedAmount: number;
+  status: string;
+  currentStage: string;
+  auditEventCount: number;
+  reviewCount: number;
+  hasOverride: boolean;
+  lastReviewed: string | null;
+  createdAt: string;
+}
+
+export interface AuditFinding {
+  findingId: string;
+  applicationId: string;
+  journeyId: string;
+  auditOfficerId: string;
+  auditOfficerName: string;
+  findingType: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  narrativeExplanation: string;
+  referencedEventIds: string[];
+  status: 'OPEN' | 'UNDER_INVESTIGATION' | 'RESOLVED' | 'CLOSED';
+  targetDepartment: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFindingRequest {
+  application_id: string;
+  journey_id: string;
+  finding_type: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  narrative_explanation: string;
+  referenced_event_ids?: string[];
+  target_department?: string;
+}
+
+export interface OverrideAnalytics {
+  totalReviews: number;
+  totalOverrides: number;
+  overrideRatePct: number;
+  concurrenceRatePct: number;
+  byRole: Record<string, number>;
+  byReasonCode: Record<string, number>;
+}
+

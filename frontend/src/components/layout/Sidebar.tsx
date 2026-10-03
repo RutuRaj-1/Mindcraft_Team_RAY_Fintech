@@ -3,7 +3,8 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Compass, FilePlus, GitCommit, FileText, Award,
-  Users, ShieldAlert, Cpu, Sparkles, Home, ChevronRight, CheckCircle2, RotateCcw
+  Users, ShieldAlert, Cpu, Sparkles, Home, ChevronRight, CheckCircle2, RotateCcw,
+  Building2, Scale, ClipboardCheck, Activity
 } from 'lucide-react';
 
 
@@ -16,8 +17,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
 
   const navSections = [
     {
-      title: 'SME Journey',
-      roles: ['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN'],
+      title: 'MSME Customer Journey',
+      roles: ['CUSTOMER'],
       items: [
         { label: 'Customer Portal', path: '/customer', icon: <Home className="w-4 h-4" /> },
         { label: 'Apply for Working Capital', path: '/customer/apply', icon: <FilePlus className="w-4 h-4" /> },
@@ -27,32 +28,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
       ],
     },
     {
-      title: 'Loan Officer (RM)',
-      roles: ['RM', 'ADMIN', 'RISK_OFFICER'],
+      title: 'First-Line RM Desk',
+      roles: ['RM'],
       items: [
-        { label: 'Underwriting Queue', path: '/rm', icon: <Users className="w-4 h-4" /> },
-        { label: 'Case Reconciliation', path: `/rm/cases/${activeJourneyId}`, icon: <CheckCircle2 className="w-4 h-4" /> },
+        { label: 'RM Pipeline Queue', path: '/rm', icon: <Users className="w-4 h-4" /> },
+        { label: 'Case Intake & Assist', path: `/rm/cases/${activeJourneyId}`, icon: <CheckCircle2 className="w-4 h-4" /> },
+        { label: 'Audit Timeline', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
       ],
     },
     {
-      title: 'Risk & Compliance',
-      roles: ['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER'],
+      title: 'Operations Management',
+      roles: ['RM_SUPERVISOR'],
       items: [
-        { label: 'Risk & Trust Console', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
+        { label: 'Operations Command', path: '/operations', icon: <Building2 className="w-4 h-4" /> },
+        { label: 'RM Underwriting Queue', path: '/rm', icon: <Users className="w-4 h-4" /> },
+        { label: 'Case SLA & Escalation', path: `/rm/cases/${activeJourneyId}`, icon: <CheckCircle2 className="w-4 h-4" /> },
         { label: 'Decision Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-        { label: 'Case Audit & Override', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
       ],
     },
-
     {
-      title: 'System & Demo',
-      roles: ['ADMIN', 'RISK_OFFICER', 'RM', 'CUSTOMER'],
+      title: 'Second-Line Risk Desk',
+      roles: ['RISK_OFFICER'],
+      items: [
+        { label: 'Risk & Fraud Intelligence', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
+        { label: 'Case Review & Challenge', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
+        { label: 'Decision Replay Console', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
+      ],
+    },
+    {
+      title: 'Supervisory Risk Desk',
+      roles: ['RISK_MANAGER'],
+      items: [
+        { label: 'Senior Risk Desk (≤₹1Cr)', path: '/risk-manager', icon: <Scale className="w-4 h-4" /> },
+        { label: 'Risk & Fraud Intelligence', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
+        { label: 'Supervisory Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
+        { label: 'Decision Replay Console', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
+      ],
+    },
+    {
+      title: 'Credit Sanction Committee',
+      roles: ['CREDIT_APPROVER'],
+      items: [
+        { label: 'Credit Sanction Chamber', path: '/approvals', icon: <Award className="w-4 h-4" /> },
+        { label: 'Executive Case Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
+        { label: 'Decision Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
+      ],
+    },
+    {
+      title: 'Third-Line Audit & Governance',
+      roles: ['AUDIT_OFFICER'],
+      items: [
+        { label: 'Audit & Governance Console', path: '/audit', icon: <ClipboardCheck className="w-4 h-4" /> },
+        { label: 'Cross-Portfolio Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
+        { label: 'Independent Case Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
+      ],
+    },
+    {
+      title: 'Technical Administration',
+      roles: ['SYS_ADMIN', 'ADMIN'],
       items: [
         { label: 'System Observability', path: '/admin', icon: <Cpu className="w-4 h-4" /> },
         { label: 'Hackathon Benchmarks', path: '/demo', icon: <Sparkles className="w-4 h-4" /> },
       ],
     },
   ];
+
+  // Filter strictly by the active user's assigned role (or allow ADMIN to view technical admin)
+  const visibleSections = navSections.filter((section) =>
+    section.roles.includes(role) || (role === 'SYS_ADMIN' && section.roles.includes('ADMIN'))
+  );
 
   return (
     <aside
@@ -61,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
       }`}
     >
       <div className="flex-1 py-4 px-3 space-y-6 overflow-y-auto">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title} className="space-y-1">
             {!isCollapsed && (
               <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)] px-3 mb-2">
@@ -93,6 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
           </div>
         ))}
       </div>
+
 
       {/* Footer Pill */}
       {!isCollapsed && (

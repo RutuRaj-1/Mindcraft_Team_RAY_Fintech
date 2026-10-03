@@ -21,8 +21,12 @@ import { CustomerDecisionPage } from './pages/customer/CustomerDecisionPage';
 import { CashFlowIntelligencePage } from './pages/customer/CashFlowIntelligencePage';
 import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
+import { RMSupervisorDashboardPage } from './pages/rm/RMSupervisorDashboardPage';
 import { RiskConsolePage } from './pages/risk/RiskConsolePage';
 import { RiskCaseDetailPage } from './pages/risk/RiskCaseDetailPage';
+import { RiskManagerDeskPage } from './pages/risk/RiskManagerDeskPage';
+import { CreditSanctionChamberPage } from './pages/risk/CreditSanctionChamberPage';
+import { AuditGovernanceConsolePage } from './pages/audit/AuditGovernanceConsolePage';
 import { DecisionReplayPage } from './pages/risk/DecisionReplayPage';
 import { AdminPage } from './pages/admin/AdminPage';
 
@@ -58,15 +62,20 @@ const AppRedirect: React.FC = () => {
   }
 
   switch (role) {
+    case 'CUSTOMER':
+      return <Navigate to="/customer" replace />;
     case 'RM':
-    case 'RM_SUPERVISOR':
       return <Navigate to="/rm" replace />;
+    case 'RM_SUPERVISOR':
+      return <Navigate to="/operations" replace />;
     case 'RISK_OFFICER':
-    case 'RISK_MANAGER':
-    case 'CREDIT_APPROVER':
       return <Navigate to="/risk" replace />;
+    case 'RISK_MANAGER':
+      return <Navigate to="/risk-manager" replace />;
+    case 'CREDIT_APPROVER':
+      return <Navigate to="/approvals" replace />;
     case 'AUDIT_OFFICER':
-      return <Navigate to="/risk/replay" replace />;
+      return <Navigate to="/audit" replace />;
     case 'SYS_ADMIN':
     case 'ADMIN':
       return <Navigate to="/admin" replace />;
@@ -74,6 +83,7 @@ const AppRedirect: React.FC = () => {
       return <Navigate to="/customer" replace />;
   }
 };
+
 
 export default function App() {
   return (
@@ -180,7 +190,7 @@ export default function App() {
                   <Route
                     path="/rm"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'ADMIN', 'SYS_ADMIN']}>
                         <RMQueuePage />
                       </ProtectedRoute>
                     }
@@ -190,7 +200,7 @@ export default function App() {
                   <Route
                     path="/rm/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'ADMIN', 'SYS_ADMIN']}>
                         <RMCaseDetailPage />
                       </ProtectedRoute>
                     }
@@ -198,17 +208,28 @@ export default function App() {
                   <Route
                     path="/app/rm/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'ADMIN', 'SYS_ADMIN']}>
                         <RMCaseDetailPage />
                       </ProtectedRoute>
                     }
                   />
 
-                  {/* Risk Officer, Risk Manager & Credit Approver Routes */}
+                  {/* Operations Manager (RM_SUPERVISOR) Dedicated Command Center */}
+                  <Route
+                    path="/operations"
+                    element={
+                      <ProtectedRoute allowedRoles={['RM_SUPERVISOR', 'ADMIN', 'SYS_ADMIN']}>
+                        <RMSupervisorDashboardPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/operations" element={<Navigate to="/operations" replace />} />
+
+                  {/* Second-Line Risk Officer Console */}
                   <Route
                     path="/risk"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'ADMIN', 'SYS_ADMIN']}>
                         <RiskConsolePage />
                       </ProtectedRoute>
                     }
@@ -218,7 +239,7 @@ export default function App() {
                   <Route
                     path="/risk/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'ADMIN', 'SYS_ADMIN']}>
                         <RiskCaseDetailPage />
                       </ProtectedRoute>
                     }
@@ -226,11 +247,45 @@ export default function App() {
                   <Route
                     path="/app/risk/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'ADMIN', 'SYS_ADMIN']}>
                         <RiskCaseDetailPage />
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Senior Risk Manager (RISK_MANAGER) Supervisory Desk */}
+                  <Route
+                    path="/risk-manager"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_MANAGER', 'CREDIT_APPROVER', 'ADMIN', 'SYS_ADMIN']}>
+                        <RiskManagerDeskPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/risk-manager" element={<Navigate to="/risk-manager" replace />} />
+
+                  {/* Credit Sanction Committee (CREDIT_APPROVER) Chamber */}
+                  <Route
+                    path="/approvals"
+                    element={
+                      <ProtectedRoute allowedRoles={['CREDIT_APPROVER', 'ADMIN', 'SYS_ADMIN']}>
+                        <CreditSanctionChamberPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/approvals" element={<Navigate to="/approvals" replace />} />
+
+                  {/* Independent Audit & Governance (AUDIT_OFFICER) Console */}
+                  <Route
+                    path="/audit"
+                    element={
+                      <ProtectedRoute allowedRoles={['AUDIT_OFFICER', 'ADMIN', 'SYS_ADMIN']}>
+                        <AuditGovernanceConsolePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/audit" element={<Navigate to="/audit" replace />} />
+
 
                   {/* Decision Replay Routes — Institutional & Audit Assurance */}
                   <Route
