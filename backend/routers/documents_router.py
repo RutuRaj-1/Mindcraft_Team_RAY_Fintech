@@ -26,6 +26,7 @@ from backend.modules.module3_financial.field_extractor import FieldExtractor
 from backend.modules.module3_financial.evidence_ledger_service import EvidenceLedgerService
 from backend.modules.module3_financial.digilocker_service import DigiLockerService
 from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
+from backend.modules.module3_financial.evidence_provenance_service import EvidenceProvenanceService
 
 router = APIRouter(tags=["Documents & Evidence Ledger"])
 
@@ -302,6 +303,23 @@ def get_journey_consistency_report(
     app_id = journey.get("application_id", journey_id)
     rep = ConsistencyEngine.verify_consistency(app_id)
     return rep.model_dump() if hasattr(rep, "model_dump") else rep
+
+
+@router.get(
+    "/api/v1/evidence/{evidence_id}/provenance",
+    response_model=Dict[str, Any],
+    summary="Get Evidence Provenance & Cross-Checks",
+    description="Traces any financial number or evidence ID back to source document, page, field, confidence, and cross-checks."
+)
+def get_evidence_provenance(
+    evidence_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    trace = EvidenceProvenanceService.get_provenance_by_id(evidence_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail=f"Provenance trace for '{evidence_id}' not found")
+    return trace
+
 
 
 # ── DigiLocker Ecosystem Endpoints ───────────────────────────────────────────

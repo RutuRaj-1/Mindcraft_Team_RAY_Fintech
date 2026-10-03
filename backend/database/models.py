@@ -401,6 +401,25 @@ class DiscrepancyItem(BaseModel):
     severity: str = "HIGH"
     explanation: str
 
+class InconsistencySeverity(str, Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class InconsistencyRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    inconsistency_id: str
+    type: str # e.g. GST_VS_ITR_REVENUE, GST_VS_BANK_INFLOW, DECLARED_VS_EXTRACTED_REVENUE, etc.
+    severity: str = InconsistencySeverity.INFO.value # INFO, WARNING, REVIEW_REQUIRED (Never FRAUD)
+    fields_involved: List[str] = []
+    documents_involved: List[str] = []
+    values: Dict[str, Any] = {}
+    expected_range: Dict[str, Any] = {} # e.g. {"tolerance_pct": 5.0, "rule": "within 5%"}
+    explanation: str
+    status: str = "CONSISTENT" # CONSISTENT, REVIEW_REQUIRED, ACCEPTED_WITH_TOLERANCE
+    variance_pct: Optional[float] = None
+
 class ConsistencyReport(BaseModel):
     model_config = ConfigDict(extra="allow")
     report_id: str
@@ -409,7 +428,32 @@ class ConsistencyReport(BaseModel):
     discrepancy_score: float
     flagged_count: int
     discrepancies: List[DiscrepancyItem] = []
+    inconsistencies: List[InconsistencyRecord] = []
+    severity_breakdown: Dict[str, int] = Field(default_factory=dict)
+    summary: Optional[str] = None
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class EvidenceProvenanceTrace(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    evidence_id: str
+    application_id: str
+    field_name: str
+    display_label: str
+    document: Dict[str, Any]
+    page: int
+    field: str
+    original_extracted_value: Any
+    normalized_value: Any
+    confidence: float
+    cross_check_status: str
+    cross_checks: List[Dict[str, Any]] = []
+    status: str
+    tolerance_rule: str
+    sha256_hash: Optional[str] = None
+    extraction_method: Optional[str] = None
+    source_text: Optional[str] = None
+    history: List[Dict[str, Any]] = []
+
 
 class MonthlyCashFlow(BaseModel):
     model_config = ConfigDict(extra="allow")

@@ -125,6 +125,20 @@ export interface DiscrepancyItem {
   explanation: string;
 }
 
+export interface InconsistencyRecord {
+
+  inconsistency_id: string;
+  type: string;
+  severity: 'INFO' | 'WARNING' | 'REVIEW_REQUIRED';
+  fields_involved: string[];
+  documents_involved: string[];
+  values: Record<string, any>;
+  expected_range: Record<string, any>;
+  explanation: string;
+  status: string;
+  variance_pct?: number;
+}
+
 export interface ConsistencyReport {
   report_id: string;
   application_id: string;
@@ -132,8 +146,72 @@ export interface ConsistencyReport {
   discrepancy_score: number;
   flagged_count: number;
   discrepancies: DiscrepancyItem[];
+  inconsistencies?: InconsistencyRecord[];
+  severity_breakdown?: {
+    INFO?: number;
+    WARNING?: number;
+    REVIEW_REQUIRED?: number;
+    TOTAL_CHECKS?: number;
+  };
   summary?: string;
+  generated_at?: string;
 }
+
+export interface CrossCheckCounterpart {
+  source: string;
+  doc_type: string;
+  page: number;
+  field: string;
+  value: string;
+  variance_pct: number;
+  status: string;
+}
+
+export interface EvidenceHistoryVersion {
+  evidence_id: string;
+  version: number;
+  is_latest: boolean;
+  value: any;
+  normalized_value: any;
+  confidence: number;
+  created_at: string;
+}
+
+export interface EvidenceProvenanceTrace {
+  evidence_id: string;
+  application_id: string;
+  field_name: string;
+  display_label: string;
+  document: {
+    document_id: string;
+    file_name: string;
+    doc_type: string;
+    page_count: number;
+    file_url?: string;
+    sha256_hash: string;
+  };
+  page: number;
+  field: string;
+  original_extracted_value: any;
+  normalized_value: any;
+  confidence: number;
+  confidence_percent: number;
+  cross_check_status: string;
+  cross_checks: CrossCheckCounterpart[];
+  status: string;
+  tolerance_rule: string;
+  sha256_hash: string;
+  extraction_method: string;
+  source_text?: string;
+  bounding_box?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  history?: EvidenceHistoryVersion[];
+}
+
 
 export interface MonthlyCashFlow {
   month: string;

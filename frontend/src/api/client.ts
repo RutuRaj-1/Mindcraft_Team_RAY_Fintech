@@ -14,7 +14,8 @@ import {
   DocumentRecord, EvidenceItem, ConsistencyReport, CashFlowMetrics,
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
   TrustGraph, WhatIfRequest, WhatIfResponse, JourneyFrictionMetrics,
-  QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential
+  QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
+  EvidenceProvenanceTrace
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -147,6 +148,8 @@ export const api = {
   getDocument:          (documentId: string) => request<DocumentRecord>(`/documents/${documentId}`),
   getEvidenceLedger:    (journeyId: string) => request<EvidenceItem[]>(`/journeys/${journeyId}/evidence`),
   getConsistencyReport: (journeyId: string) => request<ConsistencyReport>(`/journeys/${journeyId}/consistency`),
+  getEvidenceProvenance: (evidenceId: string) =>
+    request<EvidenceProvenanceTrace>(`/evidence/${evidenceId}/provenance`),
   listDigiLockerAvailable: (journeyId: string) =>
     request<DigiLockerCredential[]>(`/journeys/${journeyId}/digilocker/available`),
   importDigiLockerCredential: (journeyId: string, credentialType: string) =>
