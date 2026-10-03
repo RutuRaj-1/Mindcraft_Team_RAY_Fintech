@@ -219,20 +219,54 @@ export interface MonthlyCashFlow {
   outflow: number;
   net_flow: number;
   closing_balance: number;
+  emi_outflow?: number;
+}
+
+export interface CashFlowAnomalyRecord {
+  anomaly_id: string;
+  anomaly_type: string;
+  severity: 'INFO' | 'WARNING' | 'REVIEW_REQUIRED';
+  month_affected?: string;
+  description: string;
+  value_observed?: number;
+  expected_range?: string;
+}
+
+export interface HealthIndicator {
+  indicator_id: string;
+  label: string;
+  metric_name: string;
+  value: number;
+  unit: string;
+  status: 'HEALTHY' | 'ADEQUATE' | 'STRESSED' | 'CRITICAL';
+  explanation: string;
+  benchmark?: string;
 }
 
 export interface CashFlowMetrics {
   metric_id: string;
   application_id: string;
-  dscr: number;
+  // Core averages
   avg_monthly_inflow: number;
   avg_monthly_outflow: number;
   operating_cash_flow: number;
+  net_monthly_surplus: number;
+  // Obligation analysis
+  existing_monthly_emi: number;
+  proposed_monthly_emi: number;
+  total_monthly_obligations: number;
+  surplus_after_obligations: number;
+  debt_service_burden_pct: number;
+  // Risk ratios
+  dscr: number;
   cash_burn_rate: number;
   working_capital_buffer_days: number;
   volatility_index: number;
   seasonality_ratio: number;
+  // Trend & analysis
   monthly_trend: MonthlyCashFlow[];
+  anomalies: CashFlowAnomalyRecord[];
+  health_indicators: HealthIndicator[];
 }
 
 export interface HardRuleEvaluation {

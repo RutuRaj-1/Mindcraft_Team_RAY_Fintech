@@ -18,6 +18,7 @@ import { ApplyLoanPage } from './pages/customer/ApplyLoanPage';
 import { CustomerJourneyPage } from './pages/customer/CustomerJourneyPage';
 import { CustomerDocumentsPage } from './pages/customer/CustomerDocumentsPage';
 import { CustomerDecisionPage } from './pages/customer/CustomerDecisionPage';
+import { CashFlowIntelligencePage } from './pages/customer/CashFlowIntelligencePage';
 import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
 import { RiskConsolePage } from './pages/risk/RiskConsolePage';
@@ -146,6 +147,15 @@ export default function App() {
                     element={
                       <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
                         <CustomerDecisionPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/customer/cashflow/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CashFlowIntelligencePage />
                       </ProtectedRoute>
                     }
                   />

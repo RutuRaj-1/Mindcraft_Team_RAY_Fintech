@@ -462,20 +462,61 @@ class MonthlyCashFlow(BaseModel):
     outflow: float
     net_flow: float
     closing_balance: float
+    emi_outflow: Optional[float] = None  # portion of outflow attributed to loan EMI
+
+class CashFlowAnomalyRecord(BaseModel):
+    """A flagged pattern or anomaly in the cash-flow data — never labelled as fraud."""
+    model_config = ConfigDict(extra="allow")
+    anomaly_id: str
+    anomaly_type: str          # IRREGULAR_INFLOW, HIGH_OUTFLOW_SPIKE, etc.
+    severity: str              # INFO | WARNING | REVIEW_REQUIRED
+    month_affected: Optional[str] = None
+    description: str
+    value_observed: Optional[float] = None
+    expected_range: Optional[str] = None
+
+class HealthIndicator(BaseModel):
+    """A single financial health signal with a plain-language label."""
+    model_config = ConfigDict(extra="allow")
+    indicator_id: str
+    label: str                 # e.g. "Debt Service Coverage"
+    metric_name: str           # e.g. "dscr"
+    value: float
+    unit: str                  # e.g. "x", "%", "days", "₹"
+    status: str                # HEALTHY | ADEQUATE | STRESSED | CRITICAL
+    explanation: str           # plain-language explanation shown in UI tooltip
+    benchmark: Optional[str] = None  # e.g. "Min 1.2x required by policy"
 
 class CashFlowMetrics(BaseModel):
     model_config = ConfigDict(extra="allow")
     metric_id: str
     application_id: str
-    dscr: float
+
+    # ── Core averages ──────────────────────────────────────────────
     avg_monthly_inflow: float
     avg_monthly_outflow: float
-    operating_cash_flow: float
-    cash_burn_rate: float
-    working_capital_buffer_days: int
-    volatility_index: float
-    seasonality_ratio: float
+    operating_cash_flow: float        # annual: credits − debits
+    net_monthly_surplus: float        # avg_inflow − avg_outflow
+
+    # ── Obligation analysis ────────────────────────────────────────
+    existing_monthly_emi: float       # declared + extracted EMI obligations
+    proposed_monthly_emi: float       # estimated EMI on requested facility
+    total_monthly_obligations: float  # existing + proposed EMI
+    surplus_after_obligations: float  # net_monthly_surplus − total_monthly_obligations
+    debt_service_burden_pct: float    # total_obligations / avg_inflow × 100
+
+    # ── Risk ratios ────────────────────────────────────────────────
+    dscr: float                       # Debt Service Coverage Ratio
+    cash_burn_rate: float             # avg daily outflow
+    working_capital_buffer_days: int  # AMB / daily_outflow
+    volatility_index: float           # coefficient of variation of monthly inflow
+    seasonality_ratio: float          # peak-month / trough-month ratio
+
+    # ── Trend & analysis ──────────────────────────────────────────
     monthly_trend: List[MonthlyCashFlow] = []
+    anomalies: List[CashFlowAnomalyRecord] = []
+    health_indicators: List[HealthIndicator] = []
+
     calculated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HardRuleEvaluation(BaseModel):

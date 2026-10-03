@@ -5,7 +5,7 @@ import { MetricCard } from '../../components/fintech/MetricCard';
 import { NextActionCard } from '../../components/fintech/NextActionCard';
 import { JourneyStepper } from '../../components/fintech/JourneyStepper';
 import { Button } from '../../components/ui/Button';
-import { PlusCircle, FileText, ArrowRight, ShieldCheck, Clock, TrendingUp, Sparkles } from 'lucide-react';
+import { PlusCircle, FileText, ArrowRight, ShieldCheck, Clock, TrendingUp, Sparkles, BarChart2 } from 'lucide-react';
 
 export const CustomerDashboardPage: React.FC = () => {
   const { persona, activeJourneyId } = useAuth();
@@ -91,7 +91,7 @@ export const CustomerDashboardPage: React.FC = () => {
       <JourneyStepper currentStage="EXPLAINABLE_DECISION" />
 
       {/* Navigation Quick Links Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link
           to={`/customer/journey/${activeJourneyId}`}
           className="p-5 rounded-2xl bg-white border border-[var(--border)] hover:border-[var(--brand-950)] hover:shadow-[3px_3px_0px_#0A1F20] transition-all flex flex-col justify-between"
@@ -122,6 +122,24 @@ export const CustomerDashboardPage: React.FC = () => {
           </div>
           <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-[var(--brand-700)]">
             <span>Manage Evidence</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </div>
+        </Link>
+
+        <Link
+          to={`/customer/cashflow/${activeJourneyId}`}
+          className="p-5 rounded-2xl bg-white border border-[var(--border)] hover:border-[var(--brand-950)] hover:shadow-[3px_3px_0px_#0A1F20] transition-all flex flex-col justify-between"
+        >
+          <div>
+            <span className="text-[10px] font-bold uppercase text-[var(--fin-green)]">Module 7</span>
+            <h3 className="text-base font-black text-[var(--brand-950)] mt-1">Cash-Flow Intelligence</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Explore 6-month inflow/outflow trends, DSCR, obligation waterfall, seasonality, and cash-flow signals.
+            </p>
+          </div>
+          <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-[var(--fin-green)]">
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span>View Cash-Flow Report</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </Link>
