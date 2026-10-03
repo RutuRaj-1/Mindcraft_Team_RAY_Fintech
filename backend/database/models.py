@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Union
+from pydantic import BaseModel, Field, ConfigDict
 
-# --- Enums ---
+# --- Core Enums ---
 
 class JourneyStage(str, Enum):
     INTENT_CAPTURE = "INTENT_CAPTURE"
@@ -38,6 +38,12 @@ class DocumentStatus(str, Enum):
     FLAGGED = "FLAGGED"
     REJECTED = "REJECTED"
 
+class VerificationStatus(str, Enum):
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    REJECTED = "REJECTED"
+    FLAGGED = "FLAGGED"
+
 class RiskBand(str, Enum):
     LOW_RISK = "LOW_RISK"
     MEDIUM_RISK = "MEDIUM_RISK"
@@ -57,9 +63,285 @@ class ActionType(str, Enum):
     CO_SIGN_SANCTION = "CO_SIGN_SANCTION"
     ADD_COLLATERAL = "ADD_COLLATERAL"
 
-# --- Models ---
+def now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+# ==============================================================================
+# 20 REQUIRED FIRESTORE COLLECTION SCHEMAS
+# ==============================================================================
+
+# 1. users
+class UserModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    userId: str = Field(..., alias="user_id")
+    email: str
+    role: str # CUSTOMER, RM, RISK_OFFICER, ADMIN
+    name: str
+    businessId: Optional[str] = Field(None, alias="business_id")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+    updatedAt: str = Field(default_factory=now_utc_iso, alias="updated_at")
+
+# 2. applications
+class ApplicationModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    applicationId: str = Field(..., alias="application_id")
+    userId: str = Field(..., alias="user_id")
+    businessName: str = Field(..., alias="business_name")
+    productType: str = Field("sme_working_capital", alias="product_type")
+    requestedAmount: float = Field(..., alias="requested_amount")
+    purpose: str
+    status: str = "ACTIVE"
+    currentStage: str = Field(JourneyStage.INTENT_CAPTURE.value, alias="current_stage")
+    vintageMonths: Optional[int] = Field(None, alias="vintage_months")
+    annualTurnover: Optional[float] = Field(None, alias="annual_turnover")
+    tenorMonths: Optional[int] = Field(12, alias="tenor_months")
+    pan: Optional[str] = None
+    gstin: Optional[str] = None
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+    updatedAt: str = Field(default_factory=now_utc_iso, alias="updated_at")
+
+# 3. documents
+class DocumentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    documentId: str = Field(..., alias="document_id")
+    applicationId: str = Field(..., alias="application_id")
+    type: str # BANK_STATEMENT, GST_RETURN, ITR, etc.
+    fileName: str = Field(..., alias="file_name")
+    storagePath: str = Field(..., alias="storage_path")
+    mimeType: str = Field("application/pdf", alias="mime_type")
+    fileHash: str = Field(..., alias="file_hash")
+    uploadedAt: str = Field(default_factory=now_utc_iso, alias="uploaded_at")
+    ocrStatus: str = Field("PENDING", alias="ocr_status")
+    verificationStatus: str = Field("PENDING", alias="verification_status")
+    pageCount: int = Field(1, alias="page_count")
+
+# 4. evidence_items
+class EvidenceItemModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    evidenceId: str = Field(..., alias="evidence_id")
+    applicationId: str = Field(..., alias="application_id")
+    documentId: str = Field(..., alias="document_id")
+    fieldName: str = Field(..., alias="field_name")
+    value: Any
+    normalizedValue: Optional[Any] = Field(None, alias="normalized_value")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    sourcePage: int = Field(1, alias="source_page")
+    sourceText: Optional[str] = Field(None, alias="source_text")
+    extractionMethod: str = Field("FinFlow-OCR-v2", alias="extraction_method")
+    verificationStatus: str = Field("PENDING", alias="verification_status")
+    boundingBox: Optional[Dict[str, float]] = Field(None, alias="bounding_box")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 5. journey_steps
+class JourneyStepModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    stepId: str = Field(..., alias="step_id")
+    applicationId: str = Field(..., alias="application_id")
+    stage: str
+    status: str = "COMPLETED"
+    notes: Optional[str] = None
+    enteredAt: str = Field(default_factory=now_utc_iso, alias="entered_at")
+    completedAt: Optional[str] = Field(None, alias="completed_at")
+    durationSeconds: Optional[float] = Field(None, alias="duration_seconds")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 6. risk_assessments
+class RiskAssessmentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    riskId: str = Field(..., alias="risk_id")
+    applicationId: str = Field(..., alias="application_id")
+    riskScore: int = Field(..., alias="risk_score", description="Trust Score 0-1000")
+    riskBand: str = Field(..., alias="risk_band")
+    featureValues: Dict[str, Any] = Field(default_factory=dict, alias="feature_values")
+    modelVersion: str = Field("scikit-learn-sme-v2.1", alias="model_version")
+    ruleResults: List[Dict[str, Any]] = Field(default_factory=list, alias="rule_results")
+    probabilityOfDefault: Optional[float] = Field(None, alias="probability_of_default")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 7. decisions
+class DecisionModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    decisionId: str = Field(..., alias="decision_id")
+    applicationId: str = Field(..., alias="application_id")
+    outcome: str # APPROVED, CONDITIONAL_APPROVAL, NEEDS_REVIEW, REJECTED
+    reasons: List[str] = Field(default_factory=list)
+    evidenceReferences: List[str] = Field(default_factory=list, alias="evidence_references")
+    policyReferences: List[str] = Field(default_factory=list, alias="policy_references")
+    modelReferences: List[str] = Field(default_factory=list, alias="model_references")
+    approvedAmount: Optional[float] = Field(None, alias="approved_amount")
+    interestRate: Optional[float] = Field(None, alias="interest_rate")
+    tenorMonths: Optional[int] = Field(None, alias="tenor_months")
+    decidedBy: str = Field("AI_ORCHESTRATOR", alias="decided_by")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 8. next_best_actions
+class NextBestActionModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    actionId: str = Field(..., alias="action_id")
+    applicationId: str = Field(..., alias="application_id")
+    title: str
+    description: str
+    actionType: str = Field(..., alias="action_type")
+    priority: int = 1
+    guardrailStatus: str = Field("SAFE", alias="guardrail_status")
+    ctaLabel: Optional[str] = Field(None, alias="cta_label")
+    targetPersona: str = Field("CUSTOMER", alias="target_persona")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 9. audit_logs (Strictly Append-Only)
+class AuditLogModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    auditId: str = Field(..., alias="audit_id")
+    applicationId: str = Field(..., alias="application_id")
+    actorId: str = Field(..., alias="actor_id")
+    actorRole: str = Field(..., alias="actor_role")
+    action: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+    oldState: Optional[str] = Field(None, alias="old_state")
+    newState: Optional[str] = Field(None, alias="new_state")
+    ipAddress: Optional[str] = Field(None, alias="ip_address")
+    timestamp: str = Field(default_factory=now_utc_iso)
+
+# 10. policy_documents
+class PolicyDocumentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    policyId: str = Field(..., alias="policy_id")
+    title: str
+    category: str = "CREDIT_RISK"
+    version: str = "2026.1"
+    effectiveDate: str = Field(default_factory=now_utc_iso, alias="effective_date")
+    content: str
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 11. policy_chunks
+class PolicyChunkModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    chunkId: str = Field(..., alias="chunk_id")
+    policyId: str = Field(..., alias="policy_id")
+    clauseId: str = Field(..., alias="clause_id")
+    text: str
+    relevanceKeywords: List[str] = Field(default_factory=list, alias="relevance_keywords")
+    embedding: Optional[List[float]] = None
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 12. financial_snapshots
+class FinancialSnapshotModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    snapshotId: str = Field(..., alias="snapshot_id")
+    applicationId: str = Field(..., alias="application_id")
+    dscr: float
+    avgMonthlyInflow: float = Field(..., alias="avg_monthly_inflow")
+    avgMonthlyOutflow: float = Field(..., alias="avg_monthly_outflow")
+    operatingCashFlow: float = Field(..., alias="operating_cash_flow")
+    cashBurnRate: float = Field(..., alias="cash_burn_rate")
+    bufferDays: int = Field(..., alias="buffer_days")
+    volatilityIndex: float = Field(..., alias="volatility_index")
+    seasonalityRatio: float = Field(1.0, alias="seasonality_ratio")
+    monthlyBreakdown: List[Dict[str, Any]] = Field(default_factory=list, alias="monthly_breakdown")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 13. trust_graph_nodes
+class TrustGraphNodeModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    nodeId: str = Field(..., alias="node_id")
+    applicationId: str = Field(..., alias="application_id")
+    label: str
+    nodeType: str = Field(..., alias="node_type") # BUSINESS, DIRECTOR, GSTIN, BANK_ACCOUNT
+    riskLevel: str = Field("LOW", alias="risk_level")
+    trustScore: int = Field(800, alias="trust_score")
+    details: Dict[str, Any] = Field(default_factory=dict)
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 14. trust_graph_edges
+class TrustGraphEdgeModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    edgeId: str = Field(..., alias="edge_id")
+    applicationId: str = Field(..., alias="application_id")
+    source: str
+    target: str
+    relation: str = Field(..., description="OWNS, INVOICED, TRANSFERRED_FUNDS")
+    weight: float = 1.0
+    flagged: bool = False
+    flagReason: Optional[str] = Field(None, alias="flag_reason")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 15. fraud_signals
+class FraudSignalModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    signalId: str = Field(..., alias="signal_id")
+    applicationId: str = Field(..., alias="application_id")
+    signalType: str = Field(..., alias="signal_type") # CIRCULAR_INVOICE, IDENTITY_MISMATCH, DUPLICATE_GSTIN
+    severity: str = "HIGH" # LOW, MEDIUM, HIGH, CRITICAL
+    description: str
+    evidenceIds: List[str] = Field(default_factory=list, alias="evidence_ids")
+    details: Dict[str, Any] = Field(default_factory=dict)
+    detectedAt: str = Field(default_factory=now_utc_iso, alias="detected_at")
+
+# 16. what_if_scenarios
+class WhatIfScenarioModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    scenarioId: str = Field(..., alias="scenario_id")
+    applicationId: str = Field(..., alias="application_id")
+    requestedInputs: Dict[str, Any] = Field(..., alias="requested_inputs")
+    simulatedOutputs: Dict[str, Any] = Field(..., alias="simulated_outputs")
+    insights: List[str] = Field(default_factory=list)
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 17. human_reviews
+class HumanReviewModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    reviewId: str = Field(..., alias="review_id")
+    applicationId: str = Field(..., alias="application_id")
+    decisionId: str = Field(..., alias="decision_id")
+    officerId: str = Field(..., alias="officer_id")
+    officerRole: str = Field(..., alias="officer_role")
+    originalOutcome: str = Field(..., alias="original_outcome")
+    newOutcome: str = Field(..., alias="new_outcome")
+    reasonCode: str = Field(..., alias="reason_code")
+    rationaleNotes: str = Field(..., alias="rationale_notes")
+    coSignedBy: Optional[str] = Field(None, alias="co_signed_by")
+    timestamp: str = Field(default_factory=now_utc_iso)
+
+# 18. feedback_events
+class FeedbackEventModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    feedbackId: str = Field(..., alias="feedback_id")
+    applicationId: str = Field(..., alias="application_id")
+    decisionId: str = Field(..., alias="decision_id")
+    performanceOutcome: str = Field(..., alias="performance_outcome") # ON_TIME_REPAYMENT, DELINQUENT, DEFAULT
+    repaymentRatePct: float = Field(100.0, alias="repayment_rate_pct")
+    notes: Optional[str] = None
+    recordedAt: str = Field(default_factory=now_utc_iso, alias="recorded_at")
+
+# 19. notifications
+class NotificationModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    notificationId: str = Field(..., alias="notification_id")
+    userId: Optional[str] = Field(None, alias="user_id")
+    role: Optional[str] = None
+    title: str
+    message: str
+    type: str = "INFO" # INFO, WARNING, SUCCESS, ALERT
+    read: bool = False
+    actionLink: Optional[str] = Field(None, alias="action_link")
+    createdAt: str = Field(default_factory=now_utc_iso, alias="created_at")
+
+# 20. system_events
+class SystemEventModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    eventId: str = Field(..., alias="event_id")
+    eventType: str = Field(..., alias="event_type")
+    sourceComponent: str = Field(..., alias="source_component")
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: str = Field(default_factory=now_utc_iso)
+
+
+# ==============================================================================
+# LEGACY & SERVICE COMPATIBILITY MODELS (Unchanged for backwards compatibility)
+# ==============================================================================
 
 class IntentPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
     product_type: str = "sme_working_capital"
     requested_amount: float = Field(..., gt=0, description="Requested loan amount in INR")
     tenor_months: int = Field(12, ge=1, le=60, description="Tenure in months")
@@ -72,13 +354,15 @@ class IntentPayload(BaseModel):
     industry_sector: Optional[str] = "Manufacturing / Textiles"
 
 class JourneyStepRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     stage: JourneyStage
-    entered_at: datetime = Field(default_factory=datetime.utcnow)
+    entered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     notes: Optional[str] = None
 
 class DocumentRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     document_id: str
     application_id: str
     doc_type: DocumentType
@@ -87,12 +371,13 @@ class DocumentRecord(BaseModel):
     sha256_hash: str
     status: DocumentStatus = DocumentStatus.PENDING
     page_count: int = 1
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     verified_at: Optional[datetime] = None
     extracted_fields_count: int = 0
     inconsistency_flags: List[str] = []
 
 class EvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
     evidence_id: str
     document_id: str
     application_id: str
@@ -100,52 +385,57 @@ class EvidenceItem(BaseModel):
     field_value: Any
     confidence: float = Field(..., ge=0.0, le=1.0)
     page_number: int = 1
-    bounding_box: Optional[Dict[str, float]] = None # {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.05}
+    bounding_box: Optional[Dict[str, float]] = None
     sha256_source_hash: str
     extraction_engine: str = "FinFlow-OCR-v2"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DiscrepancyItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
     field: str
     doc_a_name: str
     doc_a_value: Any
     doc_b_name: str
     doc_b_value: Any
     variance_pct: float
-    severity: str = "HIGH" # LOW, MEDIUM, HIGH
+    severity: str = "HIGH"
     explanation: str
 
 class ConsistencyReport(BaseModel):
+    model_config = ConfigDict(extra="allow")
     report_id: str
     application_id: str
     is_consistent: bool
-    discrepancy_score: float # 0.0 (perfect) to 1.0 (highly inconsistent)
+    discrepancy_score: float
     flagged_count: int
     discrepancies: List[DiscrepancyItem] = []
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MonthlyCashFlow(BaseModel):
-    month: str # e.g. "2026-04"
+    model_config = ConfigDict(extra="allow")
+    month: str
     inflow: float
     outflow: float
     net_flow: float
     closing_balance: float
 
 class CashFlowMetrics(BaseModel):
+    model_config = ConfigDict(extra="allow")
     metric_id: str
     application_id: str
-    dscr: float # Debt Service Coverage Ratio
+    dscr: float
     avg_monthly_inflow: float
     avg_monthly_outflow: float
     operating_cash_flow: float
     cash_burn_rate: float
     working_capital_buffer_days: int
-    volatility_index: float # 0.0 to 1.0
+    volatility_index: float
     seasonality_ratio: float
     monthly_trend: List[MonthlyCashFlow] = []
-    calculated_at: datetime = Field(default_factory=datetime.utcnow)
+    calculated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HardRuleEvaluation(BaseModel):
+    model_config = ConfigDict(extra="allow")
     rule_id: str
     rule_name: str
     passed: bool
@@ -155,112 +445,125 @@ class HardRuleEvaluation(BaseModel):
     policy_citation: str
 
 class RiskAssessment(BaseModel):
+    model_config = ConfigDict(extra="allow")
     risk_id: str
     application_id: str
     all_hard_rules_passed: bool
     hard_rules: List[HardRuleEvaluation] = []
     probability_of_default: float = Field(..., ge=0.0, le=1.0)
-    risk_score: int = Field(..., ge=0, le=1000, description="FinFlow Trust Score 0-1000")
+    risk_score: int = Field(..., ge=0, le=1000)
     risk_band: RiskBand
     model_version: str = "scikit-learn-sme-v2.1"
-    calculated_at: datetime = Field(default_factory=datetime.utcnow)
+    calculated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SHAPFeatureImpact(BaseModel):
+    model_config = ConfigDict(extra="allow")
     feature_name: str
     feature_display_name: str
     feature_value: Any
-    shap_value: float # Contribution (+ pushes towards risk, - reduces risk)
-    direction: str # "INCREASES_RISK" or "REDUCES_RISK"
+    shap_value: float
+    direction: str
     importance_rank: int
 
 class SHAPAttribution(BaseModel):
+    model_config = ConfigDict(extra="allow")
     shap_id: str
     risk_id: str
     application_id: str
-    base_value: float # Expected model output E[f(x)]
-    model_output: float # Actual f(x)
+    base_value: float
+    model_output: float
     features: List[SHAPFeatureImpact] = []
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PolicyCitation(BaseModel):
+    model_config = ConfigDict(extra="allow")
     clause_id: str
     title: str
     excerpt: str
     relevance_score: float
 
 class DecisionRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     decision_id: str
     application_id: str
     outcome: DecisionOutcome
     approved_amount: float
-    interest_rate: float # e.g. 11.5%
+    interest_rate: float
     tenor_months: int
-    confidence_score: float # 0.0 to 1.0
+    confidence_score: float
     reasoning: str
     policy_citations: List[PolicyCitation] = []
     evidence_citations: List[str] = []
-    decided_by: str = "AI_ORCHESTRATOR" # or officer UID if overridden
-    decided_at: datetime = Field(default_factory=datetime.utcnow)
+    decided_by: str = "AI_ORCHESTRATOR"
+    decided_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class NextBestActionItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
     action_id: str
     priority: int
     title: str
     description: str
     action_type: ActionType
     cta_label: str
-    safe_guardrail_status: str = "SAFE" # SAFE, REQUIRES_OVERRIDE, BLOCKED
+    safe_guardrail_status: str = "SAFE"
     safety_confidence: float = 0.95
-    target_persona: str = "CUSTOMER" # CUSTOMER, RM, RISK_OFFICER
+    target_persona: str = "CUSTOMER"
 
 class NextBestActionsResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
     application_id: str
     primary_action: NextBestActionItem
     alternative_actions: List[NextBestActionItem] = []
 
 class TrustGraphNode(BaseModel):
+    model_config = ConfigDict(extra="allow")
     id: str
     label: str
-    node_type: str # BUSINESS, DIRECTOR, GSTIN, BANK_ACCOUNT, SUPPLIER, BUYER
-    risk_level: str # LOW, MEDIUM, HIGH
+    node_type: str
+    risk_level: str
     trust_score: int
     details: Dict[str, Any] = {}
 
 class TrustGraphEdge(BaseModel):
+    model_config = ConfigDict(extra="allow")
     source: str
     target: str
-    relation: str # OWNS, INVOICED, TRANSFERRED_FUNDS, REGISTERED_AT, CO_DIRECTOR
+    relation: str
     weight: float
     flagged: bool = False
     flag_reason: Optional[str] = None
 
 class TrustGraph(BaseModel):
+    model_config = ConfigDict(extra="allow")
     graph_id: str
     application_id: str
     nodes: List[TrustGraphNode]
     edges: List[TrustGraphEdge]
     circular_trading_detected: bool = False
-    network_risk_score: float = 0.12 # 0 to 1
+    network_risk_score: float = 0.12
     cross_app_duplicate_signals: List[str] = []
 
 class AuditLog(BaseModel):
+    model_config = ConfigDict(extra="allow")
     audit_id: str
     application_id: str
     actor_id: str
     actor_role: str
     action: str
     details: Dict[str, Any] = {}
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HumanOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
     new_outcome: DecisionOutcome
     new_approved_amount: Optional[float] = None
     new_interest_rate: Optional[float] = None
-    reason_code: str # e.g. "COLLATERAL_BACKED", "RELATIONSHIP_EXCEPTION", "PROVEN_CASHFLOW"
+    reason_code: str
     rationale_notes: str
     co_signed_by: Optional[str] = None
 
 class HumanOverrideRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     override_id: str
     decision_id: str
     application_id: str
@@ -271,15 +574,17 @@ class HumanOverrideRecord(BaseModel):
     officer_id: str
     officer_name: str
     co_signed_by: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class WhatIfRequest(BaseModel):
-    revenue_delta_pct: float = 0.0 # e.g. +15%
+    model_config = ConfigDict(extra="allow")
+    revenue_delta_pct: float = 0.0
     tenor_months: Optional[int] = None
     buffer_days_delta: int = 0
     collateral_offered_amount: float = 0.0
 
 class WhatIfResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
     original_dscr: float
     simulated_dscr: float
     original_risk_score: int
@@ -294,14 +599,16 @@ class WhatIfResponse(BaseModel):
     insights: List[str]
 
 class JourneyFrictionMetrics(BaseModel):
+    model_config = ConfigDict(extra="allow")
     journey_id: str
     total_time_seconds: float
-    friction_score: int # 0 (seamless) to 100 (high friction)
+    friction_score: int
     bottleneck_stage: Optional[JourneyStage] = None
     resubmissions_count: int = 0
     warnings: List[str] = []
 
 class ApplicationRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     application_id: str
     journey_id: str
     user_id: str
@@ -314,9 +621,10 @@ class ApplicationRecord(BaseModel):
     pan: Optional[str] = None
     gstin: Optional[str] = None
     industry_sector: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class JourneyRecord(BaseModel):
+    model_config = ConfigDict(extra="allow")
     journey_id: str
     applicant_id: str
     current_stage: JourneyStage = JourneyStage.INTENT_CAPTURE
@@ -324,5 +632,5 @@ class JourneyRecord(BaseModel):
     intent: IntentPayload
     history: List[JourneyStepRecord] = []
     application_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     FIREBASE_CLIENT_ID: str = ""
     FIREBASE_STORAGE_BUCKET: str = "finflow-ai-demo.appspot.com"
     FIREBASE_CREDENTIALS_PATH: str = ""
+    FIRESTORE_EMULATOR_HOST: Optional[str] = None
 
     # AI / LLM Providers
     GEMINI_API_KEY: str = ""
