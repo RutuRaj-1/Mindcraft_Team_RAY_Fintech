@@ -1038,3 +1038,39 @@ class JourneyRecord(BaseModel):
     application_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DecisionReplayEvent(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    eventId: str = Field(..., alias="event_id")
+    applicationId: str = Field(..., alias="application_id")
+    journeyId: Optional[str] = Field(None, alias="journey_id")
+    eventType: str = Field(..., alias="event_type")
+    actorType: str = Field(..., alias="actor_type")
+    actorId: str = Field(..., alias="actor_id")
+    stage: str
+    payloadSummary: str = Field(..., alias="payload_summary")
+    references: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: str
+    service: str
+    modelVersion: Optional[str] = Field(None, alias="model_version")
+    input: Dict[str, Any] = Field(default_factory=dict)
+    output: Dict[str, Any] = Field(default_factory=dict)
+    evidenceUsed: List[Any] = Field(default_factory=list, alias="evidence_used")
+
+class DecisionReplayResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    journey_id: str
+    application_id: str
+    replayed_at: str
+    snapshot_version: str = "v2.1-audit-checkpoint"
+    is_tamper_evident: bool = True
+    audit_trail_events_count: int
+    timeline: List[DecisionReplayEvent]
+    journey_state: Dict[str, Any] = Field(default_factory=dict)
+    declared_intent: Dict[str, Any] = Field(default_factory=dict)
+    evidence_snapshot: Dict[str, Any] = Field(default_factory=dict)
+    risk_snapshot: Dict[str, Any] = Field(default_factory=dict)
+    decision_record: Dict[str, Any] = Field(default_factory=dict)
+    overrides_applied: List[Dict[str, Any]] = Field(default_factory=list)
+    summary: Dict[str, Any] = Field(default_factory=dict)
+

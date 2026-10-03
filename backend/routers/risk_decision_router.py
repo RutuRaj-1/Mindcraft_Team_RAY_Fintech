@@ -328,8 +328,11 @@ def replay_decision(
     journey_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
 ):
-    journey = db.get("journeys", journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-    app_id = journey.get("application_id", journey_id)
-    return DecisionReplayService.replay_decision_state(app_id)
+    """
+    Chronological Decision Replay:
+    Reconstructs all major system events (Intent, Upload, OCR, Evidence, Consistency,
+    Cashflow, Risk, SHAP, Policy, Decision, Safe Actions, Overrides) with full
+    traceability into system inputs, outputs, and evidence used.
+    """
+    return DecisionReplayService.replay_decision_state(journey_id)
+

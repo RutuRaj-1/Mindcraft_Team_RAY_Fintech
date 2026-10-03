@@ -16,7 +16,9 @@ import {
   TrustGraph, WhatIfRequest, WhatIfResponse, WhatIfHistoryResponse, JourneyFrictionMetrics,
   QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
   EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
+  DecisionReplayResponse,
 } from '../types';
+
 
 const API_BASE = '/api/v1';
 
@@ -178,7 +180,8 @@ export const api = {
   getWhatIfHistory:  (journeyId: string) =>
     request<WhatIfHistoryResponse>(`/journeys/${journeyId}/what-if`),
   replayDecision: (journeyId: string) =>
-    request<Record<string, unknown>>(`/journeys/${journeyId}/replay`),
+    request<DecisionReplayResponse>(`/journeys/${journeyId}/replay`),
+
 
   // Policy & RAG System
   searchPolicies: (query: string, category?: string, limit: number = 4) =>

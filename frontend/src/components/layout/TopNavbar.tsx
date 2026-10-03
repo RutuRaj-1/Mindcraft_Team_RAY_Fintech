@@ -3,8 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { UserProfileMenu } from './UserProfileMenu';
 import { FinFlowLogo } from '../ui/FinFlowLogo';
-import { Bell, Building2, Menu, ShieldCheck } from 'lucide-react';
+import { Bell, Building2, Menu, ShieldCheck, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
 
 export const BENCHMARK_CASES = [
   { id: 'jrn_priya_001', label: 'Sharma Textiles', tier: 'Prime Tier (Approved)', badgeColor: 'var(--fin-green)' },
@@ -59,10 +60,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             </option>
           ))}
         </select>
+
+        {/* Quick Decision Replay Link */}
+        <Link
+          to={`/risk/replay/${activeJourneyId}`}
+          className="ml-2 flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[var(--brand-950)] text-[var(--brand-950)] rounded-lg text-[11px] font-black shadow-[2px_2px_0px_#0A1F20] hover:bg-[var(--brand-50)] transition-all active:translate-y-0.5"
+          title="Launch Decision Replay for Active Case"
+        >
+          <RotateCcw className="w-3 h-3 text-[var(--brand-700)]" />
+          <span>Decision Replay</span>
+        </Link>
       </div>
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
+
         {/* Live Engine Pulse */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[var(--fin-green-bg)] border border-[var(--fin-green)]/30 rounded-lg">
           <span className="relative flex h-2 w-2">

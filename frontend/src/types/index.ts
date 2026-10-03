@@ -660,3 +660,74 @@ export interface IntentSubmitResponse {
   };
   normalized_structured_intent?: NormalizedIntent;
 }
+
+export interface DecisionReplayEvent {
+  eventId: string;
+  applicationId: string;
+  journeyId?: string;
+  eventType: string;
+  actorType: string;
+  actorId: string;
+  stage: string;
+  payloadSummary: string;
+  references: Record<string, any>;
+  timestamp: string;
+  service: string;
+  modelVersion?: string;
+  input: Record<string, any>;
+  output: Record<string, any>;
+  evidenceUsed: any[];
+}
+
+export interface DecisionReplayResponse {
+  journey_id: string;
+  application_id: string;
+  replayed_at: string;
+  snapshot_version: string;
+  is_tamper_evident: boolean;
+  audit_trail_events_count: number;
+  timeline: DecisionReplayEvent[];
+  summary: {
+    total_events: number;
+    event_types_count: number;
+    stages_traversed: string[];
+    first_event_at: string;
+    latest_event_at: string;
+    ledger_status: string;
+    final_decision_outcome: string;
+    trust_score?: number;
+    risk_band?: string;
+  };
+  journey_state: {
+    stage?: string;
+    status?: string;
+    history?: any[];
+  };
+  declared_intent: {
+    business_name?: string;
+    requested_amount?: number;
+    vintage_months?: number;
+    annual_turnover?: number;
+    product_type?: string;
+    purpose?: string;
+    pan?: string;
+    gstin?: string;
+  };
+  evidence_snapshot: {
+    total_verified_fields?: number;
+    sample_fields?: any[];
+    consistency_status?: boolean;
+    discrepancies_count?: number;
+  };
+  risk_snapshot: {
+    all_hard_rules_passed?: boolean;
+    hard_rules_evaluated?: any[];
+    finflow_trust_score?: number;
+    risk_band?: string;
+    probability_of_default?: number;
+    shap_waterfall?: any[];
+  };
+  decision_record: Record<string, any>;
+  overrides_applied: any[];
+}
+

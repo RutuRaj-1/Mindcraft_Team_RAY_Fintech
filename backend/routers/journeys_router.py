@@ -149,3 +149,18 @@ def get_journey_friction(
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> Dict[str, Any]:
     return JourneyOrchestrator.calculate_friction(journey_id)
+
+
+@router.get(
+    "/{journey_id}/replay",
+    response_model=Dict[str, Any],
+    summary="Replay Decision Journey",
+    description="Chronologically reconstructs all major system events with traceable input, output, and evidence."
+)
+def get_journey_replay(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    from backend.modules.module6_product.decision_replay import DecisionReplayService
+    return DecisionReplayService.replay_decision_state(journey_id)
+

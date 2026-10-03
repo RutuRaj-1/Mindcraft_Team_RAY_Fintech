@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Compass, FilePlus, GitCommit, FileText, Award,
-  Users, ShieldAlert, Cpu, Sparkles, Home, ChevronRight, CheckCircle2
+  Users, ShieldAlert, Cpu, Sparkles, Home, ChevronRight, CheckCircle2, RotateCcw
 } from 'lucide-react';
+
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -35,12 +36,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
     },
     {
       title: 'Risk & Compliance',
-      roles: ['RISK_OFFICER', 'ADMIN', 'RM'],
+      roles: ['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER'],
       items: [
         { label: 'Risk & Trust Console', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
+        { label: 'Decision Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
         { label: 'Case Audit & Override', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
       ],
     },
+
     {
       title: 'System & Demo',
       roles: ['ADMIN', 'RISK_OFFICER', 'RM', 'CUSTOMER'],

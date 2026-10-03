@@ -23,7 +23,9 @@ import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
 import { RiskConsolePage } from './pages/risk/RiskConsolePage';
 import { RiskCaseDetailPage } from './pages/risk/RiskCaseDetailPage';
+import { DecisionReplayPage } from './pages/risk/DecisionReplayPage';
 import { AdminPage } from './pages/admin/AdminPage';
+
 import { DemoHubPage } from './pages/demo/DemoHubPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -223,6 +225,42 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Decision Replay Routes */}
+                  <Route
+                    path="/risk/replay/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                        <DecisionReplayPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/risk/replay"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                        <DecisionReplayPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/replay/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                        <DecisionReplayPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/replay"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                        <DecisionReplayPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/replay/:id" element={<Navigate to="/risk/replay/:id" replace />} />
+
 
                   {/* System Administrator Route */}
                   <Route

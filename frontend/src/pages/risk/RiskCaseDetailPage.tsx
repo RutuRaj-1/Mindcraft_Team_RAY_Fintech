@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { JourneyRecord, DecisionRecord, RiskAssessment, TrustGraph } from '../../types';
 import { TrustGraphVisual } from '../../components/risk/TrustGraphVisual';
@@ -10,7 +10,8 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
-import { ShieldAlert, AlertTriangle, Network, Compass, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Network, Compass, ShieldCheck, ArrowRight, RotateCcw } from 'lucide-react';
+
 
 export const RiskCaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -108,15 +109,27 @@ export const RiskCaseDetailPage: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          variant="brutal"
-          size="sm"
-          onClick={() => setIsOverrideOpen(true)}
-          leftIcon={<ShieldAlert className="w-4 h-4" />}
-        >
-          Execute Human Override
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to={`/risk/replay/${journey.journey_id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<RotateCcw className="w-4 h-4 text-[var(--brand-700)]" />}
+            >
+              Launch Decision Replay
+            </Button>
+          </Link>
+          <Button
+            variant="brutal"
+            size="sm"
+            onClick={() => setIsOverrideOpen(true)}
+            leftIcon={<ShieldAlert className="w-4 h-4" />}
+          >
+            Execute Human Override
+          </Button>
+        </div>
       </div>
+
 
       {/* Trust Graph */}
       {graph && (

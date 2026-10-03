@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from backend.database.models import (
     IntentPayload, JourneyRecord, ApplicationRecord, DocumentRecord,
     DocumentType, DocumentStatus, EvidenceItem, JourneyStage, JourneyStatus,
@@ -12,6 +12,8 @@ from backend.database.firestore_client import db
 from backend.modules.module3_financial.cashflow_engine import CashFlowEngine
 from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
 from backend.modules.module7_trust_intelligence.trust_graph_engine import TrustGraphEngine
+from backend.modules.module5_trust.audit_ledger import AuditLedger
+
 
 router = APIRouter(prefix="/api/v1/demo", tags=["Demo Management & Seed Data"])
 
@@ -362,6 +364,11 @@ def seed_demo_data():
     )
     db.set("decisions", "dec_c3_003", c3_decision.model_dump())
 
+    # ==========================================
+    # Seed Immutable Chronological Decision Replay Audit Trails
+    # ==========================================
+    seed_demo_audit_events(now)
+
     return {
         "status": "SUCCESS",
         "message": "Demo benchmark cases seeded successfully",
@@ -401,3 +408,331 @@ def get_benchmark_cases():
             "recommended_view": "Consistency Engine, Fraud Graph & Human Override"
         }
     ]
+
+def seed_demo_audit_events(base_now: datetime):
+    """
+    Seeds authoritative chronological Decision Replay events for benchmark cases.
+    Adheres strictly to the 18 canonical milestones:
+    INTENT_RECEIVED -> JOURNEY_CREATED -> DOCUMENT_UPLOADED -> OCR_STARTED ->
+    OCR_COMPLETED -> EVIDENCE_CREATED -> EVIDENCE_VERIFIED -> INCONSISTENCY_DETECTED ->
+    CASHFLOW_CALCULATED -> RISK_ASSESSED -> SHAP_GENERATED -> POLICY_RETRIEVED ->
+    DECISION_GENERATED -> NEXT_ACTION_GENERATED -> HUMAN_REVIEW_STARTED ->
+    HUMAN_OVERRIDE -> ACTION_EXECUTED -> JOURNEY_RESOLVED
+    """
+    t0 = base_now - timedelta(minutes=15)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # CASE 1: Priya Sharma (Sharma Textiles) — Clean Prime Approval
+    # Matches the exact timeline example in the specification!
+    # ──────────────────────────────────────────────────────────────────────────
+    p_app = "app_priya_001"
+    p_jrn = "jrn_priya_001"
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="INTENT_RECEIVED", actor_type="CUSTOMER", actor_id="usr_priya_001",
+        stage="INTENT_CAPTURE",
+        payload_summary="Loan intent submitted: ₹15,00,000 for Sharma Textiles festive textile inventory",
+        references={"product": "sme_working_capital", "vintage": 48},
+        service="intent-capture-service", model_version="finflow-intent-parser-v2.0",
+        input_data={"business_name": "Sharma Textiles Private Limited", "requested_amount": 1500000.0, "vintage_months": 48},
+        output_data={"status": "INTENT_ACCEPTED", "preliminary_eligibility": "HIGH"},
+        timestamp=t0 + timedelta(minutes=1) # 10:31
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="JOURNEY_CREATED", actor_type="SYSTEM", actor_id="journey_orchestrator",
+        stage="INTENT_CAPTURE",
+        payload_summary="Journey orchestrated: jrn_priya_001 initialized in state INTENT_CAPTURE",
+        references={"fsm_version": "2.1"},
+        service="journey-orchestrator",
+        input_data={"application_id": p_app, "journey_id": p_jrn},
+        output_data={"state": "INTENT_CAPTURE", "next_required": "EVIDENCE_COLLECTION"},
+        timestamp=t0 + timedelta(minutes=1, seconds=15)
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="DOCUMENT_UPLOADED", actor_type="CUSTOMER", actor_id="usr_priya_001",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="GST returns (GSTR3B) and 6M HDFC Bank Statement uploaded",
+        references={"files": ["HDFC_Bank_Statement_6M_SharmaTextiles.pdf", "GSTR3B_FY2526_SharmaTextiles.pdf"]},
+        service="document-gateway",
+        input_data={"uploaded_count": 2, "mimes": ["application/pdf"]},
+        output_data={"document_ids": ["doc_c1_bank", "doc_c1_gst"], "status": "STORED_ENCRYPTED"},
+        evidence_used=[{"document_id": "doc_c1_bank", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}],
+        timestamp=t0 + timedelta(minutes=2) # 10:32
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="OCR_STARTED", actor_type="SYSTEM", actor_id="ocr_worker_daemon",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="OCR extraction pipeline triggered on HDFC Bank Statement & GSTR3B",
+        service="document-intelligence-ocr", model_version="FinFlow-OCR-v2.1",
+        input_data={"documents": ["doc_c1_bank", "doc_c1_gst"], "pages": 9},
+        output_data={"job_id": "ocr_job_c1_001", "status": "IN_PROGRESS"},
+        timestamp=t0 + timedelta(minutes=2, seconds=10)
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="OCR_COMPLETED", actor_type="SYSTEM", actor_id="ocr_worker_daemon",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="OCR completed: 6 verified financial fields extracted with bounding box coordinates",
+        references={"fields_count": 6, "avg_confidence": 0.98},
+        service="document-intelligence-ocr", model_version="FinFlow-OCR-v2.1",
+        input_data={"pages_processed": 9},
+        output_data={"extracted_fields": ["average_monthly_balance", "annual_credit_turnover", "inward_cheque_bounces_6m", "gst_annual_taxable_turnover"]},
+        evidence_used=[{"field": "gst_annual_taxable_turnover", "value": 14500000.0, "confidence": 0.97, "page": 2}],
+        timestamp=t0 + timedelta(minutes=2, seconds=45) # 10:32
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="EVIDENCE_CREATED", actor_type="SYSTEM", actor_id="evidence_ledger",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="6 evidence records committed to immutable tamper-evident ledger",
+        references={"ledger": "evidence_ledger"},
+        service="evidence-ledger-service",
+        input_data={"uncommitted_items": 6},
+        output_data={"committed_ids": ["evi_c1_1", "evi_c1_2", "evi_c1_3", "evi_c1_4", "evi_c1_5", "evi_c1_6"]},
+        evidence_used=["evi_c1_1", "evi_c1_2", "evi_c1_6"],
+        timestamp=t0 + timedelta(minutes=3) # 10:33
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="EVIDENCE_VERIFIED", actor_type="SYSTEM", actor_id="verification_engine",
+        stage="VERIFICATION",
+        payload_summary="Cross-document verification passed: GST turnover (₹1.45 Cr) reconciles with Bank credits (₹1.42 Cr)",
+        references={"variance": "2.07%", "threshold": "15.0%"},
+        service="verification-engine",
+        input_data={"gst_turnover": 14500000.0, "bank_turnover": 14200000.0},
+        output_data={"is_consistent": True, "reconciliation": "MATCHED"},
+        evidence_used=["evi_c1_2: ₹1,42,00,000", "evi_c1_6: ₹1,45,00,000"],
+        timestamp=t0 + timedelta(minutes=3, seconds=20) # 10:33
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="CASHFLOW_CALCULATED", actor_type="SYSTEM", actor_id="cashflow_engine",
+        stage="RISK_ASSESSMENT",
+        payload_summary="Cash flow computed: Healthy DSCR of 1.85x, 0 cheque bounces, ₹3.15L Average Monthly Balance",
+        references={"metric": "DSCR", "value": 1.85},
+        service="cashflow-analytics-engine", model_version="FinFlow-Cashflow-v2.0",
+        input_data={"annual_credits": 14200000.0, "annual_debits": 12400000.0, "bounces_6m": 0},
+        output_data={"dscr": 1.85, "average_monthly_balance": 315000.0, "buffer_days": 38},
+        evidence_used=["evi_c1_1", "evi_c1_4"],
+        timestamp=t0 + timedelta(minutes=3, seconds=50) # 10:33
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="RISK_ASSESSED", actor_type="SYSTEM", actor_id="risk_orchestrator",
+        stage="RISK_ASSESSMENT",
+        payload_summary="Risk assessed: 10/10 hard policy gates passed. Trust Score: 920/1000 (LOW_RISK, PD 8%)",
+        references={"risk_id": "rsk_c1_001"},
+        service="risk-scoring-service", model_version="scikit-learn-sme-v2.1",
+        input_data={"vintage_months": 48, "annual_turnover": 14500000.0, "dscr": 1.85, "bounces": 0},
+        output_data={"all_hard_rules_passed": True, "risk_score": 920, "risk_band": "LOW_RISK", "probability_of_default": 0.08},
+        evidence_used=["R01_VINTAGE: Passed", "R02_TURNOVER: Passed", "R03_CHEQUE_BOUNCES: Passed", "R04_DSCR: Passed"],
+        timestamp=t0 + timedelta(minutes=4) # 10:34
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="SHAP_GENERATED", actor_type="SYSTEM", actor_id="shap_explainer",
+        stage="RISK_ASSESSMENT",
+        payload_summary="SHAP generated: Top risk-reducing factors: DSCR (+1.85x: -14.5% PD), 0 Cheque Bounces (-8.5% PD)",
+        references={"shap_id": "shp_c1_001"},
+        service="shap-explainability-engine", model_version="shap-tree-explainer-v0.42",
+        input_data={"base_value": 0.22, "features_evaluated": 5},
+        output_data={"model_output": 0.08, "top_feature": "dscr", "importance_rank_1": "dscr"},
+        evidence_used=["dscr: 1.85", "bounces_6m: 0", "vintage_months: 48"],
+        timestamp=t0 + timedelta(minutes=4, seconds=20) # 10:34
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="POLICY_RETRIEVED", actor_type="SYSTEM", actor_id="rag_decision_engine",
+        stage="EXPLAINABLE_DECISION",
+        payload_summary="Policy retrieved: Dense RAG matched POL-SME-4.1 (Vintage >= 24m) & POL-SME-5.2 (DSCR >= 1.25x)",
+        references={"citations": ["POL-SME-4.1", "POL-SME-5.2"]},
+        service="policy-rag-engine", model_version="bge-small-en-v1.5",
+        input_data={"query": "SME working capital underwriting norms for textile manufacturing"},
+        output_data={"citations": ["POL-SME-4.1: Operational Vintage", "POL-SME-5.2: DSCR Norms"]},
+        evidence_used=["Credit Policy Clause 4.1", "Credit Policy Clause 5.2"],
+        timestamp=t0 + timedelta(minutes=4, seconds=45) # 10:34
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="DECISION_GENERATED", actor_type="AI_AGENT", actor_id="ai_underwriting_orchestrator",
+        stage="EXPLAINABLE_DECISION",
+        payload_summary="Decision generated: APPROVED ₹15,00,000 facility @ 10.75% prime interest rate (Confidence 96%)",
+        references={"decision_id": "dec_c1_001"},
+        service="explainable-decision-engine", model_version="finflow-decision-synthesizer-v2.1",
+        input_data={"risk_band": "LOW_RISK", "trust_score": 920, "hard_rules_passed": True},
+        output_data={"outcome": "APPROVED", "approved_amount": 1500000.0, "interest_rate": 10.75, "tenor_months": 12},
+        evidence_used=["annual_credit_turnover: ₹1,42,00,000", "gst_annual_taxable_turnover: ₹1,45,00,000", "dscr: 1.85x"],
+        timestamp=t0 + timedelta(minutes=5) # 10:35
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="NEXT_ACTION_GENERATED", actor_type="AI_AGENT", actor_id="safe_action_agent",
+        stage="NEXT_BEST_ACTION",
+        payload_summary="Next action generated: Digital Sanction Letter Issuance & Disbursal Agreement",
+        references={"guardrail": "AUTONOMOUS_PRIME_SANCTION"},
+        service="safe-action-agent", model_version="safe-action-guardrails-v2.0",
+        input_data={"decision_outcome": "APPROVED", "approved_amount": 1500000.0},
+        output_data={"recommended_action": "ISSUE_SANCTION_LETTER", "guardrail_status": "SAFE"},
+        evidence_used=["dec_c1_001"],
+        timestamp=t0 + timedelta(minutes=5, seconds=30)
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="ACTION_EXECUTED", actor_type="SYSTEM", actor_id="safe_action_executor",
+        stage="SANCTION_AND_DISBURSAL",
+        payload_summary="Action executed: Sanction letter digitally signed and dispatched to applicant",
+        references={"dispatch_medium": "SECURE_EMAIL_AND_SMS"},
+        service="safe-action-agent",
+        input_data={"action": "DISPATCH_SANCTION_LETTER", "recipient": "usr_priya_001"},
+        output_data={"status": "SENT", "transaction_receipt": "tx_c1_sanction_9918"},
+        evidence_used=["dec_c1_001"],
+        timestamp=t0 + timedelta(minutes=6)
+    )
+
+    AuditLedger.record_event(
+        application_id=p_app, journey_id=p_jrn,
+        event_type="JOURNEY_RESOLVED", actor_type="SYSTEM", actor_id="journey_orchestrator",
+        stage="SANCTION_AND_DISBURSAL",
+        payload_summary="Journey resolved: COMPLETED with full cryptographic audit compliance",
+        references={"final_state": "COMPLETED"},
+        service="journey-orchestrator",
+        input_data={"journey_id": p_jrn, "resolution": "SANCTION_DISBURSED"},
+        output_data={"status": "ARCHIVED", "tamper_evident_seal": "VERIFIED"},
+        timestamp=t0 + timedelta(minutes=6, seconds=30)
+    )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # CASE 3: Apex Logistics — Discrepancy & Human Review / Override
+    # ──────────────────────────────────────────────────────────────────────────
+    a_app = "app_apex_003"
+    a_jrn = "jrn_apex_003"
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="INTENT_RECEIVED", actor_type="CUSTOMER", actor_id="usr_apex_003",
+        stage="INTENT_CAPTURE",
+        payload_summary="Financing intent received: ₹40,00,000 for Apex Logistics fleet expansion",
+        service="intent-capture-service",
+        input_data={"business_name": "Apex Logistics & Freight Solutions", "requested_amount": 4000000.0},
+        output_data={"status": "ACCEPTED"},
+        timestamp=t0 + timedelta(minutes=1)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="DOCUMENT_UPLOADED", actor_type="CUSTOMER", actor_id="usr_apex_003",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="Uploaded GST Returns (declared ₹80L) and Bank Statements",
+        service="document-gateway",
+        input_data={"files": ["Apex_GST_2025.pdf", "Apex_Bank_Statement.pdf"]},
+        output_data={"stored": 2},
+        timestamp=t0 + timedelta(minutes=2)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="OCR_COMPLETED", actor_type="SYSTEM", actor_id="ocr_worker",
+        stage="EVIDENCE_COLLECTION",
+        payload_summary="OCR completed: Bank credits ₹50L vs GST taxable turnover ₹80L extracted",
+        service="document-intelligence-ocr", model_version="FinFlow-OCR-v2.1",
+        input_data={"pages": 7},
+        output_data={"gst_turnover": 8000000.0, "annual_credits": 5000000.0},
+        timestamp=t0 + timedelta(minutes=2, seconds=50)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="INCONSISTENCY_DETECTED", actor_type="SYSTEM", actor_id="consistency_engine",
+        stage="VERIFICATION",
+        payload_summary="CRITICAL DISCREPANCY: 37.5% turnover variance between GST filings (₹80L) and Bank credits (₹50L)",
+        references={"tolerance": "15.0%", "detected_variance": "37.5%"},
+        service="consistency-engine",
+        input_data={"gst_turnover": 8000000.0, "bank_credits": 5000000.0},
+        output_data={"variance_pct": 37.5, "flag": "TURNOVER_MISMATCH", "trigger_human_review": True},
+        evidence_used=["evi_c3_gst", "evi_c3_bank"],
+        timestamp=t0 + timedelta(minutes=3, seconds=30)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="RISK_ASSESSED", actor_type="SYSTEM", actor_id="risk_orchestrator",
+        stage="RISK_ASSESSMENT",
+        payload_summary="Risk evaluated: Hard Rule R05_CONSISTENCY failed. Trust Score: 410/1000 (HIGH_RISK)",
+        references={"risk_id": "rsk_c3_003"},
+        service="risk-scoring-service", model_version="scikit-learn-sme-v2.1",
+        input_data={"discrepancy": "37.5%", "circular_trading": True},
+        output_data={"all_hard_rules_passed": False, "risk_score": 410, "risk_band": "HIGH_RISK"},
+        evidence_used=["Turnover Variance 37.5%", "Financial Trust Graph Circular Trading"],
+        timestamp=t0 + timedelta(minutes=4)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="DECISION_GENERATED", actor_type="AI_AGENT", actor_id="ai_decision_engine",
+        stage="EXPLAINABLE_DECISION",
+        payload_summary="Recommendation: NEEDS_REVIEW — Blocked automatic sanction due to turnover discrepancy",
+        references={"decision_id": "dec_c3_003"},
+        service="explainable-decision-engine",
+        input_data={"risk_band": "HIGH_RISK", "all_hard_rules_passed": False},
+        output_data={"outcome": "NEEDS_REVIEW", "policy_trigger": "POL-SME-7.1 Anti-Fraud"},
+        evidence_used=["GST turnover: ₹80,00,000", "Bank credits: ₹50,00,000"],
+        timestamp=t0 + timedelta(minutes=4, seconds=45)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="HUMAN_REVIEW_STARTED", actor_type="RISK_OFFICER", actor_id="usr_risk_ananya",
+        stage="HUMAN_REVIEW",
+        payload_summary="Risk Officer Ananya Iyer initiated manual investigation into turnover variance",
+        service="governance-review-service",
+        input_data={"queue": "SME_ANOMALY_ESCALATION", "priority": "P1"},
+        output_data={"status": "UNDER_INVESTIGATION"},
+        timestamp=t0 + timedelta(minutes=5)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="HUMAN_OVERRIDE", actor_type="RISK_OFFICER", actor_id="usr_risk_ananya",
+        stage="HUMAN_REVIEW",
+        payload_summary="Institutional Override applied: CONDITIONAL_APPROVAL for ₹24,00,000 with mandatory promoter collateral charge",
+        references={"override_id": "ovr_c3_001"},
+        service="override-governance-service",
+        input_data={
+            "original_outcome": "NEEDS_REVIEW",
+            "new_outcome": "CONDITIONAL_APPROVAL",
+            "reason_code": "PROMOTER_ADDITIONAL_COLLATERAL",
+            "notes": "Verified unencumbered commercial warehouse title deed pledged as second-loss guarantee"
+        },
+        output_data={"approved_amount": 2400000.0, "interest_rate": 14.50, "co_signed_by": "usr_cro_headquarters"},
+        evidence_used=["Promoter Title Deed C-44", "Verified Offtake Agreement with Concor India"],
+        timestamp=t0 + timedelta(minutes=7)
+    )
+
+    AuditLedger.record_event(
+        application_id=a_app, journey_id=a_jrn,
+        event_type="ACTION_EXECUTED", actor_type="SYSTEM", actor_id="safe_action_executor",
+        stage="HUMAN_REVIEW",
+        payload_summary="Dispatched conditional sanction letter with collateral covenants to Apex Logistics",
+        service="safe-action-agent",
+        input_data={"action": "DISPATCH_CONDITIONAL_OFFER"},
+        output_data={"status": "SENT"},
+        timestamp=t0 + timedelta(minutes=8)
+    )
+

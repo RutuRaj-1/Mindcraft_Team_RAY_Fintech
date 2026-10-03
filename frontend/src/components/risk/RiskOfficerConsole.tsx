@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import {
   JourneyRecord, ConsistencyReport, TrustGraph, DecisionRecord,
-  RiskAssessment, DecisionOutcome
+  RiskAssessment, DecisionOutcome, DecisionReplayResponse
 } from '../../types';
 import {
   AlertTriangle, ShieldAlert, RotateCcw, Edit3,
@@ -10,6 +10,8 @@ import {
   ShieldCheck, BarChart2, Layers, Clock
 } from 'lucide-react';
 import { TrustGraphVisual } from './TrustGraphVisual';
+import { DecisionReplayViewer } from '../replay/DecisionReplayViewer';
+
 
 interface RiskConsoleProps {
   journeyId: string;
@@ -28,7 +30,8 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
   const [trustGraph,      setTrustGraph]      = useState<TrustGraph | null>(null);
   const [decision,        setDecision]        = useState<DecisionRecord | null>(null);
   const [riskAssessment,  setRiskAssessment]  = useState<RiskAssessment | null>(null);
-  const [replayData,      setReplayData]      = useState<Record<string, any> | null>(null);
+  const [replayData,      setReplayData]      = useState<DecisionReplayResponse | null>(null);
+
   const [learningStats,   setLearningStats]   = useState<Record<string, any> | null>(null);
 
   // Override state
@@ -330,59 +333,14 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
         {activeTab === 'replay' && (
           <div className="space-y-4">
             {replayData ? (
-              <div className="card p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-[var(--fin-violet-bg)] flex items-center justify-center">
-                    <RotateCcw className="w-4 h-4 text-[var(--fin-violet)]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[13px] font-bold text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                      Decision Replay & Time-Travel Snapshot
-                    </h3>
-                    <p className="text-[10px] text-[var(--text-muted)]">
-                      Exact deterministic reconstruction of all decision inputs, policy versions, and evidence at time of sanction
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[
-                    {
-                      label: 'Snapshot Version',
-                      value: replayData.snapshot_version || '—',
-                      sub: `${replayData.audit_trail_events_count || 0} audit events recorded`,
-                      Icon: Layers, color: 'var(--brand-700)'
-                    },
-                    {
-                      label: 'Verified Evidence Fields',
-                      value: String(replayData.evidence_snapshot?.total_verified_fields || '—'),
-                      sub: replayData.evidence_snapshot?.consistency_status ? '✓ Consistency Verified' : '⚠ Consistency Flagged',
-                      Icon: CheckCircle2, color: 'var(--fin-green)'
-                    },
-                    {
-                      label: 'Model Decision',
-                      value: replayData.decision_record?.outcome || '—',
-                      sub: `Trust Score: ${replayData.risk_snapshot?.finflow_trust_score || '—'}/1000`,
-                      Icon: ShieldCheck, color: 'var(--fin-violet)'
-                    },
-                  ].map((item, i) => (
-                    <div key={i} className="bg-[var(--surface-subtle)] p-4 rounded-xl border border-[var(--border)]">
-                      <div className="flex items-center gap-2 mb-2">
-                        <item.Icon className="w-3.5 h-3.5" style={{ color: item.color }} />
-                        <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{item.label}</span>
-                      </div>
-                      <p className="text-sm font-bold text-[var(--text-primary)]">{item.value}</p>
-                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{item.sub}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <DecisionReplayViewer data={replayData} onRefresh={fetchRiskData} />
             ) : (
               <div className="card p-12 text-center">
                 <RotateCcw className="w-10 h-10 text-[var(--border-strong)] mx-auto mb-3" />
                 <p className="text-sm font-semibold text-[var(--text-secondary)]">No decision replay available yet</p>
               </div>
             )}
+
 
             {/* Active Learning Stats */}
             {learningStats && (
