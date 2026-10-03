@@ -18,12 +18,31 @@ interface TopNavbarProps {
   onToggleMobileNav?: () => void;
 }
 
+import { journeysApi } from '../../api/journeys';
+
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   onToggleMobileNav,
 }) => {
   const { activeJourneyId, setActiveJourneyId, role } = useAuth();
   const { unreadCount, openDrawer } = useNotifications();
+  const [cases, setCases] = React.useState<{ id: string; label: string; tier: string }[]>(BENCHMARK_CASES);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    journeysApi.listJourneys()
+      .then((res: any[]) => {
+        if (!isMounted || !res || res.length === 0) return;
+        const mapped = res.map((j) => ({
+          id: j.journey_id,
+          label: j.intent?.business_name || j.business_name || j.journey_id,
+          tier: j.current_stage ? `${j.current_stage.replace(/_/g, ' ')}` : (j.status || 'ACTIVE')
+        }));
+        setCases(mapped);
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-[var(--brand-950)] px-4 sm:px-6 h-16 flex items-center justify-between gap-4 shadow-xs">
@@ -52,9 +71,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         <select
           value={activeJourneyId}
           onChange={(e) => setActiveJourneyId(e.target.value)}
-          className="bg-transparent text-xs font-bold text-[var(--brand-950)] focus:outline-none cursor-pointer"
+          className="bg-transparent text-xs font-bold text-[var(--brand-950)] focus:outline-none cursor-pointer max-w-[280px] truncate"
         >
-          {BENCHMARK_CASES.map((c) => (
+          {cases.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label} — {c.tier}
             </option>

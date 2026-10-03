@@ -5,6 +5,7 @@ import { NormalizedIntent, IntentSubmitResponse } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { JourneyStepper } from '../../components/fintech/JourneyStepper';
 import {
   Sparkles,
   ArrowRight,
@@ -211,61 +212,8 @@ export const ApplyLoanPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 7-Stage Interactive Journey Stepper */}
-        <Card variant="bordered" padding="md">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-700)]">
-                Authoritative Journey Graph
-              </span>
-              <h3 className="text-base font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                Current Stage: <span className="text-[var(--brand-700)]">{submissionResult.current_stage}</span>
-              </h3>
-            </div>
-            <Badge variant="green" size="sm">
-              Status: {submissionResult.status}
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            {JOURNEY_STAGES.map((s, idx) => {
-              const isCurrent = s.key === submissionResult.current_stage;
-              const isCompleted = s.key === "INTENT_CAPTURE";
-              return (
-                <div
-                  key={s.key}
-                  className={`p-3 rounded-xl border text-center transition-all ${
-                    isCurrent
-                      ? 'bg-[var(--brand-50)] border-[var(--brand-500)] shadow-sm ring-2 ring-[var(--brand-500)]/20'
-                      : isCompleted
-                      ? 'bg-emerald-50/50 border-emerald-300 text-emerald-900'
-                      : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-center justify-center mb-1">
-                    <span
-                      className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                        isCurrent
-                          ? 'bg-[var(--brand-700)] text-white'
-                          : isCompleted
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-200 text-slate-500'
-                      }`}
-                    >
-                      {isCompleted && !isCurrent ? '✓' : s.num}
-                    </span>
-                  </div>
-                  <div className="text-[11px] font-bold leading-tight truncate">
-                    {s.label}
-                  </div>
-                  <div className="text-[9px] mt-0.5 font-medium">
-                    {isCurrent ? 'Active Now' : isCompleted ? 'Completed' : 'Upcoming'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        {/* Canonical Backend-Driven Live Journey Tracker */}
+        <JourneyStepper currentStage={submissionResult.current_stage} status={submissionResult.status} />
 
         {/* 2-Column Split: Next Best Action & Missing Evidence Checklist */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

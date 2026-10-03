@@ -601,6 +601,18 @@ def seed_demo_data():
 def seed_demo_endpoint():
     return seed_demo_data()
 
+@router.post("/reset")
+def reset_demo_endpoint():
+    """Controlled backend endpoint to reset synthetic demonstration data without touching production data."""
+    # Reset in-memory / firestore synthetic benchmark entries
+    for doc_id in ["jrn_priya_001", "jrn_kavita_002", "jrn_apex_003", "jrn_swifttrans_004", "jrn_zenith_005", "jrn_omkar_006"]:
+        db.delete("journeys", doc_id)
+    for app_id in ["app_priya_001", "app_kavita_002", "app_apex_003", "app_swifttrans_004", "app_zenith_005", "app_omkar_006"]:
+        db.delete("applications", app_id)
+        db.delete("risk_assessments", f"rsk_{app_id}")
+        db.delete("decisions", f"dec_{app_id}")
+    return seed_demo_data()
+
 @router.get("/cases")
 def get_benchmark_cases():
     return [
@@ -608,22 +620,51 @@ def get_benchmark_cases():
             "id": "jrn_priya_001",
             "name": "Sharma Textiles Private Limited",
             "persona": "Priya Sharma (SME Owner)",
-            "scenario": "Clean financial health, 0 cheque bounces, healthy DSCR 1.85x, prime sanction ₹15 Lakhs @ 10.75%",
-            "recommended_view": "Customer Journey & What-If Simulator"
+            "scenario": "CASE A — STRONG APPLICATION: Complete evidence, consistent documents, healthy cash flow (DSCR 1.85x), lower risk, instant prime approval ₹15L @ 10.75%",
+            "category": "CASE_A_STRONG",
+            "outcome": "APPROVED",
+            "recommended_view": "/customer/journey/jrn_priya_001",
+            "role": "CUSTOMER"
         },
         {
             "id": "jrn_kavita_002",
             "name": "Kavita Electronics Retail LLP",
             "persona": "Rohan Mehta (Relationship Manager)",
-            "scenario": "Boundary case, moderate volatility, conditional sanction ₹21.25 Lakhs (85% haircut)",
-            "recommended_view": "RM Review & Counterfactual Optimization"
+            "scenario": "CASE B — MISSING EVIDENCE: Needs Review, missing 6M bank statement, pending evidence ingestion, Next Best Action: Request Missing Document",
+            "category": "CASE_B_MISSING_EVIDENCE",
+            "outcome": "NEEDS_REVIEW",
+            "recommended_view": "/rm/cases/jrn_kavita_002",
+            "role": "RM"
         },
         {
             "id": "jrn_apex_003",
             "name": "Apex Logistics & Freight Solutions",
             "persona": "Ananya Iyer (Risk & Compliance Officer)",
-            "scenario": "37.5% GST vs Bank turnover discrepancy + circular trading detected on Financial Trust Graph",
-            "recommended_view": "Consistency Engine, Fraud Graph & Human Override"
+            "scenario": "CASE C — INCONSISTENT EVIDENCE: 37.5% turnover discrepancy between GST and Bank credits, adverse risk flag, automated governance routing to Human Review",
+            "category": "CASE_C_INCONSISTENT_EVIDENCE",
+            "outcome": "FLAGGED_FOR_REVIEW",
+            "recommended_view": "/risk/cases/jrn_apex_003",
+            "role": "RISK_OFFICER"
+        },
+        {
+            "id": "jrn_swifttrans_004",
+            "name": "SwiftTrans Freightways Pvt Ltd",
+            "persona": "Risk & Compliance Officer",
+            "scenario": "CASE D — LINKED APPLICATION SIGNAL: Shared synthetic phone, bank account, and repeated doc hash with Apex Logistics, potential linked-case signal",
+            "category": "CASE_D_LINKED_SIGNAL",
+            "outcome": "LINKED_RISK_SIGNAL",
+            "recommended_view": "/risk",
+            "role": "RISK_OFFICER"
+        },
+        {
+            "id": "jrn_priya_001",
+            "name": "Sharma Textiles (What-If Simulation)",
+            "persona": "Underwriter & Business Owner",
+            "scenario": "CASE E — WHAT-IF SIMULATOR: Interactive sensitivity simulation, stress-testing revenue shocks, margin shifts, and inward cheque bounce impacts on risk scores",
+            "category": "CASE_E_WHAT_IF",
+            "outcome": "SIMULATION_READY",
+            "recommended_view": "/customer/what-if",
+            "role": "CUSTOMER"
         }
     ]
 

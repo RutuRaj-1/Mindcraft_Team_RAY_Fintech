@@ -98,24 +98,26 @@ export const CustomerDashboardPage: React.FC = () => {
   };
 
   // Derive dynamic metrics strictly from backend API responses
-  const activeBusinessName = activeJourney?.intent?.business_name || 'Sharma Textiles Pvt. Ltd.';
-  const activeCIN = (activeJourney?.intent as any)?.cin || (activeJourney?.intent as any)?.registration_number || 'CIN: U17111MH2020PTC334455';
+  const activeBusinessName = activeJourney?.intent?.business_name || (isLoading ? 'Loading Application...' : 'No Active Application');
+  const activeCIN = (activeJourney?.intent as any)?.cin || (activeJourney?.intent as any)?.registration_number || (activeJourney?.intent?.gstin ? `GSTIN: ${activeJourney.intent.gstin}` : 'Registration Pending');
 
-  const approvedAmountNum = decision?.approved_amount || (activeJourney?.intent?.requested_amount ? activeJourney.intent.requested_amount * 0.9 : 1500000);
-  const approvedAmountDisplay = `₹${(approvedAmountNum / 100000).toFixed(2)} Lakhs`;
-  const interestRateDisplay = decision?.interest_rate ? `${decision.interest_rate}% APR` : '11.5% APR';
+  const approvedAmountNum = decision?.approved_amount || (activeJourney?.intent?.requested_amount ? activeJourney.intent.requested_amount * 0.9 : 0);
+  const approvedAmountDisplay = approvedAmountNum > 0 ? `₹${(approvedAmountNum / 100000).toFixed(2)} Lakhs` : (activeJourney ? 'Under Assessment' : '—');
+  const interestRateDisplay = decision?.interest_rate ? `${decision.interest_rate}% APR` : 'Awaiting Sanction';
 
   const trustScoreNum = decision?.risk_score
     ? Math.round((1 - decision.risk_score) * 1000)
-    : Math.round((decision?.confidence_score ?? 0.78) * 1000);
-  const trustScoreDisplay = `${trustScoreNum} / 1000`;
+    : decision?.confidence_score
+    ? Math.round(decision.confidence_score * 1000)
+    : null;
+  const trustScoreDisplay = trustScoreNum !== null ? `${trustScoreNum} / 1000` : 'Calculating...';
 
-  const dscrNum = cashFlow?.dscr ?? 1.45;
-  const dscrDisplay = `${dscrNum.toFixed(2)}x DSCR`;
+  const dscrNum = cashFlow?.dscr ?? null;
+  const dscrDisplay = dscrNum !== null ? `${dscrNum.toFixed(2)}x DSCR` : 'Analyzing Banking...';
 
   const verifiedDocsCount = documents.filter((d) => d.verification_status === 'VERIFIED').length;
-  const totalDocsCount = documents.length > 0 ? documents.length : 4;
-  const docsDisplay = `${verifiedDocsCount > 0 ? verifiedDocsCount : (documents.length > 0 ? verifiedDocsCount : 4)} / ${totalDocsCount} Verified`;
+  const totalDocsCount = documents.length;
+  const docsDisplay = totalDocsCount > 0 ? `${verifiedDocsCount} / ${totalDocsCount} Verified` : '0 / 0 Uploaded';
 
   // Verified items list derived from live documents and consistency report
   const verifiedItems: string[] = [];
@@ -256,7 +258,7 @@ export const CustomerDashboardPage: React.FC = () => {
           label="Debt Service Coverage"
           value={isLoading ? 'Loading...' : dscrDisplay}
           benchmark="Minimum 1.25x policy"
-          status={dscrNum >= 1.25 ? "success" : "warning"}
+          status={dscrNum !== null && dscrNum >= 1.25 ? "success" : "warning"}
           icon={<TrendingUp className="w-4 h-4 text-[var(--brand-800)]" />}
         />
         <MetricCard
@@ -307,7 +309,7 @@ export const CustomerDashboardPage: React.FC = () => {
                 <span>WHAT HAPPENED?</span>
               </div>
               <p className="text-[var(--text-secondary)] leading-relaxed">
-                {verifiedDocsCount || 4} financial documents extracted with SHA-256 provenance; DSCR calculated at {dscrNum.toFixed(2)}x.
+                {verifiedDocsCount || 0} financial documents extracted with SHA-256 provenance; DSCR calculated at {dscrNum !== null ? `${dscrNum.toFixed(2)}x` : 'pending reconciliation'}.
               </p>
             </div>
             <span className="mt-2 text-[10px] font-mono text-[var(--fin-green)] font-bold">100% Provenance</span>

@@ -118,7 +118,7 @@ export const CustomerJourneyPage: React.FC = () => {
       </div>
 
       {/* Stepper */}
-      <JourneyStepper currentStage={journey.current_stage} />
+      <JourneyStepper currentStage={journey.current_stage} status={journey.status} />
 
       {/* Friction & State Machine Telemetry */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

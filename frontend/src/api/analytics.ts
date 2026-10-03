@@ -7,6 +7,9 @@ export const analyticsApi = {
   seedDemo: () =>
     http.post<{ status: string; message: string; cases: unknown[] }>('/demo/seed'),
 
+  resetDemo: () =>
+    http.post<{ status: string; message: string; cases?: unknown[] }>('/demo/reset'),
+
   getDemoCases: () =>
-    http.get<unknown[]>('/demo/cases'),
+    http.get<any[]>('/demo/cases'),
 };
