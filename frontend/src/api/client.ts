@@ -236,6 +236,28 @@ export const api = {
   // Demo
   seedDemo:    () => request<{ status: string; message: string; cases: unknown[] }>('/demo/seed', { method: 'POST' }),
   getDemoCases: () => request<unknown[]>('/demo/cases'),
+
+  // Human Review & Governance
+  listReviews: (status?: string, role?: string) =>
+    request<import('../types').HumanReview[]>(
+      `/reviews${status ? `?status=${encodeURIComponent(status)}` : ''}${role ? `&role=${encodeURIComponent(role)}` : ''}`
+    ),
+  getReview: (reviewId: string) =>
+    request<import('../types').HumanReview>(`/reviews/${reviewId}`),
+  getJourneyReviews: (journeyId: string) =>
+    request<import('../types').HumanReview[]>(`/journeys/${journeyId}/reviews`),
+  startReview: (journeyId: string, notes?: string) =>
+    request<import('../types').HumanReview>(`/journeys/${journeyId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+  submitReview: (journeyId: string, reviewId: string, req: import('../types').SubmitReviewRequest) =>
+    request<import('../types').HumanReview>(`/journeys/${journeyId}/review/${reviewId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  getFeedbackEvents: (journeyId: string) =>
+    request<import('../types').FeedbackEvent[]>(`/journeys/${journeyId}/feedback`),
 };
 
 // ── Legacy alias for backward compat ─────────────────────────────────────────

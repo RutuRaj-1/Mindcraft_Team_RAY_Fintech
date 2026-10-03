@@ -12,6 +12,7 @@ import {
 import { TrustGraphVisual } from './TrustGraphVisual';
 import { DecisionReplayViewer } from '../replay/DecisionReplayViewer';
 import { CrossAppRiskIntelligence } from './CrossAppRiskIntelligence';
+import { HumanReviewWorkflow } from './HumanReviewWorkflow';
 
 
 interface RiskConsoleProps {
@@ -44,7 +45,7 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
   const [overrideNotes,        setOverrideNotes]        = useState<string>('');
   const [coSigner,             setCoSigner]             = useState<string>('Ananya Iyer (Chief Risk Officer)');
   const [isSubmittingOverride, setIsSubmittingOverride] = useState<boolean>(false);
-  const [activeTab,            setActiveTab]            = useState<'consistency' | 'trust_graph' | 'fraud_signals' | 'replay'>('consistency');
+  const [activeTab,            setActiveTab]            = useState<'consistency' | 'trust_graph' | 'fraud_signals' | 'replay' | 'human_review'>('consistency');
   const [fraudSignalsCount,    setFraudSignalsCount]    = useState<number>(0);
 
   const fetchRiskData = async () => {
@@ -213,6 +214,7 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
           { id: 'trust_graph' as const, label: 'Financial Trust Graph', Icon: GitBranch, color: 'var(--fin-violet)', badge: null },
           { id: 'fraud_signals' as const, label: 'Cross-App Risk Signals', Icon: ShieldAlert, color: 'var(--fin-amber)', badge: fraudSignalsCount > 0 ? fraudSignalsCount : null },
           { id: 'replay' as const, label: 'Decision Replay', Icon: RotateCcw, color: 'var(--brand-700)', badge: null },
+          { id: 'human_review' as const, label: 'Human Review', Icon: UserCheck, color: 'var(--fin-green)', badge: null },
         ].map(({ id, label, Icon, color, badge }) => (
           <button
             key={id}
@@ -404,6 +406,17 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
             }}
           />
         )}
+
+        {/* Human Review & Governance */}
+        {activeTab === 'human_review' && (
+          <HumanReviewWorkflow
+            journeyId={journeyId}
+            onRefresh={() => {
+              fetchRiskData();
+              onRefreshJourney();
+            }}
+          />
+        )}
       </div>
 
       {/* ── Human Override Modal ── */}
@@ -528,3 +541,4 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRe
     </div>
   );
 };
+

@@ -797,3 +797,71 @@ export interface FraudNetworkResponse {
   riskSummary: string;
 }
 
+// -- Human Review & Governance -------------------------------------------------
+
+export type HumanReviewStatus = "OPEN" | "SUBMITTED" | "ESCALATED";
+export type HumanReviewOutcome =
+  | "APPROVED"
+  | "CONDITIONAL_APPROVAL"
+  | "DECLINED"
+  | "REJECTED"
+  | "ESCALATED"
+  | "NEEDS_REVIEW";
+
+export interface AIDecisionSnapshot {
+  outcome: string;
+  approved_amount?: number;
+  interest_rate?: number;
+  confidence?: number;
+  risk_score?: number;
+  risk_band?: string;
+  decided_by?: string;
+  reasoning?: string;
+}
+
+export interface HumanReview {
+  reviewId: string;
+  applicationId: string;
+  journeyId: string;
+  reviewerId: string;
+  reviewerName: string;
+  reviewerRole: string;
+  originalAIOutcome: string;
+  aiDecisionId: string;
+  aiDecisionSnapshot: AIDecisionSnapshot;
+  humanOutcome: HumanReviewOutcome | null;
+  reasonCode: string | null;
+  rationaleNotes: string | null;
+  evidenceReviewed: string[];
+  coSignedBy: string | null;
+  status: HumanReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt: string | null;
+}
+
+export interface SubmitReviewRequest {
+  human_outcome: HumanReviewOutcome;
+  reason_code: string;
+  rationale_notes: string;
+  evidence_reviewed?: string[];
+  co_signed_by?: string;
+  new_approved_amount?: number;
+  new_interest_rate?: number;
+}
+
+export interface FeedbackEvent {
+  feedbackId: string;
+  applicationId: string;
+  journeyId?: string;
+  aiDecisionId: string;
+  modelVersion: string;
+  AIOutcome: string;
+  HumanOutcome: string;
+  isOverride: boolean;
+  reason: string;
+  reasonCode: string;
+  reviewerRole: string;
+  reviewerName: string;
+  timestamp: string;
+}

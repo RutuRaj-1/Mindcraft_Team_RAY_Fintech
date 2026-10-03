@@ -14,6 +14,7 @@ from backend.routers import (
     intent_router,
     policy_rag_router,
     fraud_network_router,
+    reviews_router,
 )
 from backend.modules.rag import PolicyIngestionService
 
@@ -54,6 +55,7 @@ app.include_router(demo_router.router)
 app.include_router(intent_router.router)
 app.include_router(policy_rag_router.router)
 app.include_router(fraud_network_router.router)
+app.include_router(reviews_router.router)
 
 @app.get("/health", tags=["System"])
 def health_check():
