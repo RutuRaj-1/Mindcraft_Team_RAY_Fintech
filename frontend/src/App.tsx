@@ -1,138 +1,152 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { UserRole } from './types';
-import { getActiveRole, setActiveRole, api } from './api/client';
-import { Navbar } from './components/layout/Navbar';
-import { CustomerJourneyView } from './components/customer/CustomerJourneyView';
-import { RMQueueView } from './components/rm/RMQueueView';
-import { RiskOfficerConsole } from './components/risk/RiskOfficerConsole';
-import { AdminConsole } from './components/admin/AdminConsole';
-import { Zap } from 'lucide-react';
+import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { AppShell } from './components/layout/AppShell';
+import { ProtectedRoute } from './router/ProtectedRoute';
+
+// Pages
+import { LandingPage } from './pages/LandingPage';
+import { LoginPage } from './pages/LoginPage';
+import { CustomerDashboardPage } from './pages/customer/CustomerDashboardPage';
+import { ApplyLoanPage } from './pages/customer/ApplyLoanPage';
+import { CustomerJourneyPage } from './pages/customer/CustomerJourneyPage';
+import { CustomerDocumentsPage } from './pages/customer/CustomerDocumentsPage';
+import { CustomerDecisionPage } from './pages/customer/CustomerDecisionPage';
+import { RMQueuePage } from './pages/rm/RMQueuePage';
+import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
+import { RiskConsolePage } from './pages/risk/RiskConsolePage';
+import { RiskCaseDetailPage } from './pages/risk/RiskCaseDetailPage';
+import { AdminPage } from './pages/admin/AdminPage';
+import { DemoHubPage } from './pages/demo/DemoHubPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 5000,
-    }
-  }
+    },
+  },
 });
-
-export const AppContent: React.FC = () => {
-  const [currentRole,    setCurrentRole]    = useState<UserRole>(getActiveRole());
-  const [activeJourneyId,setActiveJourneyId]= useState<string>('jrn_priya_001');
-  const [isSeeding,      setIsSeeding]      = useState<boolean>(false);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-
-  const handleRoleChange = (role: UserRole) => {
-    setActiveRole(role);
-    setCurrentRole(role);
-  };
-
-  const handleSelectCase = (journeyId: string) => {
-    setActiveJourneyId(journeyId);
-    if (journeyId === 'jrn_apex_003' && currentRole === 'CUSTOMER') {
-      handleRoleChange('RISK_OFFICER');
-    }
-  };
-
-  const handleResetSeed = async () => {
-    setIsSeeding(true);
-    try {
-      await api.seedDemo();
-      setRefreshTrigger(prev => prev + 1);
-    } catch (e: any) {
-      alert(`Seed failed: ${e.message}`);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      <Navbar
-        currentRole={currentRole}
-        onRoleChange={handleRoleChange}
-        activeJourneyId={activeJourneyId}
-        onSelectCase={handleSelectCase}
-        onResetSeed={handleResetSeed}
-        isSeeding={isSeeding}
-      />
-
-      <main className="flex-1 pb-16">
-        {currentRole === 'CUSTOMER' && (
-          <CustomerJourneyView
-            key={`${activeJourneyId}-${refreshTrigger}`}
-            journeyId={activeJourneyId}
-          />
-        )}
-
-        {currentRole === 'RM' && (
-          <RMQueueView
-            key={`rm-${refreshTrigger}`}
-            onSelectJourney={(id) => {
-              setActiveJourneyId(id);
-              handleRoleChange('CUSTOMER');
-            }}
-          />
-        )}
-
-        {currentRole === 'RISK_OFFICER' && (
-          <RiskOfficerConsole
-            key={`risk-${activeJourneyId}-${refreshTrigger}`}
-            journeyId={activeJourneyId}
-            onRefreshJourney={() => setRefreshTrigger(prev => prev + 1)}
-          />
-        )}
-
-        {currentRole === 'ADMIN' && (
-          <AdminConsole
-            key={`admin-${activeJourneyId}-${refreshTrigger}`}
-            journeyId={activeJourneyId}
-          />
-        )}
-      </main>
-
-      {/* Premium Footer */}
-      <footer style={{
-        borderTop: '1px solid var(--border)',
-        background: 'var(--surface)',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '8px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '20px', height: '20px', borderRadius: '6px',
-            background: 'linear-gradient(135deg, #123E40, #3DA5A6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <Zap size={10} color="white" />
-          </div>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-900)', fontFamily: 'Outfit, sans-serif' }}>
-            FinFlow AI
-          </span>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-            Intelligent & Explainable Financial Journey Orchestration
-          </span>
-        </div>
-        <div style={{ display: 'flex', items: 'center', gap: '16px', fontSize: '10px', color: 'var(--text-muted)' }}>
-          <span>MindCraft Fintech Hackathon MVP v2.1</span>
-          <span style={{ color: 'var(--border-strong)' }}>•</span>
-          <span>7 Modules · 3 Personas · SHAP + RAG + ML</span>
-        </div>
-      </footer>
-    </div>
-  );
-};
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppContent />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <NotificationProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public standalone login route */}
+                <Route path="/login" element={<LoginPage />} />
+
+                {/* Main Application Shell layout with nested routes */}
+                <Route element={<AppShell />}>
+                  {/* Home & Landing */}
+                  <Route path="/" element={<LandingPage />} />
+
+                  {/* Customer SME Routes */}
+                  <Route
+                    path="/customer"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerDashboardPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/customer/apply"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <ApplyLoanPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/customer/journey/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerJourneyPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/customer/documents/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerDocumentsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/customer/decision/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerDecisionPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* RM (Relationship Manager) Routes */}
+                  <Route
+                    path="/rm"
+                    element={
+                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                        <RMQueuePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/rm/cases/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                        <RMCaseDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Risk Officer Routes */}
+                  <Route
+                    path="/risk"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                        <RiskConsolePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/risk/cases/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                        <RiskCaseDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* System Administrator Route */}
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute allowedRoles={['ADMIN', 'RISK_OFFICER']}>
+                        <AdminPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Demo Hub */}
+                  <Route path="/demo" element={<DemoHubPage />} />
+
+                  {/* Catch-all 404 Route */}
+                  <Route path="*" element={<NotFoundPage />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </NotificationProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
