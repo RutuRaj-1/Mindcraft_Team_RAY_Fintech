@@ -19,6 +19,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { HumanReviewModal, HumanReviewAction } from '../../components/fintech/HumanReviewModal';
+import { GovernanceBadge } from '../../components/fintech/GovernanceBadge';
 import {
   Award, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight,
   RefreshCw, Gavel, Check, X, FileText, ChevronRight, Building2,
@@ -280,7 +281,7 @@ export const CreditSanctionChamberPage: React.FC = () => {
             <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
               Role 6: Executive Credit Sanction Committee
             </span>
-            <span className="text-xs font-mono font-bold text-[var(--brand-900)]">FINAL SANCTION AUTHORITY (TIER 3)</span>
+            <GovernanceBadge tier="AUTHORIZED_DECISION" actor="Credit Committee" />
           </div>
           <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Executive Credit Sanction Chamber

@@ -2,6 +2,7 @@ import React from 'react';
 import { DecisionRecord, RiskAssessment } from '../../types';
 import { ShieldCheck, Award, ArrowRight, Percent, Clock, DollarSign, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { GovernanceBadge, GovernanceTier } from './GovernanceBadge';
 
 export interface DecisionCardProps {
   decision: DecisionRecord;
@@ -31,18 +32,27 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
     ? 'bg-[var(--fin-amber-bg)] text-[var(--fin-amber)] border-[var(--fin-amber)]/30'
     : 'bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border-[var(--fin-coral)]/30';
 
+  // Part 61: Determine authoritative governance tier
+  const decLower = (decision.decided_by || '').toLowerCase();
+  const governanceTier: GovernanceTier =
+    decLower.includes('committee') || decLower.includes('approver') || decLower.includes('chair') || decLower.includes('sanction')
+      ? 'AUTHORIZED_DECISION'
+      : decLower.includes('risk') || decLower.includes('officer') || decLower.includes('rm') || decLower.includes('supervisor')
+      ? 'INDEPENDENT_REVIEW'
+      : decLower.includes('audit')
+      ? 'INDEPENDENT_AUDIT'
+      : 'MODEL_OUTPUT';
+
   return (
     <div className={`p-6 rounded-2xl bg-white border border-[var(--border)] shadow-xs ${outcomeBorder} ${className}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${badgeColor}`}>
               {decision.outcome.replace('_', ' ')}
             </span>
-            <span className="text-[11px] text-[var(--text-muted)]">
-              Decided by: <strong className="text-[var(--brand-950)]">{decision.decided_by}</strong>
-            </span>
+            <GovernanceBadge tier={governanceTier} actor={decision.decided_by} />
           </div>
           <h3 className="text-xl font-black text-[var(--brand-950)] tracking-tight">
             SME Credit Facility Sanction

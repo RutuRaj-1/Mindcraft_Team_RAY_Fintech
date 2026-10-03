@@ -16,6 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { GovernanceBadge } from '../../components/fintech/GovernanceBadge';
 import {
   ShieldAlert, AlertTriangle, Network, ArrowRight, Eye, RefreshCw,
   Scale, FileText, CheckCircle2, TrendingUp, Cpu, BookOpen,
@@ -210,11 +211,12 @@ export const RiskConsolePage: React.FC = () => {
       {/* Header */}
       <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[var(--fin-amber-bg)] text-[var(--fin-amber)] border border-[var(--fin-amber)]/30">
               Second-Line Independent Risk Desk
             </span>
-            <span className="text-xs text-[var(--text-muted)]">Officer: Ananya Iyer · Authority Limit: ≤ ₹25 Lakhs</span>
+            <GovernanceBadge tier="INDEPENDENT_REVIEW" actor="Ananya Iyer (Risk Officer)" />
+            <span className="text-xs text-[var(--text-muted)]">Authority Limit: ≤ ₹25 Lakhs</span>
           </div>
           <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Risk & Compliance Command Center
