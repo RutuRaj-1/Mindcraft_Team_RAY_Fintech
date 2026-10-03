@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
-import { ShieldAlert, ArrowRight } from 'lucide-react';
+import { ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 
 interface ProtectedRouteProps {
@@ -14,15 +14,34 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  const { role, persona, switchRole } = useAuth();
+  const { role, persona, switchRole, loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
+  // ── Auth state not yet resolved (Firebase is initialising) ─────────────────
+  if (loading) {
+    return (
+      <div className="min-h-[500px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-[var(--text-muted)]">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-700)]" />
+          <p className="text-xs font-medium">Verifying credentials…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Not authenticated — redirect to login ───────────────────────────────────
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // ── No role restriction — allow through ────────────────────────────────────
   if (!allowedRoles || allowedRoles.length === 0) {
     return <>{children}</>;
   }
 
   const isAuthorized = allowedRoles.includes(role);
 
+  // ── Role mismatch — show access denied panel ───────────────────────────────
   if (!isAuthorized) {
     const recommendedRole = allowedRoles[0];
 
@@ -42,8 +61,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           </h2>
 
           <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
-            You are currently browsing as <strong className="text-[var(--brand-950)]">{persona.name} ({role})</strong>.
-            This view is restricted to institutional {allowedRoles.join(' / ')} personas.
+            You are currently browsing as{' '}
+            <strong className="text-[var(--brand-950)]">
+              {persona.name} ({role})
+            </strong>
+            . This view is restricted to institutional {allowedRoles.join(' / ')} personas.
           </p>
 
           <div className="mt-6 flex flex-col gap-2">
