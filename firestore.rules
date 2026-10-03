@@ -1,20 +1,22 @@
 rules_version = '2';
 
 /**
- * FinFlow AI — Enterprise Firestore Security Rules
- * =================================================
- * Architecture:
- * - Direct client access is strictly gated by Role-Based Access Control (RBAC).
- * - Sensitive financial models and decision waterfalls are institutional-only.
- * - Audit logs, journey steps, risk assessments, and decision records are APPEND-ONLY.
- * - Tampering, deletion, and privilege escalation are blocked by invariant validations.
+ * FinFlow AI — Enterprise RBAC & Separation of Duties Security Rules
+ * =================================================================
+ * Architecture & Governance Principles:
+ * - Direct client access strictly gated by 7+1 Role-Based Access Control (RBAC).
+ * - Separation of Duties: System Admin has ZERO financial sanction or review authority.
+ * - Customer data projection: Customers can view only their own case and public explanations.
+ * - Evidence Ledger & Audit Trail: APPEND-ONLY and cryptographically immutable.
+ * - Four-Eyes Principle: Multi-tier reviews require authorized institutional roles.
+ * - No person or role (including SysAdmin) may delete or tamper with audit records.
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // =========================================================================
-    // 1. HELPER FUNCTIONS
+    // 1. RBAC HELPER FUNCTIONS
     // =========================================================================
 
     function isAuthenticated() {
@@ -25,43 +27,47 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Role extraction from custom claims (fallback to user record if claims missing)
+    // Role extraction strictly from cryptographically verified claims (fallback to CUSTOMER)
     function getRole() {
       return request.auth.token.role != null ? request.auth.token.role : 'CUSTOMER';
     }
 
     function hasRole(role) {
-      return isAuthenticated() && (getRole() == role || isAdmin());
+      return isAuthenticated() && getRole() == role;
     }
 
-    function isCustomer() {
-      return hasRole('CUSTOMER');
+    // --- Individual Role Testers (7 Business Roles + 1 Technical Custodian) ---
+    function isCustomer()       { return hasRole('CUSTOMER'); }
+    function isRM()             { return hasRole('RM'); }
+    function isRiskOfficer()    { return hasRole('RISK_OFFICER'); }
+    function isRMSupervisor()   { return hasRole('RM_SUPERVISOR'); }
+    function isRiskManager()    { return hasRole('RISK_MANAGER'); }
+    function isCreditApprover() { return hasRole('CREDIT_APPROVER'); }
+    function isAuditOfficer()   { return hasRole('AUDIT_OFFICER'); }
+    function isSysAdmin()       { return hasRole('SYS_ADMIN') || hasRole('ADMIN') || (request.auth.token.admin == true); }
+
+    // --- Tiered Operational Groups ---
+    // First-line operations: RM and RM Supervisor
+    function isFirstLineOps() {
+      return isRM() || isRMSupervisor();
     }
 
-    function isRM() {
-      return hasRole('RM');
+    // Second-line independent risk: Risk Officer and Risk Manager
+    function isSecondLineRisk() {
+      return isRiskOfficer() || isRiskManager();
     }
 
-    function isRiskOfficer() {
-      return hasRole('RISK_OFFICER');
+    // Sanction authority: Risk Manager (delegated limits) and Credit Approver / Committee
+    function isSanctionAuthority() {
+      return isRiskManager() || isCreditApprover();
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'ADMIN' ||
-        request.auth.token.admin == true
-      );
+    // All financial institution personnel (excludes Customer and purely technical SysAdmin)
+    function isInstitutionalStaff() {
+      return isFirstLineOps() || isSecondLineRisk() || isSanctionAuthority() || isAuditOfficer();
     }
 
-    function isInstitutionalUser() {
-      return isAuthenticated() && (
-        getRole() == 'RM' ||
-        getRole() == 'RISK_OFFICER' ||
-        isAdmin()
-      );
-    }
-
-    // Access check based on application ownership
+    // Application ownership validation
     function isApplicationOwner(applicationId) {
       return isAuthenticated() && (
         exists(/databases/$(database)/documents/applications/$(applicationId)) &&
@@ -76,7 +82,6 @@ service cloud.firestore {
       );
     }
 
-    // Immutable field helper
     function notChanging(field) {
       return !(field in request.resource.data) ||
              (field in resource.data && request.resource.data[field] == resource.data[field]);
@@ -85,64 +90,63 @@ service cloud.firestore {
     // =========================================================================
     // 2. USERS & PROFILES
     // =========================================================================
-
     match /users/{userId} {
-      allow read: if isUser(userId) || isInstitutionalUser();
+      allow read: if isUser(userId) || isInstitutionalStaff() || isSysAdmin();
+      // Public registration can only assign CUSTOMER role
       allow create: if isUser(userId) && (
-        // Public registration can only assign CUSTOMER role
-        (request.resource.data.role == 'CUSTOMER') ||
-        isAdmin()
+        (request.resource.data.role == 'CUSTOMER') || isSysAdmin()
       );
-      allow update: if (isUser(userId) && notChanging('role') && notChanging('userId')) || isAdmin();
-      allow delete: if isAdmin();
+      // Users can update their own profile fields, but only SysAdmin can change roles or delegated limits
+      allow update: if (isUser(userId) && notChanging('role') && notChanging('userId') && notChanging('delegatedApprovalLimitInr')) || isSysAdmin();
+      // User accounts are deactivated rather than deleted
+      allow delete: if false;
     }
 
     // =========================================================================
     // 3. APPLICATIONS & JOURNEYS
     // =========================================================================
-
     match /applications/{applicationId} {
-      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isInstitutionalUser();
-      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid) || isInstitutionalUser();
-      allow update: if ((isAuthenticated() && resource.data.userId == request.auth.uid && notChanging('userId') && notChanging('applicationId')) || isInstitutionalUser());
-      allow delete: if isAdmin();
+      allow read: if isApplicationOwner(applicationId) || isInstitutionalStaff();
+      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid) || isFirstLineOps();
+      allow update: if (isApplicationOwner(applicationId) && notChanging('applicationId') && notChanging('userId')) || isInstitutionalStaff();
+      allow delete: if false; // Applications are legal artifacts; deletion is prohibited
     }
 
     match /journeys/{journeyId} {
-      allow read: if (isAuthenticated() && resource.data.applicant_id == request.auth.uid) || isInstitutionalUser();
-      allow create: if (isAuthenticated() && request.resource.data.applicant_id == request.auth.uid) || isInstitutionalUser();
-      allow update: if (isAuthenticated() && resource.data.applicant_id == request.auth.uid && notChanging('journey_id')) || isInstitutionalUser();
-      allow delete: if isAdmin();
+      allow read: if isJourneyOwner(journeyId) || isInstitutionalStaff();
+      allow create: if isAuthenticated() && (request.resource.data.applicant_id == request.auth.uid || isFirstLineOps());
+      allow update: if isInstitutionalStaff() || (isAuthenticated() && resource.data.applicant_id == request.auth.uid && notChanging('journey_id'));
+      allow delete: if false;
     }
 
     // =========================================================================
-    // 4. DOCUMENTS & EVIDENCE ITEMS
+    // 4. DOCUMENTS & EVIDENCE ITEMS — EVIDENCE LEDGER IMMUTABILITY
     // =========================================================================
-
     match /documents/{documentId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create: if isApplicationOwner(request.resource.data.applicationId) || isInstitutionalUser();
-      allow update: if (isApplicationOwner(resource.data.applicationId) && notChanging('documentId') && notChanging('fileHash')) || isInstitutionalUser();
-      allow delete: if isAdmin();
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      allow create: if isApplicationOwner(request.resource.data.applicationId) || isFirstLineOps();
+      // Documents cannot have their fileHash or storagePath modified after upload
+      allow update: if isInstitutionalStaff() && notChanging('fileHash') && notChanging('storagePath');
+      allow delete: if false;
     }
 
     match /evidence_items/{evidenceId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create: if isInstitutionalUser();
-      allow update: if isInstitutionalUser() && notChanging('evidenceId');
-      allow delete: if isAdmin();
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      // Evidence items are created by OCR / backend extraction services
+      allow create: if isInstitutionalStaff();
+      // Extracted evidence items are immutable point-in-time facts
+      allow update: if false;
+      allow delete: if false;
     }
 
     // =========================================================================
-    // 5. JOURNEY STEPS — APPEND-ONLY
+    // 5. JOURNEY STEPS — STRICTLY APPEND-ONLY
     // =========================================================================
-
     match /journey_steps/{stepId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
       allow create: if isAuthenticated() && (
-        isApplicationOwner(request.resource.data.applicationId) || isInstitutionalUser()
+        isApplicationOwner(request.resource.data.applicationId) || isInstitutionalStaff()
       );
-      // Strictly immutable once recorded
       allow update: if false;
       allow delete: if false;
     }
@@ -150,130 +154,143 @@ service cloud.firestore {
     // =========================================================================
     // 6. RISK ASSESSMENTS & DECISIONS — IMMUTABLE SNAPSHOTS
     // =========================================================================
-
     match /risk_assessments/{riskId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create: if isInstitutionalUser();
-      allow update: if false; // Risk evaluations must be immutable snapshots
+      // Direct raw risk assessments with internal weights are institutional only
+      allow read: if isInstitutionalStaff();
+      allow create: if isSecondLineRisk() || isSanctionAuthority();
+      allow update: if false;
       allow delete: if false;
     }
 
     match /decisions/{decisionId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create: if isInstitutionalUser();
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      allow create: if isSanctionAuthority();
       allow update: if false; // Decisions are immutable once rendered
       allow delete: if false;
     }
 
     match /next_best_actions/{actionId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create, update: if isInstitutionalUser();
-      allow delete: if isAdmin();
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      allow create, update: if isInstitutionalStaff();
+      allow delete: if false;
     }
 
     // =========================================================================
     // 7. AUDIT LOGS — STRICTLY APPEND-ONLY (TAMPER-PROOF LEDGER)
     // =========================================================================
-
     match /audit_logs/{auditId} {
-      allow read: if isInstitutionalUser() || (isAuthenticated() && resource.data.actorId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.actorId == request.auth.uid;
-      // Absolute guarantee: no modifications or deletions permitted
+      allow read: if isInstitutionalStaff() || (isAuthenticated() && resource.data.actorId == request.auth.uid);
+      allow create: if isAuthenticated();
+      // Absolute guarantee: Zero tolerance for editing or deleting audit logs
       allow update: if false;
       allow delete: if false;
     }
 
     // =========================================================================
-    // 8. POLICIES & RAG CHUNKS
+    // 8. POLICIES & DELEGATED RULES
     // =========================================================================
-
     match /policy_documents/{policyId} {
       allow read: if isAuthenticated();
-      allow write: if isRiskOfficer() || isAdmin();
+      // Policy changes require Senior Risk Manager or Credit Approver
+      allow write: if isRiskManager() || isCreditApprover();
     }
 
     match /policy_chunks/{chunkId} {
       allow read: if isAuthenticated();
-      allow write: if isRiskOfficer() || isAdmin();
+      allow write: if isRiskManager() || isCreditApprover();
+    }
+
+    match /delegated_authority_rules/{ruleId} {
+      allow read: if isInstitutionalStaff();
+      allow write: if isCreditApprover();
     }
 
     // =========================================================================
     // 9. FINANCIAL SNAPSHOTS — APPEND-ONLY
     // =========================================================================
-
     match /financial_snapshots/{snapshotId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalUser();
-      allow create: if isInstitutionalUser() || isApplicationOwner(request.resource.data.applicationId);
-      allow update: if false; // Snapshots are point-in-time immutable records
+      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      allow create: if isInstitutionalStaff() || isApplicationOwner(request.resource.data.applicationId);
+      allow update: if false;
       allow delete: if false;
     }
 
     // =========================================================================
-    // 10. FINANCIAL TRUST GRAPH (NODES, EDGES, FRAUD SIGNALS)
+    // 10. FINANCIAL TRUST GRAPH & FRAUD SIGNALS
     // =========================================================================
-
     match /trust_graph_nodes/{nodeId} {
-      allow read: if isInstitutionalUser();
-      allow write: if isRiskOfficer() || isAdmin();
+      allow read: if isInstitutionalStaff();
+      allow write: if isSecondLineRisk();
     }
 
     match /trust_graph_edges/{edgeId} {
-      allow read: if isInstitutionalUser();
-      allow write: if isRiskOfficer() || isAdmin();
+      allow read: if isInstitutionalStaff();
+      allow write: if isSecondLineRisk();
     }
 
     match /fraud_signals/{signalId} {
-      allow read: if isInstitutionalUser();
-      allow create: if isInstitutionalUser();
-      allow update: if false; // Fraud signals must preserve detection timestamps
+      allow read: if isInstitutionalStaff();
+      allow create: if isSecondLineRisk();
+      allow update: if false;
       allow delete: if false;
     }
 
     // =========================================================================
     // 11. WHAT-IF SCENARIOS & SIMULATIONS
     // =========================================================================
-
     match /what_if_scenarios/{scenarioId} {
-      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isInstitutionalUser();
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isInstitutionalStaff();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if false; // Scenarios are historical simulation snapshots
-      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow update: if false;
+      allow delete: if false;
     }
 
     // =========================================================================
-    // 12. HUMAN REVIEWS & FEEDBACK EVENTS — AUDITABLE OVERSIGHT
+    // 12. HUMAN REVIEWS, SIGNING CHAINS & AUDIT FINDINGS
     // =========================================================================
-
     match /human_reviews/{reviewId} {
-      allow read: if isInstitutionalUser();
-      allow create: if isInstitutionalUser() && request.resource.data.reviewerId == request.auth.uid;
-      allow update: if false; // Override events cannot be tampered with
+      allow read: if isInstitutionalStaff();
+      allow create: if isInstitutionalStaff() && request.resource.data.reviewerId == request.auth.uid;
+      allow update: if false; // Individual override events are immutable
+      allow delete: if false;
+    }
+
+    match /application_reviews/{reviewId} {
+      allow read: if isInstitutionalStaff();
+      allow create: if isFirstLineOps() || isSecondLineRisk();
+      allow update: if isInstitutionalStaff() && notChanging('aiBaseline') && notChanging('reviewId');
+      allow delete: if false;
+    }
+
+    match /audit_findings/{findingId} {
+      allow read: if isInstitutionalStaff();
+      // Only Independent Audit Officer can create findings
+      allow create: if isAuditOfficer() && request.resource.data.auditOfficerId == request.auth.uid;
+      allow update: if isAuditOfficer() || isSanctionAuthority();
       allow delete: if false;
     }
 
     match /feedback_events/{feedbackId} {
-      allow read: if isInstitutionalUser();
-      allow create: if isInstitutionalUser();
-      allow update: if false; // Machine learning active feedback is append-only
+      allow read: if isInstitutionalStaff();
+      allow create: if isInstitutionalStaff();
+      allow update: if false;
       allow delete: if false;
     }
 
     // =========================================================================
     // 13. NOTIFICATIONS & SYSTEM EVENTS
     // =========================================================================
-
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated();
-      // Allow marking as read only
       allow update: if isAuthenticated() &&
                        resource.data.userId == request.auth.uid &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'updatedAt']);
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if false;
     }
 
     match /system_events/{eventId} {
-      allow read: if isAdmin() || isRiskOfficer();
+      allow read: if isSysAdmin() || isAuditOfficer();
       allow create: if isAuthenticated();
       allow update: if false;
       allow delete: if false;

@@ -1,7 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserRole } from '../../types';
 import { FinFlowLogo } from '../ui/FinFlowLogo';
-import { ShieldCheck, UserCheck, AlertTriangle, Settings, RefreshCw, Zap, Building2, Activity, ChevronDown } from 'lucide-react';
+import { 
+  ShieldCheck, 
+  UserCheck, 
+  AlertTriangle, 
+  Settings, 
+  RefreshCw, 
+  Zap, 
+  Building2, 
+  Activity, 
+  ChevronDown, 
+  Users, 
+  ShieldAlert, 
+  Award, 
+  FileSearch,
+  Check
+} from 'lucide-react';
 
 interface NavbarProps {
   currentRole: UserRole;
@@ -18,11 +33,87 @@ const CASES = [
   { id: 'jrn_apex_003', label: 'Apex Trading', desc: '⚠ Fraud', badge: 'coral' },
 ];
 
-const ROLE_CONFIG: Record<UserRole, { icon: React.ReactNode; label: string; description: string; color: string }> = {
-  CUSTOMER: { icon: <UserCheck className="w-3.5 h-3.5" />, label: 'Customer', description: 'Priya Sharma (SME Applicant)', color: '#3DA5A6' },
-  RM: { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'RM', description: 'Rohan Mehta (Loan Officer)', color: '#6A49C6' },
-  RISK_OFFICER: { icon: <AlertTriangle className="w-3.5 h-3.5" />, label: 'Risk Officer', description: 'Ananya Iyer (Risk Officer)', color: '#C98A10' },
-  ADMIN: { icon: <Settings className="w-3.5 h-3.5" />, label: 'Admin', description: 'System Administrator', color: '#2460DC' },
+export const ROLE_CONFIG: Record<string, { 
+  role: UserRole;
+  icon: React.ReactNode; 
+  label: string; 
+  officer: string; 
+  category: string; 
+  color: string;
+  badgeBg: string;
+}> = {
+  CUSTOMER: { 
+    role: 'CUSTOMER',
+    icon: <UserCheck className="w-3.5 h-3.5" />, 
+    label: '1. Customer', 
+    officer: 'Priya Sharma (MSME Applicant)', 
+    category: 'Customer Boundary',
+    color: '#059669',
+    badgeBg: '#ECFDF5'
+  },
+  RM: { 
+    role: 'RM',
+    icon: <ShieldCheck className="w-3.5 h-3.5" />, 
+    label: '2. RM', 
+    officer: 'Rohan Mehta (Loan Officer)', 
+    category: 'First-Line Ops',
+    color: '#2563EB',
+    badgeBg: '#EFF6FF'
+  },
+  RM_SUPERVISOR: { 
+    role: 'RM_SUPERVISOR',
+    icon: <Users className="w-3.5 h-3.5" />, 
+    label: '3. RM Supervisor', 
+    officer: 'Vikram Malhotra (Ops Manager)', 
+    category: 'First-Line Ops',
+    color: '#0F766E',
+    badgeBg: '#F0FDFA'
+  },
+  RISK_OFFICER: { 
+    role: 'RISK_OFFICER',
+    icon: <AlertTriangle className="w-3.5 h-3.5" />, 
+    label: '4. Risk Officer', 
+    officer: 'Ananya Iyer (Credit Risk & Fraud)', 
+    category: 'Second-Line Risk',
+    color: '#D97706',
+    badgeBg: '#FFFBEB'
+  },
+  RISK_MANAGER: { 
+    role: 'RISK_MANAGER',
+    icon: <ShieldAlert className="w-3.5 h-3.5" />, 
+    label: '5. Risk Manager', 
+    officer: 'Meera Krishnan (Senior Risk Oversight)', 
+    category: 'Second-Line Risk',
+    color: '#E11D48',
+    badgeBg: '#FFF1F2'
+  },
+  CREDIT_APPROVER: { 
+    role: 'CREDIT_APPROVER',
+    icon: <Award className="w-3.5 h-3.5" />, 
+    label: '6. Credit Approver', 
+    officer: 'Rajesh Singhania (Sanction Chair)', 
+    category: 'Sanction Authority',
+    color: '#991B1B',
+    badgeBg: '#FEF2F2'
+  },
+  AUDIT_OFFICER: { 
+    role: 'AUDIT_OFFICER',
+    icon: <FileSearch className="w-3.5 h-3.5" />, 
+    label: '7. Audit & Gov', 
+    officer: 'Sunita Rao (Independent Audit)', 
+    category: 'Third-Line Assurance',
+    color: '#7C3AED',
+    badgeBg: '#F5F3FF'
+  },
+  SYS_ADMIN: { 
+    role: 'SYS_ADMIN',
+    icon: <Settings className="w-3.5 h-3.5" />, 
+    label: '8. SysAdmin', 
+    officer: 'Amit Verma (Technical Custodian)', 
+    category: 'Technical Custodian',
+    color: '#475569',
+    badgeBg: '#F8FAFC'
+  },
 };
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,12 +121,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [scrolled, setScrolled] = useState(false);
   const [showCasePicker, setShowCasePicker] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
   const activeCase = CASES.find(c => c.id === activeJourneyId);
+
+  // Normalize current role if legacy 'ADMIN'
+  const normalizedRole = currentRole === 'ADMIN' ? 'SYS_ADMIN' : currentRole;
+  const currentConfig = ROLE_CONFIG[normalizedRole] || ROLE_CONFIG.CUSTOMER;
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 8);
     window.addEventListener('scroll', handler);
     return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
+        setShowRolePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
@@ -46,66 +153,55 @@ export const Navbar: React.FC<NavbarProps> = ({
           : 'bg-white border-b border-[var(--border)]'
       }`}
     >
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-[60px] gap-4">
 
           {/* ── Brand Identity ── */}
           <div className="flex items-center gap-3 shrink-0">
             <FinFlowLogo size="sm" className="h-9 sm:h-10" />
             <span className="hidden sm:inline bg-[var(--brand-50)] text-[var(--brand-700)] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[var(--brand-200)]">
-              MVP v2.1
+              RBAC v3.0
             </span>
           </div>
 
           {/* ── Case Picker (Desktop) ── */}
-          <div className="hidden lg:flex items-center gap-1.5 bg-[var(--surface-subtle)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
-            <Building2 className="w-3.5 h-3.5 text-[var(--brand-600)] shrink-0" />
-            <span className="text-[11px] font-semibold text-[var(--text-muted)] mr-1">Case:</span>
-            {CASES.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => onSelectCase(c.id)}
-                className={`text-[11px] px-2.5 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap ${
-                  activeJourneyId === c.id
-                    ? c.badge === 'coral'
-                      ? 'bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border border-[var(--fin-coral)]/25 shadow-xs'
-                      : c.badge === 'amber'
-                      ? 'bg-[var(--fin-amber-bg)] text-[var(--fin-amber)] border border-[var(--fin-amber)]/25 shadow-xs'
-                      : 'bg-white text-[var(--brand-800)] border border-[var(--border)] shadow-xs'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/70'
-                }`}
-              >
-                {c.id === activeJourneyId && <span className="mr-1">●</span>}
-                {c.label}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Mobile Case Picker ── */}
-          <div className="flex lg:hidden relative">
+          <div className="relative">
             <button
-              onClick={() => setShowCasePicker(s => !s)}
-              className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-subtle)] px-3 py-1.5 rounded-lg border border-[var(--border)]"
+              onClick={() => setShowCasePicker(p => !p)}
+              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] hover:bg-white text-xs font-semibold text-[var(--text-primary)] transition-all cursor-pointer shadow-2xs"
             >
-              <Building2 className="w-3 h-3" />
-              {activeCase?.label || 'Case'}
-              <ChevronDown className="w-3 h-3" />
+              <Building2 className="w-3.5 h-3.5 text-[var(--brand-600)]" />
+              <span className="max-w-[140px] truncate">{activeCase?.label ?? 'Select Benchmark Case'}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase ${
+                activeCase?.badge === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                activeCase?.badge === 'amber' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}>
+                {activeCase?.desc ?? 'Demo'}
+              </span>
+              <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
             </button>
+
             {showCasePicker && (
-              <div className="absolute top-full mt-2 left-0 bg-white border border-[var(--border)] rounded-xl shadow-lg overflow-hidden z-50 w-52">
+              <div className="absolute left-0 mt-2 w-64 bg-white border border-[var(--border)] rounded-xl shadow-lg p-1.5 z-50 animate-fadeInUp">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1">
+                  Synthetic Benchmark Applications
+                </p>
                 {CASES.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => { onSelectCase(c.id); setShowCasePicker(false); }}
-                    className={`w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs transition-colors ${
-                      c.id === activeJourneyId ? 'bg-[var(--brand-50)] text-[var(--brand-800)] font-bold' : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)]'
+                    onClick={() => {
+                      onSelectCase(c.id);
+                      setShowCasePicker(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer ${
+                      c.id === activeJourneyId
+                        ? 'bg-[var(--brand-50)] text-[var(--brand-900)] font-bold'
+                        : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)]'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${
-                      c.badge === 'coral' ? 'bg-[var(--fin-coral)]' : c.badge === 'amber' ? 'bg-[var(--fin-amber)]' : 'bg-[var(--fin-green)]'
-                    }`} />
-                    <span className="font-semibold">{c.label}</span>
-                    <span className="text-[var(--text-muted)] ml-auto">{c.desc}</span>
+                    <span>{c.label}</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{c.desc}</span>
                   </button>
                 ))}
               </div>
@@ -115,28 +211,96 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* ── Right Controls ── */}
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Role Switcher */}
-            <div className="flex items-center bg-[var(--surface-subtle)] p-1 rounded-xl border border-[var(--border)]">
-              {(Object.entries(ROLE_CONFIG) as [UserRole, typeof ROLE_CONFIG[UserRole]][]).map(([role, cfg]) => (
-                <button
-                  key={role}
-                  onClick={() => onRoleChange(role)}
-                  title={cfg.description}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                    currentRole === role
-                      ? 'bg-white text-[var(--brand-800)] shadow-xs border border-[var(--border)] font-bold'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/50'
-                  }`}
-                  style={currentRole === role ? { color: cfg.color } : {}}
+            {/* ── 7+1 Enterprise Role Selector Dropdown ── */}
+            <div className="relative" ref={roleDropdownRef}>
+              <button
+                onClick={() => setShowRolePicker(p => !p)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-white hover:bg-[var(--surface-subtle)] transition-all shadow-xs cursor-pointer"
+                style={{ borderColor: currentConfig.color }}
+              >
+                <div 
+                  className="w-5 h-5 rounded-md flex items-center justify-center text-white"
+                  style={{ backgroundColor: currentConfig.color }}
                 >
-                  {cfg.icon}
-                  <span className={role === 'ADMIN' ? 'hidden sm:inline' : ''}>{cfg.label}</span>
-                </button>
-              ))}
+                  {currentConfig.icon}
+                </div>
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
+                      {currentConfig.label}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold uppercase tracking-wider" style={{ backgroundColor: currentConfig.badgeBg, color: currentConfig.color }}>
+                      {currentConfig.category}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)] leading-tight hidden sm:block">
+                    {currentConfig.officer}
+                  </p>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform duration-200 ${showRolePicker ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showRolePicker && (
+                <div className="absolute right-0 mt-2 w-84 bg-white border-2 border-[var(--brand-950)] rounded-2xl shadow-[4px_4px_0px_#0A1F20] p-2 z-50 animate-fadeInUp">
+                  <div className="px-3 py-1.5 border-b border-[var(--border)] flex items-center justify-between">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-[var(--brand-950)]">
+                      Select Persona (7 Business Roles + SysAdmin)
+                    </p>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-700)]">
+                      Four-Eyes SoD
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 mt-1 max-h-[360px] overflow-y-auto">
+                    {Object.values(ROLE_CONFIG).map((cfg) => {
+                      const isSelected = normalizedRole === cfg.role;
+                      return (
+                        <button
+                          key={cfg.role}
+                          onClick={() => {
+                            onRoleChange(cfg.role);
+                            setShowRolePicker(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[var(--brand-50)] border border-[var(--brand-200)] shadow-2xs'
+                              : 'hover:bg-[var(--surface-subtle)] border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div 
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
+                              style={{ backgroundColor: cfg.color }}
+                            >
+                              {cfg.icon}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-[var(--text-primary)]">
+                                  {cfg.label}
+                                </span>
+                                <span className="text-[9px] px-1 rounded font-semibold uppercase" style={{ backgroundColor: cfg.badgeBg, color: cfg.color }}>
+                                  {cfg.category}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-[var(--text-muted)] truncate">
+                                {cfg.officer}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-[var(--brand-700)] shrink-0 ml-2" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* System Status Pulse */}
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--fin-green-bg)] border border-[var(--fin-green)]/20 rounded-lg">
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--fin-green-bg)] border border-[var(--fin-green)]/20 rounded-lg">
               <Activity className="w-3 h-3 text-[var(--fin-green)]" />
               <span className="text-[10px] font-bold text-[var(--fin-green)]">Live</span>
             </div>
@@ -146,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onResetSeed}
               disabled={isSeeding}
               title="Reset & Re-seed Benchmark Demo Data"
-              className={`p-2 rounded-lg transition-all border border-[var(--border)] ${
+              className={`p-2 rounded-lg transition-all border border-[var(--border)] cursor-pointer ${
                 isSeeding
                   ? 'text-[var(--brand-500)] bg-[var(--brand-50)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--brand-700)] hover:bg-[var(--brand-50)] hover:border-[var(--brand-200)]'

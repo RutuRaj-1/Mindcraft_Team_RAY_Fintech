@@ -59,9 +59,15 @@ const AppRedirect: React.FC = () => {
 
   switch (role) {
     case 'RM':
+    case 'RM_SUPERVISOR':
       return <Navigate to="/rm" replace />;
     case 'RISK_OFFICER':
+    case 'RISK_MANAGER':
+    case 'CREDIT_APPROVER':
       return <Navigate to="/risk" replace />;
+    case 'AUDIT_OFFICER':
+      return <Navigate to="/risk/replay" replace />;
+    case 'SYS_ADMIN':
     case 'ADMIN':
       return <Navigate to="/admin" replace />;
     default:
@@ -174,7 +180,7 @@ export default function App() {
                   <Route
                     path="/rm"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
                         <RMQueuePage />
                       </ProtectedRoute>
                     }
@@ -184,7 +190,7 @@ export default function App() {
                   <Route
                     path="/rm/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
                         <RMCaseDetailPage />
                       </ProtectedRoute>
                     }
@@ -192,17 +198,17 @@ export default function App() {
                   <Route
                     path="/app/rm/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['RM', 'RM_SUPERVISOR', 'AUDIT_OFFICER']}>
                         <RMCaseDetailPage />
                       </ProtectedRoute>
                     }
                   />
 
-                  {/* Risk Officer Routes */}
+                  {/* Risk Officer, Risk Manager & Credit Approver Routes */}
                   <Route
                     path="/risk"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
                         <RiskConsolePage />
                       </ProtectedRoute>
                     }
@@ -212,7 +218,7 @@ export default function App() {
                   <Route
                     path="/risk/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
                         <RiskCaseDetailPage />
                       </ProtectedRoute>
                     }
@@ -220,17 +226,17 @@ export default function App() {
                   <Route
                     path="/app/risk/cases/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER']}>
                         <RiskCaseDetailPage />
                       </ProtectedRoute>
                     }
                   />
 
-                  {/* Decision Replay Routes */}
+                  {/* Decision Replay Routes — Institutional & Audit Assurance */}
                   <Route
                     path="/risk/replay/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'RM', 'RM_SUPERVISOR', 'CUSTOMER']}>
                         <DecisionReplayPage />
                       </ProtectedRoute>
                     }
@@ -238,7 +244,7 @@ export default function App() {
                   <Route
                     path="/risk/replay"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'RM', 'RM_SUPERVISOR', 'CUSTOMER']}>
                         <DecisionReplayPage />
                       </ProtectedRoute>
                     }
@@ -246,7 +252,7 @@ export default function App() {
                   <Route
                     path="/replay/:id"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'RM', 'RM_SUPERVISOR', 'CUSTOMER']}>
                         <DecisionReplayPage />
                       </ProtectedRoute>
                     }
@@ -254,7 +260,7 @@ export default function App() {
                   <Route
                     path="/replay"
                     element={
-                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM', 'CUSTOMER']}>
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'RISK_MANAGER', 'CREDIT_APPROVER', 'AUDIT_OFFICER', 'RM', 'RM_SUPERVISOR', 'CUSTOMER']}>
                         <DecisionReplayPage />
                       </ProtectedRoute>
                     }
@@ -262,11 +268,11 @@ export default function App() {
                   <Route path="/app/replay/:id" element={<Navigate to="/risk/replay/:id" replace />} />
 
 
-                  {/* System Administrator Route */}
+                  {/* System Administrator Route (Technical Custodian Only) */}
                   <Route
                     path="/admin"
                     element={
-                      <ProtectedRoute allowedRoles={['ADMIN', 'RISK_OFFICER']}>
+                      <ProtectedRoute allowedRoles={['SYS_ADMIN', 'ADMIN']}>
                         <AdminPage />
                       </ProtectedRoute>
                     }

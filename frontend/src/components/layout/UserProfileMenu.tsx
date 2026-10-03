@@ -1,7 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, PERSONAS } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import { UserCheck, ShieldCheck, AlertTriangle, Settings, ChevronDown, Check, LogOut, ArrowRightLeft } from 'lucide-react';
+import { 
+  UserCheck, 
+  ShieldCheck, 
+  AlertTriangle, 
+  Settings, 
+  ChevronDown, 
+  Check, 
+  LogOut, 
+  ArrowRightLeft,
+  Users,
+  ShieldAlert,
+  Award,
+  FileSearch
+} from 'lucide-react';
 
 export const UserProfileMenu: React.FC = () => {
   const { role, persona, switchRole, logout } = useAuth();
@@ -21,8 +34,13 @@ export const UserProfileMenu: React.FC = () => {
   const roleIcons: Record<UserRole, React.ReactNode> = {
     CUSTOMER: <UserCheck className="w-3.5 h-3.5 text-[var(--fin-green)]" />,
     RM: <ShieldCheck className="w-3.5 h-3.5 text-[var(--fin-blue)]" />,
+    RM_SUPERVISOR: <Users className="w-3.5 h-3.5 text-[var(--brand-700)]" />,
     RISK_OFFICER: <AlertTriangle className="w-3.5 h-3.5 text-[var(--fin-amber)]" />,
-    ADMIN: <Settings className="w-3.5 h-3.5 text-[var(--fin-violet)]" />,
+    RISK_MANAGER: <ShieldAlert className="w-3.5 h-3.5 text-[var(--fin-coral)]" />,
+    CREDIT_APPROVER: <Award className="w-3.5 h-3.5 text-[#dc2626]" />,
+    AUDIT_OFFICER: <FileSearch className="w-3.5 h-3.5 text-[var(--fin-violet)]" />,
+    SYS_ADMIN: <Settings className="w-3.5 h-3.5 text-[#64748b]" />,
+    ADMIN: <Settings className="w-3.5 h-3.5 text-[#64748b]" />,
   };
 
   return (

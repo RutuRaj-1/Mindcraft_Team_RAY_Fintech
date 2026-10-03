@@ -36,10 +36,20 @@ export const SignInPage: React.FC = () => {
 
   const getRoleDestination = (role: UserRole) => {
     switch (role) {
-      case 'RM': return '/rm';
-      case 'RISK_OFFICER': return '/risk';
-      case 'ADMIN': return '/admin';
-      default: return '/customer';
+      case 'RM':
+      case 'RM_SUPERVISOR':
+        return '/rm';
+      case 'RISK_OFFICER':
+      case 'RISK_MANAGER':
+      case 'CREDIT_APPROVER':
+        return '/risk';
+      case 'AUDIT_OFFICER':
+        return '/risk/replay';
+      case 'SYS_ADMIN':
+      case 'ADMIN':
+        return '/admin';
+      default:
+        return '/customer';
     }
   };
 
@@ -354,7 +364,9 @@ export const SignInPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  {Object.entries(PERSONAS).map(([roleKey, p]) => (
+                  {Object.entries(PERSONAS)
+                    .filter(([roleKey]) => roleKey !== 'ADMIN')
+                    .map(([roleKey, p]) => (
                     <button
                       key={roleKey}
                       type="button"
@@ -366,10 +378,7 @@ export const SignInPage: React.FC = () => {
                         <div
                           className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-2xs"
                           style={{
-                            backgroundColor:
-                              roleKey === 'CUSTOMER' ? '#0E9B6D' :
-                              roleKey === 'RM' ? '#2460DC' :
-                              roleKey === 'RISK_OFFICER' ? '#C98A10' : '#6A49C6',
+                            backgroundColor: p.badgeColor || '#0F4C81',
                           }}
                         >
                           {p.avatarInitials}
@@ -378,7 +387,7 @@ export const SignInPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-black text-[#0B1F3A]">{p.name}</span>
                             <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EEF8F7] text-[#0F4C81] border border-[#12B8C8]/30">
-                              {roleKey}
+                              {roleKey.replace('_', ' ')}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#64748B]">{p.title} · {p.organization}</p>

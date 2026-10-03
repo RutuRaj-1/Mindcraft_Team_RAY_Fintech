@@ -31,8 +31,14 @@ from backend.database.models import (
 from backend.modules.module5_trust.audit_ledger import AuditLedger
 
 
-# -- Authorised reviewer roles -------------------------------------------------
-AUTHORIZED_REVIEWER_ROLES = {"RM", "RISK_OFFICER", "ADMIN"}
+# -- Authorised reviewer roles (Excludes technical SysAdmin & read-heavy Audit Officer)
+AUTHORIZED_REVIEWER_ROLES = {
+    "RM",
+    "RM_SUPERVISOR",
+    "RISK_OFFICER",
+    "RISK_MANAGER",
+    "CREDIT_APPROVER",
+}
 
 # -- Valid human outcomes ------------------------------------------------------
 VALID_HUMAN_OUTCOMES = {
@@ -185,6 +191,45 @@ class HumanReviewService:
                 status_code=400,
                 detail="A detailed rationale (minimum 10 characters) is mandatory for human review.",
             )
+
+        # Enforce Separation of Duties & Delegated Authority Thresholds
+        is_approval = human_outcome.upper() in {"APPROVED", "CONDITIONAL_APPROVAL"}
+        if is_approval:
+            # 1. First-Line Operations cannot sanction credit approvals unilaterally
+            if reviewer_role in {"RM", "RM_SUPERVISOR"}:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"Separation of Duties violation: {reviewer_role} is a First-Line role and cannot "
+                        "grant final credit approval. Please submit recommendation as ESCALATED or NEEDS_REVIEW."
+                    ),
+                )
+
+            # Determine requested loan amount for limit checks
+            requested_amount = 0.0
+            apps = db.list("applications", {"application_id": application_id})
+            if apps:
+                requested_amount = float(apps[0].get("requested_amount", apps[0].get("requestedAmount", 0.0)))
+
+            # 2. Risk Officer limit: ₹25 Lakhs
+            if reviewer_role == "RISK_OFFICER" and requested_amount > 2500000.0:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"Delegated Authority limit exceeded: Loan amount ₹{requested_amount:,.2f} exceeds "
+                        "Risk Officer limit of ₹25,00,000.00. Please escalate to Risk Manager."
+                    ),
+                )
+
+            # 3. Risk Manager limit: ₹1 Crore
+            if reviewer_role == "RISK_MANAGER" and requested_amount > 10000000.0:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"Delegated Authority limit exceeded: Loan amount ₹{requested_amount:,.2f} exceeds "
+                        "Risk Manager limit of ₹1,00,00,000.00. Please escalate to Credit Approver / Committee."
+                    ),
+                )
 
         # Fetch review record
         review_doc = db.get("human_reviews", review_id)

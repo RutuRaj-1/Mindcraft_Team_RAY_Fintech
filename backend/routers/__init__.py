@@ -14,6 +14,7 @@ from backend.routers import (
     policy_rag_router,
     fraud_network_router,
     reviews_router,
+    audit_router,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "policy_rag_router",
     "fraud_network_router",
     "reviews_router",
+    "audit_router",
 ]

@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, List
+from typing import Optional, List, Callable
 from fastapi import HTTPException, Security, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -16,38 +16,95 @@ class AuthenticatedUser(BaseModel):
     name: str
     role: UserRole
     business_id: Optional[str] = None
+    team_id: Optional[str] = None
+    supervisor_id: Optional[str] = None
+    delegated_limit_inr: float = 0.0
     claims: dict = {}
 
-# Demo user profiles for instantaneous hackathon switching and mock testing
-DEMO_USERS = {
+# Demo user profiles for instantaneous hackathon switching across all 7 business roles + 1 SysAdmin
+DEMO_USERS: dict[str, AuthenticatedUser] = {
+    # 1. MSME Customer
     "demo-customer": AuthenticatedUser(
         uid="usr_priya_001",
         email="priya.sharma@sharmatextiles.in",
         name="Priya Sharma",
         role=UserRole.CUSTOMER,
         business_id="biz_sharma_textiles",
+        delegated_limit_inr=0.0,
         claims={"role": "CUSTOMER"}
     ),
+    # 2. Relationship Manager (First-Line Operations)
     "demo-rm": AuthenticatedUser(
         uid="usr_rohan_002",
-        email="rohan.mehta@finbridge.bank",
+        email="rohan.mehta@finflowbank.com",
         name="Rohan Mehta",
         role=UserRole.RM,
-        claims={"role": "RM"}
+        team_id="team_west_sme",
+        delegated_limit_inr=0.0,
+        claims={"role": "RM", "team_id": "team_west_sme"}
     ),
+    # 3. RM Supervisor (First-Line Operations Oversight)
+    "demo-rm-supervisor": AuthenticatedUser(
+        uid="usr_vikram_004",
+        email="vikram.malhotra@finflowbank.com",
+        name="Vikram Malhotra",
+        role=UserRole.RM_SUPERVISOR,
+        team_id="team_west_sme",
+        delegated_limit_inr=0.0,
+        claims={"role": "RM_SUPERVISOR", "team_id": "team_west_sme"}
+    ),
+    # 4. Risk & Compliance Officer (Second-Line Independent Risk)
     "demo-risk-officer": AuthenticatedUser(
         uid="usr_ananya_003",
-        email="ananya.iyer@finbridge.bank",
+        email="ananya.iyer@finflowbank.com",
         name="Ananya Iyer",
         role=UserRole.RISK_OFFICER,
-        claims={"role": "RISK_OFFICER"}
+        delegated_limit_inr=2500000.0,  # ₹25 Lakhs fast-track limit
+        claims={"role": "RISK_OFFICER", "delegated_limit_inr": 2500000.0}
     ),
+    # 5. Risk Manager (Second-Line Supervisory Risk Oversight)
+    "demo-risk-manager": AuthenticatedUser(
+        uid="usr_meera_005",
+        email="meera.krishnan@finflowbank.com",
+        name="Meera Krishnan",
+        role=UserRole.RISK_MANAGER,
+        delegated_limit_inr=10000000.0,  # ₹1 Crore limit
+        claims={"role": "RISK_MANAGER", "delegated_limit_inr": 10000000.0}
+    ),
+    # 6. Credit Approver / Committee (Governed Sanction Authority)
+    "demo-credit-approver": AuthenticatedUser(
+        uid="usr_rajesh_006",
+        email="rajesh.singhania@finflowbank.com",
+        name="Rajesh Singhania",
+        role=UserRole.CREDIT_APPROVER,
+        delegated_limit_inr=50000000.0,  # ₹5 Crore limit
+        claims={"role": "CREDIT_APPROVER", "delegated_limit_inr": 50000000.0}
+    ),
+    # 7. Independent Audit & Governance Officer (Third-Line Read-Heavy Assurance)
+    "demo-audit-officer": AuthenticatedUser(
+        uid="usr_sunita_007",
+        email="sunita.rao@finflowbank.com",
+        name="Sunita Rao",
+        role=UserRole.AUDIT_OFFICER,
+        delegated_limit_inr=0.0,
+        claims={"role": "AUDIT_OFFICER"}
+    ),
+    # 8. System Administrator (Purely Technical Infrastructure Custodian)
     "demo-admin": AuthenticatedUser(
-        uid="usr_admin_004",
+        uid="usr_amit_008",
         email="admin@finflow.ai",
-        name="System Administrator",
-        role=UserRole.ADMIN,
-        claims={"role": "ADMIN"}
+        name="Amit Verma",
+        role=UserRole.SYS_ADMIN,
+        delegated_limit_inr=0.0,
+        claims={"role": "SYS_ADMIN"}
+    ),
+    "demo-sys-admin": AuthenticatedUser(
+        uid="usr_amit_008",
+        email="admin@finflow.ai",
+        name="Amit Verma",
+        role=UserRole.SYS_ADMIN,
+        delegated_limit_inr=0.0,
+        claims={"role": "SYS_ADMIN"}
     )
 }
 
@@ -112,6 +169,8 @@ def verify_token(token: str) -> AuthenticatedUser:
             from firebase_admin import auth as fb_auth
             decoded = fb_auth.verify_id_token(clean_token)
             role_claim = decoded.get("role", "CUSTOMER").upper()
+            if role_claim == "ADMIN":
+                role_claim = "SYS_ADMIN"
             try:
                 user_role = UserRole(role_claim)
             except ValueError:
@@ -123,6 +182,9 @@ def verify_token(token: str) -> AuthenticatedUser:
                 name=decoded.get("name", decoded.get("email", "User")),
                 role=user_role,
                 business_id=decoded.get("business_id"),
+                team_id=decoded.get("team_id"),
+                supervisor_id=decoded.get("supervisor_id"),
+                delegated_limit_inr=float(decoded.get("delegated_limit_inr", 0.0)),
                 claims=decoded
             )
         except Exception as e:
@@ -134,10 +196,23 @@ def verify_token(token: str) -> AuthenticatedUser:
 
     # 4. Fallback matching in demo mode
     if settings.DEMO_MODE:
-        # Match demo token patterns like 'demo-customer', 'demo-rm', etc.
-        for role_key, user in DEMO_USERS.items():
-            if role_key.replace("demo-", "") in clean_token.lower():
-                return user
+        lower_token = clean_token.lower()
+        if "customer" in lower_token:
+            return DEMO_USERS["demo-customer"]
+        if "rm-supervisor" in lower_token or "supervisor" in lower_token:
+            return DEMO_USERS["demo-rm-supervisor"]
+        if "rm" in lower_token:
+            return DEMO_USERS["demo-rm"]
+        if "risk-manager" in lower_token:
+            return DEMO_USERS["demo-risk-manager"]
+        if "risk-officer" in lower_token or "risk" in lower_token:
+            return DEMO_USERS["demo-risk-officer"]
+        if "credit-approver" in lower_token or "approver" in lower_token:
+            return DEMO_USERS["demo-credit-approver"]
+        if "audit" in lower_token:
+            return DEMO_USERS["demo-audit-officer"]
+        if "admin" in lower_token:
+            return DEMO_USERS["demo-admin"]
         return DEMO_USERS["demo-customer"]
 
     raise HTTPException(
@@ -158,7 +233,7 @@ async def get_current_user(
         )
     return verify_token(credentials.credentials)
 
-def require_role(allowed_roles: List[UserRole]):
+def require_role(allowed_roles: List[UserRole]) -> Callable:
     """Generic role-checking dependency."""
     def role_checker(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
         if user.role not in allowed_roles:
@@ -169,10 +244,10 @@ def require_role(allowed_roles: List[UserRole]):
         return user
     return role_checker
 
-# Explicit role dependencies as required by architecture
+# Explicit role dependencies enforcing strict Separation of Duties
 def require_customer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces CUSTOMER role access (or ADMIN override)."""
-    if user.role not in [UserRole.CUSTOMER, UserRole.ADMIN]:
+    """Enforces CUSTOMER role access (Audit Officer can view in read-only mode)."""
+    if user.role not in [UserRole.CUSTOMER, UserRole.AUDIT_OFFICER]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Customer privileges required, but current role is {user.role.value}"
@@ -180,41 +255,109 @@ def require_customer(user: AuthenticatedUser = Depends(get_current_user)) -> Aut
     return user
 
 def require_rm(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Relationship Manager (RM) role access (or ADMIN override)."""
-    if user.role not in [UserRole.RM, UserRole.ADMIN]:
+    """Enforces Relationship Manager (RM) or RM Supervisor access."""
+    if user.role not in [UserRole.RM, UserRole.RM_SUPERVISOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Relationship Manager privileges required, but current role is {user.role.value}"
         )
     return user
 
+def require_rm_supervisor(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    """Enforces RM Supervisor privileges for team reassignments and ops exceptions."""
+    if user.role != UserRole.RM_SUPERVISOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. RM Supervisor privileges required, but current role is {user.role.value}"
+        )
+    return user
+
 def require_risk_officer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Risk & Compliance Officer role access (or ADMIN override)."""
-    if user.role not in [UserRole.RISK_OFFICER, UserRole.ADMIN]:
+    """Enforces Risk & Compliance Officer or Senior Risk Manager access."""
+    if user.role not in [UserRole.RISK_OFFICER, UserRole.RISK_MANAGER, UserRole.AUDIT_OFFICER]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Risk Officer privileges required, but current role is {user.role.value}"
         )
     return user
 
-def require_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Administrator role access."""
-    if user.role != UserRole.ADMIN:
+def require_risk_manager(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    """Enforces Senior Risk Manager or Credit Approver access."""
+    if user.role not in [UserRole.RISK_MANAGER, UserRole.CREDIT_APPROVER]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. Administrator privileges required, but current role is {user.role.value}"
+            detail=f"Access denied. Risk Manager privileges required, but current role is {user.role.value}"
         )
     return user
 
-def set_firebase_custom_role(uid: str, role: UserRole) -> bool:
+def require_credit_approver(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    """Enforces final Credit Approver / Committee authority."""
+    if user.role != UserRole.CREDIT_APPROVER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Credit Approver privileges required, but current role is {user.role.value}"
+        )
+    return user
+
+def require_audit_officer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    """Enforces Independent Audit & Governance Officer access."""
+    if user.role != UserRole.AUDIT_OFFICER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Independent Audit privileges required, but current role is {user.role.value}"
+        )
+    return user
+
+def require_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    """Enforces System Administrator role access.
+    IMPORTANT: SysAdmin has NO authority to approve loans or alter credit risk decisions!
+    """
+    if user.role != UserRole.SYS_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. System Administrator privileges required, but current role is {user.role.value}"
+        )
+    return user
+
+def require_sanction_authority(requested_amount_inr: float = 0.0, risk_band: str = "LOW_RISK") -> Callable:
+    """Dependency checking that the caller has adequate delegated authority to sanction."""
+    def checker(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+        # 1. Must be in the authorized sanction hierarchy
+        if user.role not in [UserRole.RISK_OFFICER, UserRole.RISK_MANAGER, UserRole.CREDIT_APPROVER]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{user.role.value}' does not possess loan sanction authority."
+            )
+
+        # 2. High-Risk cases strictly require Credit Approver / Committee
+        if risk_band == "HIGH_RISK" and user.role != UserRole.CREDIT_APPROVER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="High-Risk loans require final approval from a Credit Approver or Credit Committee."
+            )
+
+        # 3. Check monetary limits
+        if requested_amount_inr > user.delegated_limit_inr:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Requested amount ₹{requested_amount_inr:,.2f} exceeds "
+                    f"officer's delegated limit of ₹{user.delegated_limit_inr:,.2f}."
+                )
+            )
+        return user
+    return checker
+
+def set_firebase_custom_role(uid: str, role: UserRole, delegated_limit_inr: float = 0.0) -> bool:
     """Admin utility to assign custom role claims in Firebase Auth."""
     if not firebase_initialized:
         logger.warning(f"Cannot set claims for {uid}: Firebase Admin not initialized.")
         return False
     try:
         from firebase_admin import auth as fb_auth
-        fb_auth.set_custom_user_claims(uid, {"role": role.value})
-        logger.info(f"Custom claim role='{role.value}' set for UID {uid}")
+        claims = {"role": role.value, "delegated_limit_inr": delegated_limit_inr}
+        fb_auth.set_custom_user_claims(uid, claims)
+        logger.info(f"Custom claims {claims} set for UID {uid}")
         return True
     except Exception as e:
         logger.error(f"Failed to set custom claim: {e}")

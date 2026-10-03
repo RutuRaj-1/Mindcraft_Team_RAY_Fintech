@@ -24,10 +24,15 @@ const API_BASE = '/api/v1';
 
 // ── Demo-mode token helpers ───────────────────────────────────────────────────
 export const ROLE_DEMO_TOKEN: Record<UserRole, string> = {
-  CUSTOMER:     'demo-customer',
-  RM:           'demo-rm',
-  RISK_OFFICER: 'demo-risk-officer',
-  ADMIN:        'demo-admin',
+  CUSTOMER:         'demo-customer',
+  RM:               'demo-rm',
+  RM_SUPERVISOR:    'demo-rm-supervisor',
+  RISK_OFFICER:     'demo-risk-officer',
+  RISK_MANAGER:     'demo-risk-manager',
+  CREDIT_APPROVER:  'demo-credit-approver',
+  AUDIT_OFFICER:    'demo-audit-officer',
+  SYS_ADMIN:        'demo-admin',
+  ADMIN:            'demo-admin',
 };
 
 // Synchronous fallback stored in localStorage (demo mode)

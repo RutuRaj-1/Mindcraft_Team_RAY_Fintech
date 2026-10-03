@@ -1,4 +1,13 @@
-export type UserRole = "CUSTOMER" | "RM" | "RISK_OFFICER" | "ADMIN";
+export type UserRole = 
+  | "CUSTOMER" 
+  | "RM" 
+  | "RM_SUPERVISOR"
+  | "RISK_OFFICER" 
+  | "RISK_MANAGER"
+  | "CREDIT_APPROVER" 
+  | "AUDIT_OFFICER" 
+  | "SYS_ADMIN"
+  | "ADMIN";
 
 export type JourneyStage = 
   | "INTENT_CAPTURE"
@@ -21,6 +30,8 @@ export interface AuthenticatedUser {
   name: string;
   role: UserRole;
   business_id?: string;
+  team_id?: string;
+  delegated_limit_inr?: number;
 }
 
 export interface IntentPayload {
