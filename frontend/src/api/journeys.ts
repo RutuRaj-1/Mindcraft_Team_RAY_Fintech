@@ -31,4 +31,10 @@ export const journeysApi = {
 
   getFrictionMetrics: (journeyId: string) =>
     http.get<JourneyFrictionMetrics>(`/journeys/${journeyId}/friction`),
+
+  getTimeline: (journeyId: string) =>
+    http.get<any>(`/journeys/${journeyId}/timeline`),
+
+  getReplay: (journeyId: string) =>
+    http.get<any>(`/journeys/${journeyId}/replay`),
 };

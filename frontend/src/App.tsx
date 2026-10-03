@@ -68,13 +68,13 @@ const AppRedirect: React.FC = () => {
     case 'RM':
       return <Navigate to="/rm" replace />;
     case 'RM_SUPERVISOR':
-      return <Navigate to="/operations" replace />;
+      return <Navigate to="/rm-supervisor" replace />;
     case 'RISK_OFFICER':
       return <Navigate to="/risk" replace />;
     case 'RISK_MANAGER':
       return <Navigate to="/risk-manager" replace />;
     case 'CREDIT_APPROVER':
-      return <Navigate to="/approvals" replace />;
+      return <Navigate to="/credit-approval" replace />;
     case 'AUDIT_OFFICER':
       return <Navigate to="/audit" replace />;
     case 'SYS_ADMIN':
@@ -227,14 +227,16 @@ export default function App() {
 
                   {/* Operations Manager (RM_SUPERVISOR) Dedicated Command Center */}
                   <Route
-                    path="/operations"
+                    path="/rm-supervisor"
                     element={
                       <ProtectedRoute allowedRoles={['RM_SUPERVISOR', 'ADMIN', 'SYS_ADMIN']}>
                         <RMSupervisorDashboardPage />
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/app/operations" element={<Navigate to="/operations" replace />} />
+                  <Route path="/operations" element={<Navigate to="/rm-supervisor" replace />} />
+                  <Route path="/app/operations" element={<Navigate to="/rm-supervisor" replace />} />
+                  <Route path="/app/rm-supervisor" element={<Navigate to="/rm-supervisor" replace />} />
 
                   {/* Second-Line Risk Officer Console */}
                   <Route
@@ -277,14 +279,16 @@ export default function App() {
 
                   {/* Credit Sanction Committee (CREDIT_APPROVER) Chamber */}
                   <Route
-                    path="/approvals"
+                    path="/credit-approval"
                     element={
                       <ProtectedRoute allowedRoles={['CREDIT_APPROVER', 'ADMIN', 'SYS_ADMIN']}>
                         <CreditSanctionChamberPage />
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/app/approvals" element={<Navigate to="/approvals" replace />} />
+                  <Route path="/approvals" element={<Navigate to="/credit-approval" replace />} />
+                  <Route path="/app/approvals" element={<Navigate to="/credit-approval" replace />} />
+                  <Route path="/app/credit-approval" element={<Navigate to="/credit-approval" replace />} />
 
                   {/* Independent Audit & Governance (AUDIT_OFFICER) Console */}
                   <Route

@@ -6,7 +6,11 @@ import { getRoleNavigation } from '../../config/navigation';
 import {
   Home, FilePlus, GitCommit, Users, Sparkles, Building2, ShieldAlert,
   FileText, TrendingUp, Award, CheckCircle2, RotateCcw, Scale, ClipboardCheck,
-  Cpu, Compass
+  Cpu, Compass, LayoutDashboard, Clock, AlertTriangle, ShieldCheck,
+  MessageSquare, Send, FileSpreadsheet, Activity, ArrowRightLeft,
+  PhoneCall, Layers, ListFilter, AlertOctagon, Network, FileCheck,
+  Share2, BookOpen, History, FileCheck2, Gavel, FolderCheck, Shield,
+  Server, Lock, Settings, Terminal
 } from 'lucide-react';
 import { BENCHMARK_CASES } from './TopNavbar';
 
@@ -32,6 +36,32 @@ const iconMap: Record<string, React.ReactNode> = {
   ClipboardCheck: <ClipboardCheck className="w-4 h-4" />,
   Cpu: <Cpu className="w-4 h-4" />,
   Compass: <Compass className="w-4 h-4" />,
+  LayoutDashboard: <LayoutDashboard className="w-4 h-4" />,
+  Clock: <Clock className="w-4 h-4" />,
+  AlertTriangle: <AlertTriangle className="w-4 h-4" />,
+  ShieldCheck: <ShieldCheck className="w-4 h-4" />,
+  MessageSquare: <MessageSquare className="w-4 h-4" />,
+  Send: <Send className="w-4 h-4" />,
+  FileSpreadsheet: <FileSpreadsheet className="w-4 h-4" />,
+  Activity: <Activity className="w-4 h-4" />,
+  ArrowRightLeft: <ArrowRightLeft className="w-4 h-4" />,
+  PhoneCall: <PhoneCall className="w-4 h-4" />,
+  Layers: <Layers className="w-4 h-4" />,
+  ListFilter: <ListFilter className="w-4 h-4" />,
+  AlertOctagon: <AlertOctagon className="w-4 h-4" />,
+  Network: <Network className="w-4 h-4" />,
+  FileCheck: <FileCheck className="w-4 h-4" />,
+  Share2: <Share2 className="w-4 h-4" />,
+  BookOpen: <BookOpen className="w-4 h-4" />,
+  History: <History className="w-4 h-4" />,
+  FileCheck2: <FileCheck2 className="w-4 h-4" />,
+  Gavel: <Gavel className="w-4 h-4" />,
+  FolderCheck: <FolderCheck className="w-4 h-4" />,
+  Shield: <Shield className="w-4 h-4" />,
+  Server: <Server className="w-4 h-4" />,
+  Lock: <Lock className="w-4 h-4" />,
+  Settings: <Settings className="w-4 h-4" />,
+  Terminal: <Terminal className="w-4 h-4" />,
 };
 
 export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {

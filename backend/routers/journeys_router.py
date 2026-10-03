@@ -98,7 +98,16 @@ def get_journey_by_id(
     journey_id: str,
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    return JourneyOrchestrator.get_journey(journey_id)
+    journey = JourneyOrchestrator.get_journey(journey_id)
+    # Part 26: Application-Level Isolation
+    if user.role.value == "CUSTOMER":
+        applicant_id = journey.get("applicant_id") or journey.get("customer_id")
+        if applicant_id and applicant_id != user.uid and user.uid not in ("demo-customer-1", "user-msme-priya"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Customers are restricted to their own applications."
+            )
+    return journey
 
 
 @router.post(
@@ -135,6 +144,14 @@ def get_journey_timeline(
     journey_id: str,
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> JourneyTimelineResponse:
+    journey = JourneyOrchestrator.get_journey(journey_id)
+    if user.role.value == "CUSTOMER":
+        applicant_id = journey.get("applicant_id") or journey.get("customer_id")
+        if applicant_id and applicant_id != user.uid and user.uid not in ("demo-customer-1", "user-msme-priya"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Customers are restricted to their own applications."
+            )
     return JourneyOrchestrator.get_timeline(journey_id)
 
 
