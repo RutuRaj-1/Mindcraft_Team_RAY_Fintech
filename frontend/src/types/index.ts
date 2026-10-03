@@ -614,6 +614,7 @@ export interface QueueItem {
   journey_id: string;
   application_id: string;
   business_name: string;
+  applicant_name?: string;
   requested_amount: number;
   current_stage: string;
   status: string;
@@ -621,10 +622,16 @@ export interface QueueItem {
   approved_amount?: number;
   trust_score?: number;
   risk_band?: string;
+  confidence?: number;
   is_consistent: boolean;
   discrepancy_count: number;
+  missing_evidence?: string[];
+  escalation_status?: string;
+  next_best_action?: string;
+  last_updated?: string;
   created_at: string;
 }
+
 
 export interface NormalizedIntent {
   product_type: string;
