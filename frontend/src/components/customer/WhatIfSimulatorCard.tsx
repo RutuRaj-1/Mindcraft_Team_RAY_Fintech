@@ -388,13 +388,16 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 relative overflow-hidden">
               <div className="absolute top-2 right-2">
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
-                  BASE CASE
+                  REAL BASELINE
                 </span>
               </div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Original Baseline</p>
+              <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">
+                Baseline application is unchanged.
+              </span>
               <div className="mt-2.5 space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Loan Facility:</span>
+                  <span className="text-slate-500">Current Amount:</span>
                   <span className="font-semibold text-slate-900">
                     ₹{baseValues ? (baseValues.requestedLoanAmount / 100000).toFixed(2) : '10.00'}L
                   </span>
@@ -430,10 +433,13 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
             <div className="p-4 rounded-xl border-2 border-indigo-500/40 bg-indigo-50/20 relative overflow-hidden shadow-xs">
               <div className="absolute top-2 right-2">
                 <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-600 text-white tracking-wide">
-                  SIMULATED SCENARIO
+                  Hypothetical Scenario
                 </span>
               </div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Hypothetical Model</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Hypothetical Scenario</p>
+              <span className="text-[10px] font-medium text-indigo-900 block mt-0.5">
+                Simulation recalculated by backend
+              </span>
               <div className="mt-2.5 space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Loan Facility:</span>

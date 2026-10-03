@@ -134,26 +134,44 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
             {activeAction.reason || activeAction.description}
           </p>
 
-          {/* Transparent Input & Impact Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-            {activeAction.requiredInput && activeAction.requiredInput !== 'None' && (
-              <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
-                <span className="font-bold text-[var(--brand-950)]">Required:</span>
-                <span className="truncate">{activeAction.requiredInput}</span>
-              </div>
-            )}
-            {activeAction.estimatedImpact && (
-              <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
-                <span className="font-bold text-emerald-800 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-600" /> Impact:
-                </span>
-                <span className="truncate text-emerald-950 font-medium">{activeAction.estimatedImpact}</span>
-              </div>
-            )}
+          {/* 8-Dimension Structured Breakdown per Part 33 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[var(--border)] text-xs">
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">1. Priority</span>
+              <span className="font-black text-[var(--brand-950)]">P{priority} • {priority === 1 ? 'Immediate' : priority === 2 ? 'Next Milestone' : 'Advisory'}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">2. Actor</span>
+              <span className="font-black text-[var(--brand-950)]">{activeAction.actor || activeAction.target_persona || 'CUSTOMER'}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">3. Action Type</span>
+              <span className="font-black text-[var(--brand-950)] truncate block">{activeAction.action_type || activeAction.recommendedAction || 'GOVERNED_TRANSITION'}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">4. Status</span>
+              <span className="font-black text-emerald-700">{activeAction.status || 'RECOMMENDED'}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] col-span-2">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">5. Required Evidence</span>
+              <span className="font-semibold text-[var(--brand-950)] truncate block">{activeAction.requiredInput || 'Foundational verification records'}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] col-span-2">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">6. Expected Impact</span>
+              <span className="font-semibold text-emerald-800 truncate block">{activeAction.estimatedImpact || 'Advances journey to next underwriting milestone'}</span>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">7. Safety / Guardrail:</span>
+            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              {isSafe ? 'Guardrail Enforced: Autonomous financial disbursal strictly blocked' : 'Human underwriter concurrence required'}
+            </span>
           </div>
         </div>
 
-        {/* Primary Single CTA Button */}
+        {/* Primary Safe CTA Button */}
         <div className="shrink-0 flex flex-col items-stretch sm:items-end gap-1.5">
           <Button
             variant="brutal"
@@ -169,7 +187,11 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
             }
             className="w-full sm:w-auto shadow-[3px_3px_0px_#0A1F20] hover:translate-x-0.5 hover:translate-y-0.5 font-black text-sm"
           >
-            {isExecuting ? 'Executing Action...' : activeAction.cta_label || 'Proceed with Next Action'}
+            {isExecuting
+              ? 'Executing Action...'
+              : (activeAction.cta_label && !activeAction.cta_label.toLowerCase().includes('disburse'))
+              ? activeAction.cta_label
+              : 'Continue to governed approval'}
           </Button>
 
           <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 justify-center sm:justify-end">
