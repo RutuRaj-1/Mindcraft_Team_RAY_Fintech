@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../api/client';
+import { api } from '../../api';
 import {
   NextBestActionsResponse,
   NextBestActionItem,
@@ -17,7 +17,8 @@ import { JourneyStepper } from '../../components/fintech/JourneyStepper';
 import { Button } from '../../components/ui/Button';
 import {
   PlusCircle, FileText, ArrowRight, TrendingUp,
-  CheckCircle2, AlertCircle, Clock, ShieldCheck, HelpCircle, RefreshCw
+  CheckCircle2, AlertCircle, Clock, ShieldCheck, HelpCircle, RefreshCw,
+  Sparkles, RotateCcw, Compass, MapPin, Info
 } from 'lucide-react';
 
 export const CustomerDashboardPage: React.FC = () => {
@@ -68,10 +69,10 @@ export const CustomerDashboardPage: React.FC = () => {
     const actType = (action.recommendedAction || action.action_type || '').toLowerCase();
     if (actType.includes('upload') || actType.includes('document')) {
       navigate(`/customer/documents/${activeJourneyId}`);
-    } else if (actType.includes('explanation')) {
+    } else if (actType.includes('explanation') || actType.includes('sanction') || actType.includes('sign') || actType.includes('accept')) {
       navigate(`/customer/decision/${activeJourneyId}`);
-    } else if (actType.includes('accept') || actType.includes('sanction') || actType.includes('sign')) {
-      navigate(`/customer/decision/${activeJourneyId}`);
+    } else if (actType.includes('what-if') || actType.includes('simulator')) {
+      navigate(`/customer/what-if/${activeJourneyId}`);
     } else if (actType.includes('intent') || actType.includes('apply')) {
       navigate('/customer/apply');
     } else {
@@ -126,6 +127,23 @@ export const CustomerDashboardPage: React.FC = () => {
   if (missingItems.length === 0) {
     missingItems.push('Zero pending document requirements. All foundational evidence verified.');
   }
+
+  // 13-stage customer journey definitions (Part 10)
+  const journeyStages13 = [
+    { num: 1, title: 'Landing & Welcome', status: 'COMPLETED', path: '/customer' },
+    { num: 2, title: 'Intent Capture', status: 'COMPLETED', path: '/customer/apply' },
+    { num: 3, title: 'Application Summary', status: 'COMPLETED', path: `/customer/journey/${activeJourneyId}` },
+    { num: 4, title: 'Document Upload', status: 'COMPLETED', path: `/customer/documents/${activeJourneyId}` },
+    { num: 5, title: 'Verification Progress', status: 'COMPLETED', path: `/customer/documents/${activeJourneyId}` },
+    { num: 6, title: 'Evidence Ledger', status: 'COMPLETED', path: `/customer/documents/${activeJourneyId}` },
+    { num: 7, title: 'Financial Health & DSCR', status: 'COMPLETED', path: `/customer/cashflow/${activeJourneyId}` },
+    { num: 8, title: 'Risk & Eligibility', status: 'COMPLETED', path: `/customer/decision/${activeJourneyId}` },
+    { num: 9, title: 'Explainable Decision', status: 'CURRENT', path: `/customer/decision/${activeJourneyId}` },
+    { num: 10, title: 'Next Best Action', status: 'CURRENT', path: `/customer` },
+    { num: 11, title: 'What-If Simulator', status: 'UPCOMING', path: `/customer/what-if/${activeJourneyId}` },
+    { num: 12, title: 'Live Journey Tracker', status: 'CURRENT', path: `/customer/journey/${activeJourneyId}` },
+    { num: 13, title: 'Final Resolution', status: decision?.outcome === 'APPROVED' ? 'READY' : 'PENDING', path: `/customer/decision/${activeJourneyId}` },
+  ];
 
   return (
     <div className="space-y-6">
@@ -200,7 +218,103 @@ export const CustomerDashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Recommended Next Best Action with Governed CTA */}
+      {/* THE 5 CORE TRANSPARENCY QUESTIONS (Requirement Part 10) */}
+      <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-700)]">
+              Core Trust Loop · Zero-Obfuscation Guarantee
+            </span>
+            <h2 className="text-lg font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Where Your Application Stands Right Now
+            </h2>
+          </div>
+          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[var(--brand-50)] text-[var(--brand-950)] border border-[var(--brand-950)]">
+            Stage: {currentStage}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+          {/* 1. WHERE AM I? */}
+          <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)] mb-1">
+                <MapPin className="w-4 h-4 text-[var(--brand-700)]" />
+                <span>WHERE AM I?</span>
+              </div>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                Stage 9 of 13: Underwriting complete. Live explainable sanction generated.
+              </p>
+            </div>
+            <span className="mt-2 text-[10px] font-mono text-[var(--text-muted)] font-bold">Current Milestone</span>
+          </div>
+
+          {/* 2. WHAT HAPPENED? */}
+          <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)] mb-1">
+                <CheckCircle2 className="w-4 h-4 text-[var(--fin-green)]" />
+                <span>WHAT HAPPENED?</span>
+              </div>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                {verifiedDocsCount || 4} financial documents extracted with SHA-256 provenance; DSCR calculated at {dscrNum.toFixed(2)}x.
+              </p>
+            </div>
+            <span className="mt-2 text-[10px] font-mono text-[var(--fin-green)] font-bold">100% Provenance</span>
+          </div>
+
+          {/* 3. WHY? */}
+          <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)] mb-1">
+                <Info className="w-4 h-4 text-blue-600" />
+                <span>WHY?</span>
+              </div>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                Eligibility rules passed: Operating cash flow meets minimum policy threshold of ₹1.5L/mo with zero hard flags.
+              </p>
+            </div>
+            <span className="mt-2 text-[10px] font-mono text-blue-700 font-bold">Policy FIN-WC-04</span>
+          </div>
+
+          {/* 4. WHAT IS REQUIRED? */}
+          <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)] mb-1">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <span>WHAT IS REQUIRED?</span>
+              </div>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                {missingItems[0] || 'Zero pending document requirements. Awaiting digital sanction signature.'}
+              </p>
+            </div>
+            <span className="mt-2 text-[10px] font-mono text-amber-700 font-bold">Zero Friction</span>
+          </div>
+
+          {/* 5. WHAT HAPPENS NEXT? */}
+          <div className="p-3.5 rounded-2xl bg-[var(--brand-50)] border-1.5 border-[var(--brand-950)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)] mb-1">
+                <Clock className="w-4 h-4 text-[var(--brand-900)]" />
+                <span>WHAT HAPPENS NEXT?</span>
+              </div>
+              <p className="text-[var(--brand-950)] font-medium leading-relaxed">
+                {nbaResponse?.primary_action?.title || 'Review sanction terms and sign digital facility agreement.'}
+              </p>
+            </div>
+            <Button
+              variant="brutal"
+              size="xs"
+              className="mt-2 w-full"
+              onClick={() => handleExecuteAction(nbaResponse?.primary_action || {} as any)}
+            >
+              Take Action
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Recommended Next Best Action */}
       <NextActionCard
         response={nbaResponse || undefined}
         action={nbaResponse?.primary_action || {
@@ -219,96 +333,49 @@ export const CustomerDashboardPage: React.FC = () => {
         onExecute={handleExecuteAction}
       />
 
-      {/* Active Journey Progress Stepper */}
-      <JourneyStepper currentStage={currentStage} />
-
-      {/* CUSTOMER TRANSPARENCY PIPELINE (Requirement Part 4) */}
+      {/* 13-STEP SME CUSTOMER EXPERIENCE MAP (Part 10) */}
       <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <div className="flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-700)]">
-              Customer Transparency Guarantee
+              Complete MSME Journey Flow (Part 10)
             </span>
             <h2 className="text-lg font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Your Application Journey Breakdown
+              13-Stage Financing Journey Roadmap
             </h2>
           </div>
-          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[var(--brand-50)] text-[var(--brand-950)] border border-[var(--brand-950)]">
-            Stage: {currentStage}
-          </span>
+          <span className="text-xs text-[var(--text-muted)] font-mono">10 / 13 Completed</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          {/* Step 1: What Has Been Verified */}
-          <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-2">
-            <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)]">
-              <CheckCircle2 className="w-4 h-4 text-[var(--fin-green)]" />
-              <span>1. Verified Credentials</span>
-            </div>
-            <ul className="space-y-1.5 text-[var(--text-secondary)]">
-              {verifiedItems.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="text-[var(--fin-green)] font-bold shrink-0">✓</span>
-                  <span className="truncate">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Step 2: What Is Missing / Needs Attention */}
-          <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-2">
-            <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)]">
-              <AlertCircle className="w-4 h-4 text-amber-500" />
-              <span>2. Pending Requirements</span>
-            </div>
-            <ul className="space-y-1.5 text-[var(--text-secondary)]">
-              {missingItems.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="text-amber-500 font-bold shrink-0">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Step 3: Why Review Is Required */}
-          <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-2">
-            <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)]">
-              <HelpCircle className="w-4 h-4 text-[var(--brand-700)]" />
-              <span>3. Governance & Review</span>
-            </div>
-            <p className="text-[var(--text-secondary)] leading-relaxed">
-              {decision?.outcome === 'APPROVED'
-                ? 'Automated cash-flow eligibility and policy benchmarks passed with zero exceptions.'
-                : 'Under supervisory Four-Eyes governance. Financial decisions require authorized human concurrence.'}
-            </p>
-            <div className="pt-1 text-[10px] font-bold text-[var(--text-muted)]">
-              Policy Citations: FIN-WC-2026-04, DSCR-1.25x
-            </div>
-          </div>
-
-          {/* Step 4: What Happens Next */}
-          <div className="p-4 rounded-2xl bg-[var(--brand-50)] border-1.5 border-[var(--brand-950)] space-y-2">
-            <div className="flex items-center gap-1.5 font-bold text-[var(--brand-950)]">
-              <Clock className="w-4 h-4 text-[var(--brand-900)]" />
-              <span>4. Immediate Next Step</span>
-            </div>
-            <p className="text-[var(--brand-950)] font-medium leading-relaxed">
-              {nbaResponse?.primary_action?.title || 'Review your credit terms and sign the digital sanction letter.'}
-            </p>
-            <Button
-              variant="brutal"
-              size="sm"
-              className="w-full mt-2"
-              onClick={() => handleExecuteAction(nbaResponse?.primary_action || {} as any)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          {journeyStages13.map((s) => (
+            <Link
+              key={s.num}
+              to={s.path}
+              className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between transition-all hover:shadow-xs ${
+                s.status === 'CURRENT'
+                  ? 'bg-[var(--brand-50)] border-2 border-[var(--brand-950)] font-bold shadow-[2px_2px_0px_#0A1F20]'
+                  : s.status === 'COMPLETED'
+                  ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                  : 'bg-[var(--surface-subtle)] border-[var(--border)] text-[var(--text-muted)]'
+              }`}
             >
-              Take Action
-            </Button>
-          </div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-mono text-[10px] font-extrabold">{s.num}</span>
+                {s.status === 'COMPLETED' && <span className="text-[10px] text-emerald-600 font-bold">✓</span>}
+                {s.status === 'CURRENT' && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-700)] animate-pulse" />}
+              </div>
+              <p className="text-[11px] font-bold leading-tight truncate">{s.title}</p>
+              <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] mt-1">{s.status}</span>
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* Navigation Quick Links Grid */}
+      {/* Active Journey Progress Stepper */}
+      <JourneyStepper currentStage={currentStage} />
+
+      {/* Navigation Quick Links Grid — Restricted to Authorized Customer Modules */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link
           to={`/customer/journey/${activeJourneyId}`}
@@ -345,19 +412,19 @@ export const CustomerDashboardPage: React.FC = () => {
         </Link>
 
         <Link
-          to={`/customer/cashflow/${activeJourneyId}`}
+          to={`/customer/what-if/${activeJourneyId}`}
           className="p-5 rounded-2xl bg-white border border-[var(--border)] hover:border-[var(--brand-950)] hover:shadow-[3px_3px_0px_#0A1F20] transition-all flex flex-col justify-between"
         >
           <div>
-            <span className="text-[10px] font-bold uppercase text-[var(--brand-700)]">Module 7</span>
-            <h3 className="text-base font-black text-[var(--brand-950)] mt-1">Cash-Flow Intelligence</h3>
+            <span className="text-[10px] font-bold uppercase text-[var(--brand-700)]">Module 5</span>
+            <h3 className="text-base font-black text-[var(--brand-950)] mt-1">What-If Simulator</h3>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Inspect monthly inflow volatility, recurring obligations, and DSCR buffer calculations.
+              Explore counterfactual parameter changes and instant interest rate adjustments.
             </p>
           </div>
           <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-[var(--brand-700)]">
-            <span>Explore Cash-Flow</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>Launch Simulator</span>
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
         </Link>
 

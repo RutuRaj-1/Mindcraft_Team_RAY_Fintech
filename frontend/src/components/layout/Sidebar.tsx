@@ -1,102 +1,41 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getRoleNavigation } from '../../config/navigation';
 import {
   Compass, FilePlus, GitCommit, FileText, Award,
   Users, ShieldAlert, Cpu, Sparkles, Home, ChevronRight, CheckCircle2, RotateCcw,
-  Building2, Scale, ClipboardCheck, Activity
+  Building2, Scale, ClipboardCheck, TrendingUp
 } from 'lucide-react';
-
 
 interface SidebarProps {
   isCollapsed?: boolean;
 }
 
+const iconMap: Record<string, React.ReactNode> = {
+  Home: <Home className="w-4 h-4" />,
+  FilePlus: <FilePlus className="w-4 h-4" />,
+  GitCommit: <GitCommit className="w-4 h-4" />,
+  FileText: <FileText className="w-4 h-4" />,
+  TrendingUp: <TrendingUp className="w-4 h-4" />,
+  Sparkles: <Sparkles className="w-4 h-4" />,
+  Award: <Award className="w-4 h-4" />,
+  Users: <Users className="w-4 h-4" />,
+  CheckCircle2: <CheckCircle2 className="w-4 h-4" />,
+  RotateCcw: <RotateCcw className="w-4 h-4" />,
+  Building2: <Building2 className="w-4 h-4" />,
+  ShieldAlert: <ShieldAlert className="w-4 h-4" />,
+  Scale: <Scale className="w-4 h-4" />,
+  ClipboardCheck: <ClipboardCheck className="w-4 h-4" />,
+  Cpu: <Cpu className="w-4 h-4" />,
+  Compass: <Compass className="w-4 h-4" />,
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
   const { activeJourneyId, role } = useAuth();
 
-  const navSections = [
-    {
-      title: 'MSME Customer Journey',
-      roles: ['CUSTOMER'],
-      items: [
-        { label: 'Customer Portal', path: '/customer', icon: <Home className="w-4 h-4" /> },
-        { label: 'Apply for Working Capital', path: '/customer/apply', icon: <FilePlus className="w-4 h-4" /> },
-        { label: 'Live Journey State', path: `/customer/journey/${activeJourneyId}`, icon: <GitCommit className="w-4 h-4" /> },
-        { label: 'Evidence & OCR Ledger', path: `/customer/documents/${activeJourneyId}`, icon: <FileText className="w-4 h-4" /> },
-        { label: 'Decision & Counterfactual', path: `/customer/decision/${activeJourneyId}`, icon: <Award className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'First-Line RM Desk',
-      roles: ['RM'],
-      items: [
-        { label: 'RM Pipeline Queue', path: '/rm', icon: <Users className="w-4 h-4" /> },
-        { label: 'Case Intake & Assist', path: `/rm/cases/${activeJourneyId}`, icon: <CheckCircle2 className="w-4 h-4" /> },
-        { label: 'Audit Timeline', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Operations Management',
-      roles: ['RM_SUPERVISOR'],
-      items: [
-        { label: 'Operations Command', path: '/operations', icon: <Building2 className="w-4 h-4" /> },
-        { label: 'RM Underwriting Queue', path: '/rm', icon: <Users className="w-4 h-4" /> },
-        { label: 'Case SLA & Escalation', path: `/rm/cases/${activeJourneyId}`, icon: <CheckCircle2 className="w-4 h-4" /> },
-        { label: 'Decision Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Second-Line Risk Desk',
-      roles: ['RISK_OFFICER'],
-      items: [
-        { label: 'Risk & Fraud Intelligence', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
-        { label: 'Case Review & Challenge', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
-        { label: 'Decision Replay Console', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Supervisory Risk Desk',
-      roles: ['RISK_MANAGER'],
-      items: [
-        { label: 'Senior Risk Desk (≤₹1Cr)', path: '/risk-manager', icon: <Scale className="w-4 h-4" /> },
-        { label: 'Risk & Fraud Intelligence', path: '/risk', icon: <ShieldAlert className="w-4 h-4" /> },
-        { label: 'Supervisory Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
-        { label: 'Decision Replay Console', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Credit Sanction Committee',
-      roles: ['CREDIT_APPROVER'],
-      items: [
-        { label: 'Credit Sanction Chamber', path: '/approvals', icon: <Award className="w-4 h-4" /> },
-        { label: 'Executive Case Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
-        { label: 'Decision Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Third-Line Audit & Governance',
-      roles: ['AUDIT_OFFICER'],
-      items: [
-        { label: 'Audit & Governance Console', path: '/audit', icon: <ClipboardCheck className="w-4 h-4" /> },
-        { label: 'Cross-Portfolio Replay', path: `/risk/replay/${activeJourneyId}`, icon: <RotateCcw className="w-4 h-4" /> },
-        { label: 'Independent Case Review', path: `/risk/cases/${activeJourneyId}`, icon: <Compass className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Technical Administration',
-      roles: ['SYS_ADMIN', 'ADMIN'],
-      items: [
-        { label: 'System Observability', path: '/admin', icon: <Cpu className="w-4 h-4" /> },
-        { label: 'Hackathon Benchmarks', path: '/demo', icon: <Sparkles className="w-4 h-4" /> },
-      ],
-    },
-  ];
-
-  // Filter strictly by the active user's assigned role (or allow ADMIN to view technical admin)
-  const visibleSections = navSections.filter((section) =>
-    section.roles.includes(role) || (role === 'SYS_ADMIN' && section.roles.includes('ADMIN'))
-  );
+  // Role-aware navigation dynamically derived from enterprise RBAC model
+  const visibleSections = getRoleNavigation(role, activeJourneyId);
 
   return (
     <aside
@@ -125,7 +64,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
                 }
                 title={item.label}
               >
-                <span className="shrink-0 text-[var(--brand-700)]">{item.icon}</span>
+                <span className="shrink-0 text-[var(--brand-700)]">
+                  {iconMap[item.iconName] || <Home className="w-4 h-4" />}
+                </span>
                 {!isCollapsed && (
                   <span className="truncate flex-1">{item.label}</span>
                 )}
@@ -137,7 +78,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false }) => {
           </div>
         ))}
       </div>
-
 
       {/* Footer Pill */}
       {!isCollapsed && (

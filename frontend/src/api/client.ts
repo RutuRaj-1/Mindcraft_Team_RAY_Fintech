@@ -1,29 +1,72 @@
 /**
- * FinFlow AI — Unified API Client
+ * FinFlow AI — Central Typed HTTP Client Layer
  *
- * - Attaches a Firebase ID token (or demo token) to every request via
- *   Authorization: Bearer <token>.
- * - In DEMO_MODE (no Firebase credentials) the token is a predictable
- *   string such as "demo-customer" that the backend maps to a mock user.
- * - The `getIdToken()` function is injected at runtime by AuthContext to
- *   avoid a circular dependency.
+ * Capabilities:
+ * - Environment-configured API base URL (`VITE_API_BASE_URL` fallback to `/api/v1`)
+ * - Attaches Firebase ID token (or demo role token) via `Authorization: Bearer <token>`
+ * - Standardized `ApiError` hierarchy handling 401, 403, 404, 409, 422, 500, and timeouts
+ * - Request cancellation & timeout via `AbortController` (default 15s)
+ * - Safe JSON parsing with fallback to text error messages
  */
 
-import {
-  AuthenticatedUser, UserRole, JourneyRecord, IntentPayload,
-  DocumentRecord, EvidenceItem, ConsistencyReport, CashFlowMetrics,
-  RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
-  TrustGraph, WhatIfRequest, WhatIfResponse, WhatIfHistoryResponse, JourneyFrictionMetrics,
-  QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential,
-  EvidenceProvenanceTrace, SafeActionExecutionRequest, SafeActionExecutionResult,
-  DecisionReplayResponse, FraudSignal, JourneyFraudSignalsResponse, FraudNetworkResponse,
-  AuditCase, AuditFinding, CreateFindingRequest, OverrideAnalytics,
-} from '../types';
+import { UserRole } from '../types';
 
+// ── Environment Configuration ────────────────────────────────────────────────
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || '/api/v1'
+).replace(/\/+$/, '');
 
-const API_BASE = '/api/v1';
+// ── Standardized API Error ────────────────────────────────────────────────────
+export class ApiError extends Error {
+  public statusCode: number;
+  public endpoint: string;
+  public details?: any;
+  public isTimeout: boolean;
 
-// ── Demo-mode token helpers ───────────────────────────────────────────────────
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    endpoint: string = '',
+    details?: any,
+    isTimeout: boolean = false
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.endpoint = endpoint;
+    this.details = details;
+    this.isTimeout = isTimeout;
+
+    // Restore prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+
+  get isUnauthorized(): boolean {
+    return this.statusCode === 401;
+  }
+
+  get isForbidden(): boolean {
+    return this.statusCode === 403;
+  }
+
+  get isNotFound(): boolean {
+    return this.statusCode === 404;
+  }
+
+  get isConflict(): boolean {
+    return this.statusCode === 409;
+  }
+
+  get isUnprocessable(): boolean {
+    return this.statusCode === 422;
+  }
+
+  get isServerError(): boolean {
+    return this.statusCode >= 500;
+  }
+}
+
+// ── Demo-mode Token & Role Helpers ───────────────────────────────────────────
 export const ROLE_DEMO_TOKEN: Record<UserRole, string> = {
   CUSTOMER:         'demo-customer',
   RM:               'demo-rm',
@@ -36,7 +79,6 @@ export const ROLE_DEMO_TOKEN: Record<UserRole, string> = {
   ADMIN:            'demo-admin',
 };
 
-// Synchronous fallback stored in localStorage (demo mode)
 export const getStoredToken = (): string =>
   localStorage.getItem('finflow_token') || ROLE_DEMO_TOKEN.CUSTOMER;
 
@@ -52,8 +94,7 @@ export const setActiveRole = (role: UserRole): void => {
   setStoredToken(ROLE_DEMO_TOKEN[role]);
 };
 
-// ── Async token provider (injected by AuthContext) ────────────────────────────
-// AuthContext calls `setTokenProvider` once the Firebase user is known.
+// ── Token Provider (Injected by AuthContext at runtime) ───────────────────────
 let _tokenProvider: (() => Promise<string>) | null = null;
 
 export const setTokenProvider = (fn: () => Promise<string>): void => {
@@ -64,227 +105,141 @@ export const clearTokenProvider = (): void => {
   _tokenProvider = null;
 };
 
-/** Returns the best available auth token (Firebase ID token or demo token). */
-async function resolveToken(): Promise<string> {
+export async function resolveAuthToken(): Promise<string> {
   if (_tokenProvider) {
     try {
-      return await _tokenProvider();
-    } catch {
+      const token = await _tokenProvider();
+      if (token) return token;
+    } catch (_) {
       // Fall through to stored token
     }
   }
   return getStoredToken();
 }
 
-// ── Core request helper ───────────────────────────────────────────────────────
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await resolveToken();
-  const headers = new Headers(options.headers || {});
+// ── Central Request Dispatcher ───────────────────────────────────────────────
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
 
-  if (!headers.has('Authorization')) {
+export async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const { timeoutMs = 15000, ...fetchOptions } = options;
+  const token = await resolveAuthToken();
+  const headers = new Headers(fetchOptions.headers || {});
+
+  if (!headers.has('Authorization') && token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+  if (!headers.has('Content-Type') && !(fetchOptions.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  // Setup timeout via AbortController
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    let errMessage = `API request failed: ${response.statusText}`;
-    try {
-      const errData = await response.json();
-      errMessage = errData.detail || errMessage;
-    } catch (_) {}
-    throw new Error(errMessage);
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE_URL}${cleanEndpoint}`;
+
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+      signal: fetchOptions.signal || controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      let errMessage = `HTTP ${response.status}: ${response.statusText}`;
+      let errDetails: any = null;
+
+      try {
+        const body = await response.json();
+        if (body.detail) {
+          errMessage = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+        } else if (body.message) {
+          errMessage = body.message;
+        }
+        errDetails = body;
+      } catch (_) {
+        try {
+          const text = await response.text();
+          if (text) errMessage = text;
+        } catch (_) {}
+      }
+
+      throw new ApiError(errMessage, response.status, cleanEndpoint, errDetails);
+    }
+
+    // 204 No Content
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    clearTimeout(timer);
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (error.name === 'AbortError') {
+      throw new ApiError(
+        `Request to ${cleanEndpoint} timed out after ${timeoutMs}ms`,
+        408,
+        cleanEndpoint,
+        null,
+        true
+      );
+    }
+
+    throw new ApiError(
+      error.message || `Network error during request to ${cleanEndpoint}`,
+      0,
+      cleanEndpoint,
+      error
+    );
   }
-
-  return response.json();
 }
 
-// ── API surface ───────────────────────────────────────────────────────────────
-export const api = {
-  // Auth
-  getSession: (role?: UserRole) =>
-    request<{ token: string; user: AuthenticatedUser }>('/auth/session', {
-      method: 'POST',
-      body: JSON.stringify({ role }),
-    }),
-  getProfile: () => request<AuthenticatedUser>('/auth/me'),
+// ── HTTP Verb Helpers ────────────────────────────────────────────────────────
+export const http = {
+  get: <T>(endpoint: string, options?: RequestOptions) =>
+    request<T>(endpoint, { ...options, method: 'GET' }),
 
-  // Intent & Conversational Origination (Module 1)
-  parseIntent: (payload: { natural_text?: string; answers?: Record<string, any> }) =>
-    request<NormalizedIntent>('/intent/parse', {
+  post: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
+    request<T>(endpoint, {
+      ...options,
       method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  submitIntent: (payload: {
-    natural_text?: string;
-    answers?: Record<string, any>;
-    normalized_intent?: Partial<NormalizedIntent>;
-    business_name?: string;
-  }) =>
-    request<IntentSubmitResponse>('/intent/submit', {
-      method: 'POST',
-      body: JSON.stringify(payload),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  // Journeys
-  createJourney: (intent: IntentPayload) =>
-    request<JourneyRecord>('/journeys', { method: 'POST', body: JSON.stringify(intent) }),
-  listJourneys: (stage?: string) =>
-    request<JourneyRecord[]>(stage ? `/journeys?stage=${stage}` : '/journeys'),
-  getJourney: (id: string) => request<JourneyRecord>(`/journeys/${id}`),
-  advanceStage: (id: string, target_stage: string, notes?: string) =>
-    request<JourneyRecord>(`/journeys/${id}/advance`, {
-      method: 'POST',
-      body: JSON.stringify({ target_stage, notes }),
-    }),
-  getFriction: (id: string) => request<JourneyFrictionMetrics>(`/journeys/${id}/friction`),
-
-  // Documents & Evidence
-  uploadDocument: (journeyId: string, docType: string, file: File) => {
-    const formData = new FormData();
-    formData.append('doc_type', docType);
-    formData.append('file', file);
-    return request<DocumentRecord>(`/journeys/${journeyId}/documents`, {
-      method: 'POST',
-      body: formData,
-    });
-  },
-  listDocuments:        (journeyId: string) => request<DocumentRecord[]>(`/journeys/${journeyId}/documents`),
-  getDocument:          (documentId: string) => request<DocumentRecord>(`/documents/${documentId}`),
-  getEvidenceLedger:    (journeyId: string) => request<EvidenceItem[]>(`/journeys/${journeyId}/evidence`),
-  getConsistencyReport: (journeyId: string) => request<ConsistencyReport>(`/journeys/${journeyId}/consistency`),
-  getEvidenceProvenance: (evidenceId: string) =>
-    request<EvidenceProvenanceTrace>(`/evidence/${evidenceId}/provenance`),
-  listDigiLockerAvailable: (journeyId: string) =>
-    request<DigiLockerCredential[]>(`/journeys/${journeyId}/digilocker/available`),
-  importDigiLockerCredential: (journeyId: string, credentialType: string) =>
-    request<DocumentRecord>(`/journeys/${journeyId}/digilocker/import`, {
-      method: 'POST',
-      body: JSON.stringify({ credential_type: credentialType }),
+  put: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
+    request<T>(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  // Financial Intelligence & Graph
-  getCashFlowMetrics: (journeyId: string) => request<CashFlowMetrics>(`/journeys/${journeyId}/cashflow`),
-  getTrustGraph:      (journeyId: string) => request<TrustGraph>(`/journeys/${journeyId}/trust-graph`),
-
-  // Risk & Explainability
-  evaluateRisk:   (journeyId: string) =>
-    request<DecisionRecord>(`/journeys/${journeyId}/evaluate-risk`, { method: 'POST' }),
-  getRiskAssessment: (journeyId: string) => request<RiskAssessment>(`/journeys/${journeyId}/risk`),
-  getSHAP:           (journeyId: string) => request<SHAPAttribution>(`/journeys/${journeyId}/shap`),
-  getDecision:       (journeyId: string) => request<DecisionRecord>(`/journeys/${journeyId}/decision`),
-  generateDecision:  (journeyId: string) =>
-    request<DecisionRecord>(`/journeys/${journeyId}/decision/generate`, { method: 'POST' }),
-  simulateWhatIf:    (journeyId: string, req: WhatIfRequest) =>
-    request<WhatIfResponse>(`/journeys/${journeyId}/what-if`, {
-      method: 'POST',
-      body: JSON.stringify(req),
-    }),
-  getWhatIfHistory:  (journeyId: string) =>
-    request<WhatIfHistoryResponse>(`/journeys/${journeyId}/what-if`),
-  replayDecision: (journeyId: string) =>
-    request<DecisionReplayResponse>(`/journeys/${journeyId}/replay`),
-
-
-  // Policy & RAG System
-  searchPolicies: (query: string, category?: string, limit: number = 4) =>
-    request<any[]>(`/policies/search?q=${encodeURIComponent(query)}${category ? `&category=${encodeURIComponent(category)}` : ''}&limit=${limit}`),
-  ingestPolicy: (payload: any) =>
-    request<any>('/admin/policies/ingest', { method: 'POST', body: JSON.stringify(payload) }),
-  getRAGExplanation: (journeyId: string) =>
-    request<any>(`/journeys/${journeyId}/rag/explain`, { method: 'POST' }),
-
-  // Oversight & Actions
-  getNextBestActions: (journeyId: string, role?: string) =>
-    request<NextBestActionsResponse>(`/journeys/${journeyId}/actions${role ? `?role=${encodeURIComponent(role)}` : ''}`),
-  executeSafeAction: (journeyId: string, req: SafeActionExecutionRequest) =>
-    request<SafeActionExecutionResult>(`/journeys/${journeyId}/actions/execute`, {
-      method: 'POST',
-      body: JSON.stringify(req),
-    }),
-  submitOverride: (
-    journeyId: string,
-    overrideData: {
-      new_outcome: string;
-      new_approved_amount?: number;
-      new_interest_rate?: number;
-      reason_code: string;
-      rationale_notes: string;
-      co_signed_by?: string;
-    }
-  ) =>
-    request<DecisionRecord>(`/journeys/${journeyId}/override`, {
-      method: 'POST',
-      body: JSON.stringify(overrideData),
-    }),
-  getAuditTrail:       (journeyId: string) => request<unknown[]>(`/journeys/${journeyId}/audit`),
-  getOfficerQueue:     (statusFilter?: string) =>
-    request<QueueItem[]>(
-      statusFilter ? `/dashboard/queue?status_filter=${statusFilter}` : '/dashboard/queue'
-    ),
-  getPortfolioMetrics: () => request<Record<string, unknown>>('/dashboard/metrics'),
-  getLearningStats:    () => request<Record<string, unknown>>('/feedback/learning-stats'),
-
-  // Cross-Application Risk Intelligence & Fraud Signals
-  getFraudSignals: (journeyId: string) =>
-    request<JourneyFraudSignalsResponse>(`/journeys/${journeyId}/fraud-signals`),
-  getFraudNetwork: (focusId?: string) =>
-    request<FraudNetworkResponse>(focusId ? `/fraud/network?focus_id=${encodeURIComponent(focusId)}` : '/fraud/network'),
-  resolveFraudSignal: (signalId: string, status: string, notes: string, officerName?: string) =>
-    request<FraudSignal>(`/fraud/signals/${signalId}/status`, {
-      method: 'POST',
-      body: JSON.stringify({ status, notes, officerName }),
+  patch: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
+    request<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  // Demo
-  seedDemo:    () => request<{ status: string; message: string; cases: unknown[] }>('/demo/seed', { method: 'POST' }),
-  getDemoCases: () => request<unknown[]>('/demo/cases'),
-
-  // Human Review & Governance
-  listReviews: (status?: string, role?: string) =>
-    request<import('../types').HumanReview[]>(
-      `/reviews${status ? `?status=${encodeURIComponent(status)}` : ''}${role ? `&role=${encodeURIComponent(role)}` : ''}`
-    ),
-  getReview: (reviewId: string) =>
-    request<import('../types').HumanReview>(`/reviews/${reviewId}`),
-  getJourneyReviews: (journeyId: string) =>
-    request<import('../types').HumanReview[]>(`/journeys/${journeyId}/reviews`),
-  startReview: (journeyId: string, notes?: string) =>
-    request<import('../types').HumanReview>(`/journeys/${journeyId}/review`, {
-      method: 'POST',
-      body: JSON.stringify({ notes }),
-    }),
-  submitReview: (journeyId: string, reviewId: string, req: import('../types').SubmitReviewRequest) =>
-    request<import('../types').HumanReview>(`/journeys/${journeyId}/review/${reviewId}/submit`, {
-      method: 'POST',
-      body: JSON.stringify(req),
-    }),
-  getFeedbackEvents: (journeyId: string) =>
-    request<import('../types').FeedbackEvent[]>(`/journeys/${journeyId}/feedback`),
-
-  // Independent Audit & Governance
-  getAuditCases: (limit: number = 50) =>
-    request<AuditCase[]>(`/audit/cases?limit=${limit}`),
-  getAuditFindings: (status?: string, severity?: string) =>
-    request<AuditFinding[]>(
-      `/audit/findings${status ? `?status=${encodeURIComponent(status)}` : ''}${severity ? `${status ? '&' : '?'}severity=${encodeURIComponent(severity)}` : ''}`
-    ),
-  createAuditFinding: (req: CreateFindingRequest) =>
-    request<AuditFinding>('/audit/findings', {
-      method: 'POST',
-      body: JSON.stringify(req),
-    }),
-  getOverrideAnalytics: () =>
-    request<OverrideAnalytics>('/audit/override-analytics'),
-
-  // Auth / Institutional Personas
-  getPersonas: () =>
-    request<Record<string, unknown>>('/auth/personas'),
+  delete: <T>(endpoint: string, options?: RequestOptions) =>
+    request<T>(endpoint, { ...options, method: 'DELETE' }),
 };
 
-// ── Legacy alias for backward compat ─────────────────────────────────────────
-export const getAuthToken  = getStoredToken;
-export const setAuthToken  = setStoredToken;
+// Backward compatibility alias
+export const getAuthToken = getStoredToken;
+export const setAuthToken = setStoredToken;
+
+// Re-export api from index
+export { api } from './index';

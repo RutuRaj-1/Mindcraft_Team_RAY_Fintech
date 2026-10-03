@@ -92,7 +92,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     organization: 'First-Line Credit Operations',
     avatarInitials: 'VM',
     badgeColor: 'var(--brand-700)',
-    defaultRoute: '/rm',
+    defaultRoute: '/operations',
     defaultJourneyId: 'jrn_kavita_002',
   },
   RISK_OFFICER: {
@@ -114,7 +114,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     organization: 'Credit Risk Oversight & Challenge',
     avatarInitials: 'MK',
     badgeColor: 'var(--fin-coral)',
-    defaultRoute: '/risk',
+    defaultRoute: '/risk-manager',
     defaultJourneyId: 'jrn_apex_003',
   },
   CREDIT_APPROVER: {
@@ -125,7 +125,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     organization: 'Sanction Authority & Credit Committee',
     avatarInitials: 'RS',
     badgeColor: '#dc2626',
-    defaultRoute: '/risk',
+    defaultRoute: '/approvals',
     defaultJourneyId: 'jrn_apex_003',
   },
   AUDIT_OFFICER: {
@@ -136,7 +136,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     organization: 'Independent Third-Line Assurance',
     avatarInitials: 'SR',
     badgeColor: 'var(--fin-violet)',
-    defaultRoute: '/risk/replay',
+    defaultRoute: '/audit',
     defaultJourneyId: 'jrn_apex_003',
   },
   SYS_ADMIN: {

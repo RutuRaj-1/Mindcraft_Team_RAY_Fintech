@@ -18,6 +18,7 @@ import { ApplyLoanPage } from './pages/customer/ApplyLoanPage';
 import { CustomerJourneyPage } from './pages/customer/CustomerJourneyPage';
 import { CustomerDocumentsPage } from './pages/customer/CustomerDocumentsPage';
 import { CustomerDecisionPage } from './pages/customer/CustomerDecisionPage';
+import { CustomerWhatIfPage } from './pages/customer/CustomerWhatIfPage';
 import { CashFlowIntelligencePage } from './pages/customer/CashFlowIntelligencePage';
 import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
@@ -177,6 +178,16 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+
+                  <Route
+                    path="/customer/what-if/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerWhatIfPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/what-if/:id" element={<Navigate to="/customer/what-if/:id" replace />} />
                   <Route
                     path="/app/decision/:id"
                     element={
