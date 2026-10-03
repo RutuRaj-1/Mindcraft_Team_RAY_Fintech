@@ -109,6 +109,8 @@ class NextActionResponse(BaseModel):
 
 
 class CreateJourneyResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     journey_id: str
     application_id: str
     current_stage: str
@@ -118,6 +120,9 @@ class CreateJourneyResponse(BaseModel):
     business_name: str
     requested_amount: float
     message: str = "Journey initiated successfully in INTENT_CAPTURE stage"
+    missing_evidence_requirements: List[str] = Field(default_factory=list)
+    raw_customer_intent: Optional[Dict[str, Any]] = None
+    normalized_structured_intent: Optional[Dict[str, Any]] = None
 
 
 # ── Advance Journey ───────────────────────────────────────────────────────────

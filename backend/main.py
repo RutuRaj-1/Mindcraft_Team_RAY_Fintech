@@ -10,7 +10,8 @@ from backend.routers import (
     financial_router,
     risk_decision_router,
     governance_router,
-    demo_router
+    demo_router,
+    intent_router
 )
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ app.include_router(financial_router.router)
 app.include_router(risk_decision_router.router)
 app.include_router(governance_router.router)
 app.include_router(demo_router.router)
+app.include_router(intent_router.router)
 
 @app.get("/health", tags=["System"])
 def health_check():

@@ -283,3 +283,49 @@ export interface QueueItem {
   discrepancy_count: number;
   created_at: string;
 }
+
+export interface NormalizedIntent {
+  product_type: string;
+  requested_amount: number;
+  purpose: string;
+  business_type: string;
+  business_vintage: string;
+  business_vintage_months: number;
+  declared_revenue: number;
+  declared_revenue_annual: number;
+  existing_obligations: number;
+  existing_obligations_monthly: number;
+  intent_summary: string;
+  confidence_score: number;
+  parser_used: string;
+  missing_evidence_requirements: string[];
+}
+
+export interface NextActionInfo {
+  action_id: string;
+  action_type: string;
+  title: string;
+  description: string;
+  cta_label: string;
+  target_stage?: string | null;
+  safe_guardrail_status?: string;
+  safety_confidence?: number;
+}
+
+export interface IntentSubmitResponse {
+  journey_id: string;
+  application_id: string;
+  current_stage: string;
+  status: string;
+  next_action: NextActionInfo;
+  created_at: string;
+  business_name: string;
+  requested_amount: number;
+  message: string;
+  missing_evidence_requirements: string[];
+  raw_customer_intent?: {
+    natural_text: string;
+    answers: Record<string, any>;
+  };
+  normalized_structured_intent?: NormalizedIntent;
+}

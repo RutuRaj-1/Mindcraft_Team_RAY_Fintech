@@ -143,6 +143,15 @@ class JourneyService:
         application_id = f"app_{uuid.uuid4().hex[:12]}"
         now = now_utc_iso()
 
+        # Extract or determine missing evidence requirements
+        missing_evidence = getattr(req, "missing_evidence_requirements", None)
+        if not missing_evidence:
+            from backend.modules.module1_intent.intent_parser import determine_missing_evidence
+            missing_evidence = determine_missing_evidence(req.product_type, req.requested_amount)
+
+        raw_intent = getattr(req, "raw_customer_intent", None)
+        normalized_intent = getattr(req, "normalized_structured_intent", None)
+
         # 3. Create Application Record in persistence layer
         app_model = ApplicationModel(
             application_id=application_id,
@@ -158,6 +167,9 @@ class JourneyService:
             tenor_months=req.tenor_months or 12,
             pan=req.pan,
             gstin=req.gstin,
+            raw_customer_intent=raw_intent,
+            normalized_structured_intent=normalized_intent,
+            missing_evidence_requirements=missing_evidence,
             created_at=now,
             updated_at=now,
         )
@@ -190,6 +202,9 @@ class JourneyService:
             "current_stage": JourneyStage.INTENT_CAPTURE.value,
             "status": "ACTIVE",
             "history": [initial_step],
+            "raw_customer_intent": raw_intent,
+            "normalized_structured_intent": normalized_intent,
+            "missing_evidence_requirements": missing_evidence,
             "metadata": {
                 "tenor_months": req.tenor_months or 12,
                 "annual_turnover": req.annual_turnover,
@@ -220,6 +235,8 @@ class JourneyService:
                 "requested_amount": req.requested_amount,
                 "product_type": req.product_type,
                 "initial_stage": JourneyStage.INTENT_CAPTURE.value,
+                "has_raw_intent": bool(raw_intent),
+                "has_normalized_intent": bool(normalized_intent),
             }
         )
 
@@ -235,5 +252,8 @@ class JourneyService:
             created_at=now,
             business_name=req.business_name,
             requested_amount=req.requested_amount,
-            message="Journey successfully created in INTENT_CAPTURE stage"
+            message="Journey successfully created in INTENT_CAPTURE stage",
+            missing_evidence_requirements=missing_evidence,
+            raw_customer_intent=raw_intent,
+            normalized_structured_intent=normalized_intent,
         )

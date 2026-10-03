@@ -1,66 +1,90 @@
-import uuid
-from datetime import datetime
-from backend.database.models import IntentPayload, JourneyRecord, JourneyStage, JourneyStatus, JourneyStepRecord, ApplicationRecord
-from backend.database.firestore_client import db
+"""
+FinFlow AI — Intent Service (Module 1)
+======================================
+Connects conversational customer intent capture with the Journey Orchestrator.
+Persists both raw customer intent and normalized structured intent into Firestore.
+
+Customer does not need to understand lending terminology.
+"""
+
+from typing import Dict, Any, Optional, Union
+from backend.modules.module1_intent.intent_parser import (
+    IntentParser,
+    NormalizedIntent,
+    determine_missing_evidence,
+)
+from backend.modules.module2_journey.schemas import CreateJourneyRequest, CreateJourneyResponse
+from backend.modules.module2_journey.service import JourneyService
+from backend.modules.module2_journey.state_machine import JourneyStage
+
 
 class IntentService:
     @staticmethod
-    def create_journey_from_intent(intent: IntentPayload, applicant_id: str) -> JourneyRecord:
-        journey_id = f"jrn_{uuid.uuid4().hex[:10]}"
-        application_id = f"app_{uuid.uuid4().hex[:10]}"
-        now = datetime.utcnow()
+    async def parse_intent(
+        natural_text: str = "",
+        answers: Optional[Dict[str, Any]] = None,
+    ) -> NormalizedIntent:
+        """
+        Parses natural text and guided questions into structured NormalizedIntent
+        using LLM (if configured) with instant deterministic fallback.
+        """
+        return await IntentParser.parse(natural_text, answers)
 
-        initial_step = JourneyStepRecord(
-            stage=JourneyStage.INTENT_CAPTURE,
-            entered_at=now,
-            completed_at=now,
-            notes=f"Intent registered: ₹{intent.requested_amount:,.2f} for {intent.purpose}"
+    @staticmethod
+    async def submit_intent(
+        natural_text: str = "",
+        answers: Optional[Dict[str, Any]] = None,
+        normalized_intent: Optional[Union[Dict[str, Any], NormalizedIntent]] = None,
+        business_name: Optional[str] = None,
+        applicant_id: str = "customer_anon",
+        actor_role: str = "CUSTOMER",
+    ) -> CreateJourneyResponse:
+        """
+        Processes customer intent, initializes the orchestrated Journey in INTENT_CAPTURE,
+        persists both raw customer intent and normalized structured intent,
+        and returns Journey ID, current stage, missing evidence requirements,
+        and Next Best Action.
+        """
+        raw_customer_intent = {
+            "natural_text": natural_text or "",
+            "answers": answers or {},
+        }
+
+        # If not provided, parse from input
+        if normalized_intent is None:
+            parsed = await IntentParser.parse(natural_text, answers)
+        elif isinstance(normalized_intent, dict):
+            parsed = NormalizedIntent(**normalized_intent)
+        else:
+            parsed = normalized_intent
+
+        resolved_business_name = (
+            business_name
+            or (answers.get("business_name") if answers else None)
+            or f"{parsed.business_type} Enterprise"
         )
 
-        next_step = JourneyStepRecord(
-            stage=JourneyStage.EVIDENCE_COLLECTION,
-            entered_at=now
+        missing_evidence = parsed.missing_evidence_requirements or determine_missing_evidence(
+            parsed.product_type, parsed.requested_amount
         )
 
-        journey = JourneyRecord(
-            journey_id=journey_id,
+        req = CreateJourneyRequest(
+            product_type=parsed.product_type,
+            requested_amount=parsed.requested_amount,
+            intent_summary=parsed.intent_summary,
+            purpose=parsed.purpose,
+            business_name=resolved_business_name,
+            annual_turnover=parsed.declared_revenue_annual,
+            vintage_months=parsed.business_vintage_months,
+            tenor_months=12,
+            industry_sector=parsed.business_type,
+            raw_customer_intent=raw_customer_intent,
+            normalized_structured_intent=parsed.model_dump(),
+            missing_evidence_requirements=missing_evidence,
+        )
+
+        return JourneyService.create_journey(
+            req=req,
             applicant_id=applicant_id,
-            current_stage=JourneyStage.EVIDENCE_COLLECTION,
-            status=JourneyStatus.ACTIVE,
-            intent=intent,
-            history=[initial_step, next_step],
-            application_id=application_id,
-            created_at=now,
-            updated_at=now
+            actor_role=actor_role,
         )
-
-        app_record = ApplicationRecord(
-            application_id=application_id,
-            journey_id=journey_id,
-            user_id=applicant_id,
-            business_name=intent.business_name,
-            product_type=intent.product_type,
-            requested_amount=intent.requested_amount,
-            tenor_months=intent.tenor_months,
-            vintage_months=intent.vintage_months,
-            annual_turnover=intent.annual_turnover,
-            pan=intent.pan or "AAACS1234F",
-            gstin=intent.gstin or "27AAACS1234F1Z5",
-            industry_sector=intent.industry_sector,
-            created_at=now
-        )
-
-        db.set("journeys", journey_id, journey.model_dump())
-        db.set("applications", application_id, app_record.model_dump())
-
-        # Log audit entry
-        from backend.modules.module5_trust.audit_ledger import AuditLedger
-        AuditLedger.log(
-            application_id=application_id,
-            actor_id=applicant_id,
-            actor_role="CUSTOMER",
-            action="JOURNEY_INITIALIZED",
-            details={"requested_amount": intent.requested_amount, "business_name": intent.business_name}
-        )
-
-        return journey

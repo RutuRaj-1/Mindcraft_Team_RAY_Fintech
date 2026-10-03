@@ -14,7 +14,7 @@ import {
   DocumentRecord, EvidenceItem, ConsistencyReport, CashFlowMetrics,
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
   TrustGraph, WhatIfRequest, WhatIfResponse, JourneyFrictionMetrics,
-  QueueItem
+  QueueItem, NormalizedIntent, IntentSubmitResponse
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -102,6 +102,23 @@ export const api = {
       body: JSON.stringify({ role }),
     }),
   getProfile: () => request<AuthenticatedUser>('/auth/me'),
+
+  // Intent & Conversational Origination (Module 1)
+  parseIntent: (payload: { natural_text?: string; answers?: Record<string, any> }) =>
+    request<NormalizedIntent>('/intent/parse', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  submitIntent: (payload: {
+    natural_text?: string;
+    answers?: Record<string, any>;
+    normalized_intent?: Partial<NormalizedIntent>;
+    business_name?: string;
+  }) =>
+    request<IntentSubmitResponse>('/intent/submit', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // Journeys
   createJourney: (intent: IntentPayload) =>
