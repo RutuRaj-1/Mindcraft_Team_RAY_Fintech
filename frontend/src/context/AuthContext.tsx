@@ -36,7 +36,13 @@ import {
 } from '../api/client';
 import {
   firebaseAuth,
+  firestoreDb,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail,
+  doc,
+  setDoc,
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser,
@@ -128,8 +134,12 @@ export interface AuthContextType {
   activeJourneyId: string;
   setActiveJourneyId: (id: string) => void;
 
-  /** Sign in with email/password (Firebase mode) */
+  /** Sign in with email/password (Firebase mode or demo fallback) */
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  /** Register new account with email/password */
+  signUpWithEmail: (email: string, password: string, name: string, role?: UserRole) => Promise<void>;
+  /** Send password reset email */
+  resetPassword: (email: string) => Promise<void>;
   /** Sign out (clears Firebase session or resets demo) */
   logout: () => Promise<void>;
 }
@@ -142,10 +152,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRoleState] = useState<UserRole>(() => getActiveRole());
   const [loading, setLoading] = useState<boolean>(FIREBASE_ENABLED);
   const [activeJourneyId, setActiveJourneyId] = useState<string>('jrn_priya_001');
+  const [customDemoUser, setCustomDemoUser] = useState<{ name: string; email: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem('finflow_demo_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   // Track whether the user is authenticated in demo mode
-  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(
-    !FIREBASE_ENABLED  // In demo mode, start as authenticated
-  );
+  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('finflow_auth_status') === 'authenticated';
+  });
 
   const tokenRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -158,15 +177,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setFirebaseUser(fbUser);
 
         // Extract role from custom claims
-        const idTokenResult = await fbUser.getIdTokenResult(true);
-        const claimedRole = (idTokenResult.claims['role'] as string | undefined)?.toUpperCase();
-        const resolvedRole: UserRole =
-          claimedRole && ['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN'].includes(claimedRole)
-            ? (claimedRole as UserRole)
-            : 'CUSTOMER';
+        try {
+          const idTokenResult = await fbUser.getIdTokenResult(true);
+          const claimedRole = (idTokenResult.claims['role'] as string | undefined)?.toUpperCase();
+          const resolvedRole: UserRole =
+            claimedRole && ['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN'].includes(claimedRole)
+              ? (claimedRole as UserRole)
+              : 'CUSTOMER';
 
-        setRoleState(resolvedRole);
-        setActiveRole(resolvedRole);
+          setRoleState(resolvedRole);
+          setActiveRole(resolvedRole);
+        } catch {
+          setRoleState('CUSTOMER');
+          setActiveRole('CUSTOMER');
+        }
 
         // Register async token provider
         setTokenProvider(async () => {
@@ -191,19 +215,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const user: AuthenticatedUser = {
     uid: firebaseUser?.uid ?? `usr_demo_${role.toLowerCase()}`,
-    email: firebaseUser?.email ?? persona.email,
-    name: firebaseUser?.displayName ?? persona.name,
+    email: firebaseUser?.email ?? customDemoUser?.email ?? persona.email,
+    name: firebaseUser?.displayName ?? customDemoUser?.name ?? persona.name,
     role,
     business_id: role === 'CUSTOMER' ? 'app_priya_001' : undefined,
   };
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const signInWithEmail = useCallback(async (email: string, password: string) => {
-    if (!FIREBASE_ENABLED) {
-      throw new Error('Firebase is not configured. Use demo persona login instead.');
+    if (FIREBASE_ENABLED) {
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      // onAuthStateChanged handles state & claims
+      return;
     }
-    await signInWithEmailAndPassword(firebaseAuth, email, password);
-    // onAuthStateChanged handles the rest
+
+    // Demo Mode fallback authentication
+    await new Promise((r) => setTimeout(r, 450)); // simulate network latency
+    const normalized = email.toLowerCase();
+    let detectedRole: UserRole = 'CUSTOMER';
+    if (normalized.includes('rm') || normalized.includes('officer')) detectedRole = 'RM';
+    else if (normalized.includes('risk') || normalized.includes('compliance')) detectedRole = 'RISK_OFFICER';
+    else if (normalized.includes('admin')) detectedRole = 'ADMIN';
+
+    setRoleState(detectedRole);
+    setActiveRole(detectedRole);
+    setStoredToken(ROLE_DEMO_TOKEN[detectedRole]);
+    setCustomDemoUser({ name: email.split('@')[0].replace(/[._]/g, ' '), email });
+    setDemoAuthenticated(true);
+    localStorage.setItem('finflow_auth_status', 'authenticated');
+    localStorage.setItem('finflow_demo_user', JSON.stringify({ name: email.split('@')[0], email }));
+    setActiveJourneyId(PERSONAS[detectedRole].defaultJourneyId);
+  }, []);
+
+  const signUpWithEmail = useCallback(async (
+    email: string,
+    password: string,
+    name: string,
+    requestedRole: UserRole = 'CUSTOMER'
+  ) => {
+    // MSME Customer is the safe public default
+    const safeRole: UserRole = requestedRole === 'CUSTOMER' ? 'CUSTOMER' : 'CUSTOMER';
+
+    if (FIREBASE_ENABLED) {
+      const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      if (cred.user) {
+        await updateProfile(cred.user, { displayName: name });
+        // Attempt saving profile document in Firestore
+        try {
+          await setDoc(doc(firestoreDb, 'users', cred.user.uid), {
+            uid: cred.user.uid,
+            email,
+            displayName: name,
+            role: safeRole,
+            createdAt: new Date().toISOString(),
+          });
+        } catch {
+          // Graceful if Firestore rules or offline
+        }
+      }
+      return;
+    }
+
+    // Demo Mode registration
+    await new Promise((r) => setTimeout(r, 450));
+    setRoleState(safeRole);
+    setActiveRole(safeRole);
+    setStoredToken(ROLE_DEMO_TOKEN[safeRole]);
+    setCustomDemoUser({ name, email });
+    setDemoAuthenticated(true);
+    localStorage.setItem('finflow_auth_status', 'authenticated');
+    localStorage.setItem('finflow_demo_user', JSON.stringify({ name, email }));
+    setActiveJourneyId(PERSONAS[safeRole].defaultJourneyId);
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    if (FIREBASE_ENABLED) {
+      await sendPasswordResetEmail(firebaseAuth, email);
+    } else {
+      await new Promise((r) => setTimeout(r, 300));
+    }
   }, []);
 
   const switchRole = useCallback((newRole: UserRole) => {
@@ -212,6 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveRole(newRole);
     setStoredToken(ROLE_DEMO_TOKEN[newRole]);
     setDemoAuthenticated(true);
+    localStorage.setItem('finflow_auth_status', 'authenticated');
     const newPersona = PERSONAS[newRole];
     setActiveJourneyId(newPersona.defaultJourneyId);
   }, []);
@@ -222,9 +313,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTokenProvider();
       setFirebaseUser(null);
     }
-    // Reset to demo customer
-    switchRole('CUSTOMER');
+    // Clear demo persistence
+    localStorage.removeItem('finflow_auth_status');
+    localStorage.removeItem('finflow_demo_user');
+    setCustomDemoUser(null);
     setDemoAuthenticated(false);
+    switchRole('CUSTOMER');
   }, [firebaseUser, switchRole]);
 
   return (
@@ -240,6 +334,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeJourneyId,
         setActiveJourneyId,
         signInWithEmail,
+        signUpWithEmail,
+        resetPassword,
         logout,
       }}
     >

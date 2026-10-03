@@ -1,15 +1,18 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './router/ProtectedRoute';
 
-// Pages
+// Public Pages
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/LoginPage';
+import { SignInPage } from './pages/SignInPage';
+import { SignUpPage } from './pages/SignUpPage';
+
+// Authenticated Application Pages
 import { CustomerDashboardPage } from './pages/customer/CustomerDashboardPage';
 import { ApplyLoanPage } from './pages/customer/ApplyLoanPage';
 import { CustomerJourneyPage } from './pages/customer/CustomerJourneyPage';
@@ -32,6 +35,37 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * AppRedirect resolves the `/app` and `/app/dashboard` entry points
+ * to the appropriate role-specific dashboard or redirects unauthenticated visitors to sign in.
+ */
+const AppRedirect: React.FC = () => {
+  const { role, isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-[500px] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#0F4C81] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  switch (role) {
+    case 'RM':
+      return <Navigate to="/rm" replace />;
+    case 'RISK_OFFICER':
+      return <Navigate to="/risk" replace />;
+    case 'ADMIN':
+      return <Navigate to="/admin" replace />;
+    default:
+      return <Navigate to="/customer" replace />;
+  }
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -40,13 +74,17 @@ export default function App() {
           <NotificationProvider>
             <BrowserRouter>
               <Routes>
-                {/* Public standalone login route */}
-                <Route path="/login" element={<LoginPage />} />
+                {/* ── Public standalone routes ── */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/signin" element={<SignInPage />} />
+                <Route path="/signup" element={<SignUpPage />} />
+                <Route path="/login" element={<Navigate to="/signin" replace />} />
 
-                {/* Main Application Shell layout with nested routes */}
+                {/* ── Main Application Shell for authenticated & protected routes ── */}
                 <Route element={<AppShell />}>
-                  {/* Home & Landing */}
-                  <Route path="/" element={<LandingPage />} />
+                  {/* General /app entry points */}
+                  <Route path="/app" element={<AppRedirect />} />
+                  <Route path="/app/dashboard" element={<AppRedirect />} />
 
                   {/* Customer SME Routes */}
                   <Route
@@ -57,6 +95,8 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/customer" element={<Navigate to="/customer" replace />} />
+
                   <Route
                     path="/customer/apply"
                     element={
@@ -65,6 +105,8 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/customer/apply" element={<Navigate to="/customer/apply" replace />} />
+
                   <Route
                     path="/customer/journey/:id"
                     element={
@@ -74,6 +116,15 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/app/journey/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerJourneyPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
                     path="/customer/documents/:id"
                     element={
                       <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
@@ -82,7 +133,24 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/app/documents/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerDocumentsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
                     path="/customer/decision/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
+                        <CustomerDecisionPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/app/decision/:id"
                     element={
                       <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN']}>
                         <CustomerDecisionPage />
@@ -99,8 +167,18 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/rm" element={<Navigate to="/rm" replace />} />
+
                   <Route
                     path="/rm/cases/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
+                        <RMCaseDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/app/rm/cases/:id"
                     element={
                       <ProtectedRoute allowedRoles={['RM', 'ADMIN', 'RISK_OFFICER']}>
                         <RMCaseDetailPage />
@@ -117,8 +195,18 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/risk" element={<Navigate to="/risk" replace />} />
+
                   <Route
                     path="/risk/cases/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
+                        <RiskCaseDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/app/risk/cases/:id"
                     element={
                       <ProtectedRoute allowedRoles={['RISK_OFFICER', 'ADMIN', 'RM']}>
                         <RiskCaseDetailPage />
@@ -135,9 +223,11 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/admin" element={<Navigate to="/admin" replace />} />
 
                   {/* Demo Hub */}
                   <Route path="/demo" element={<DemoHubPage />} />
+                  <Route path="/app/demo" element={<Navigate to="/demo" replace />} />
 
                   {/* Catch-all 404 Route */}
                   <Route path="*" element={<NotFoundPage />} />

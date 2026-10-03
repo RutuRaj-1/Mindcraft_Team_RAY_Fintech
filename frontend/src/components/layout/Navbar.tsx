@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole } from '../../types';
+import { FinFlowLogo } from '../ui/FinFlowLogo';
 import { ShieldCheck, UserCheck, AlertTriangle, Settings, RefreshCw, Zap, Building2, Activity, ChevronDown } from 'lucide-react';
 
 interface NavbarProps {
@@ -50,25 +51,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* ── Brand Identity ── */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="relative w-9 h-9">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#123E40] via-[#237277] to-[#3DA5A6] flex items-center justify-center shadow-md animate-pulse-glow">
-                <Zap className="w-4.5 h-4.5 text-white" fill="currentColor" />
-              </div>
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--fin-green)] rounded-full border-2 border-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[17px] font-black tracking-tight text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  FinFlow <span className="text-[var(--brand-600)]">AI</span>
-                </span>
-                <span className="hidden sm:inline bg-[var(--brand-50)] text-[var(--brand-700)] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[var(--brand-200)]">
-                  MVP v2.1
-                </span>
-              </div>
-              <p className="hidden sm:block text-[10px] text-[var(--text-muted)] font-medium">
-                Intelligent SME Lending Orchestration
-              </p>
-            </div>
+            <FinFlowLogo size="sm" className="h-9 sm:h-10" />
+            <span className="hidden sm:inline bg-[var(--brand-50)] text-[var(--brand-700)] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[var(--brand-200)]">
+              MVP v2.1
+            </span>
           </div>
 
           {/* ── Case Picker (Desktop) ── */}

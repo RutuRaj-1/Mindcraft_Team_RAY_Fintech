@@ -35,7 +35,7 @@ export const DecisionExplainableCard: React.FC<DecisionProps> = ({
 
   const isApproved = decision.outcome === 'APPROVED';
   const isConditional = decision.outcome === 'CONDITIONAL_APPROVAL';
-  const isReview = decision.outcome === 'NEEDS_REVIEW' || decision.outcome === 'HUMAN_REVIEW';
+  const isReview = decision.outcome === 'NEEDS_REVIEW' || (decision.outcome as string) === 'HUMAN_REVIEW';
 
   const badgeClass = isApproved
     ? 'badge-success'

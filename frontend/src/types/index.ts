@@ -102,6 +102,7 @@ export interface ConsistencyReport {
   discrepancy_score: number;
   flagged_count: number;
   discrepancies: DiscrepancyItem[];
+  summary?: string;
 }
 
 export interface MonthlyCashFlow {
@@ -197,8 +198,10 @@ export interface NextBestActionItem {
   cta_label: string;
   safe_guardrail_status: string;
   safety_confidence: number;
-  target_persona: string;
+  target_persona?: string;
 }
+
+export type NextBestAction = NextBestActionItem;
 
 export interface NextBestActionsResponse {
   application_id: string;

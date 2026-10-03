@@ -29,9 +29,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // ── Not authenticated — redirect to login ───────────────────────────────────
+  // ── Not authenticated — redirect to sign in ────────────────────────────────
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
   // ── No role restriction — allow through ────────────────────────────────────

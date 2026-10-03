@@ -3,7 +3,8 @@ import { TrustGraph, TrustGraphNode } from '../../types';
 import { Network, AlertTriangle, ShieldCheck, Building2, User, CreditCard, Package } from 'lucide-react';
 
 interface TrustGraphProps {
-  trustGraph: TrustGraph;
+  trustGraph?: TrustGraph;
+  graph?: TrustGraph;
 }
 
 const NODE_COLORS: Record<string, string> = {
@@ -54,7 +55,9 @@ const getNodePositions = (nodes: TrustGraphNode[], width: number, height: number
   return positions;
 };
 
-export const TrustGraphVisual: React.FC<TrustGraphProps> = ({ trustGraph }) => {
+export const TrustGraphVisual: React.FC<TrustGraphProps> = ({ trustGraph: propTrustGraph, graph }) => {
+  const trustGraph = propTrustGraph || graph;
+  if (!trustGraph) return null;
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<TrustGraphNode | null>(null);

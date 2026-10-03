@@ -2,7 +2,8 @@ import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { UserProfileMenu } from './UserProfileMenu';
-import { Zap, Bell, Building2, Menu, ShieldCheck } from 'lucide-react';
+import { FinFlowLogo } from '../ui/FinFlowLogo';
+import { Bell, Building2, Menu, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const BENCHMARK_CASES = [
@@ -35,23 +36,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-[var(--brand-950)] border-1.5 border-[var(--brand-800)] flex items-center justify-center shadow-[2px_2px_0px_#0A1F20] group-hover:scale-105 transition-transform">
-            <Zap className="w-4.5 h-4.5 text-[var(--brand-300)]" fill="currentColor" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-base font-black tracking-tight text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                FinFlow <span className="text-[var(--brand-600)]">AI</span>
-              </span>
-              <span className="hidden md:inline text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)]">
-                v2.1 Enterprise
-              </span>
-            </div>
-            <p className="hidden md:block text-[9px] text-[var(--text-muted)] font-medium">
-              Intelligent SME Journey Orchestration
-            </p>
-          </div>
+        <Link to="/" className="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+          <FinFlowLogo size="sm" className="h-9 sm:h-10" />
+          <span className="hidden md:inline text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)]">
+            v2.1 Enterprise
+          </span>
         </Link>
       </div>
 

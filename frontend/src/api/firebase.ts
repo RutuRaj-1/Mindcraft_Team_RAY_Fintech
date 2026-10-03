@@ -10,6 +10,9 @@ import {
   getAuth,
   Auth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   User,
@@ -17,6 +20,7 @@ import {
   browserLocalPersistence,
   connectAuthEmulator,
 } from 'firebase/auth';
+import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
 // ── Firebase Configuration ──────────────────────────────────────────────────
 // Place your project config in frontend/.env as VITE_FIREBASE_* variables.
@@ -35,6 +39,7 @@ const app: FirebaseApp = getApps().length
   : initializeApp(firebaseConfig);
 
 export const firebaseAuth: Auth = getAuth(app);
+export const firestoreDb: Firestore = getFirestore(app);
 
 // Use auth emulator if VITE_FIREBASE_USE_EMULATOR=true
 if (import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'true') {
@@ -45,12 +50,18 @@ if (import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'true') {
 // Persist session across browser tabs / page reloads
 setPersistence(firebaseAuth, browserLocalPersistence).catch(() => {});
 
-// Re-export Firebase Auth helpers so callers don't import firebase directly
+// Re-export Firebase Auth & Firestore helpers so callers don't import firebase directly
 export {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   type User,
+  doc,
+  setDoc,
+  getDoc,
 };
 
 export default app;
