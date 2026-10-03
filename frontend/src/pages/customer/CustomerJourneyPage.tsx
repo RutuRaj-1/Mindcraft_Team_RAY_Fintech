@@ -9,6 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { GitCommit, Clock, ArrowRight, ShieldCheck, RefreshCw, Sparkles, AlertTriangle } from 'lucide-react';
+import { TrustGraphVisual } from '../../components/risk/TrustGraphVisual';
 
 export const CustomerJourneyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -150,6 +151,12 @@ export const CustomerJourneyPage: React.FC = () => {
           icon={<ShieldCheck className="w-4 h-4 text-[var(--fin-green)]" />}
         />
       </div>
+ 
+      {/* Financial Trust Graph: Entity Relationship Network */}
+      <TrustGraphVisual
+        journeyId={journey.journey_id}
+        title="Financial Trust Graph — Evidence & Entity Provenance"
+      />
 
       {/* Stage History Ledger */}
       <Card variant="bordered" padding="md">

@@ -33,6 +33,7 @@ from backend.database.repositories.repositories import (
     SystemEventRepository,
     TrustGraphEdgeRepository,
     TrustGraphNodeRepository,
+    TrustGraphRepository,
     UserRepository,
     WhatIfScenarioRepository,
 )
@@ -55,6 +56,7 @@ policy_chunk_repo = PolicyChunkRepository()
 financial_snapshot_repo = FinancialSnapshotRepository()
 trust_node_repo = TrustGraphNodeRepository()
 trust_edge_repo = TrustGraphEdgeRepository()
+trust_graph_repo = TrustGraphRepository()
 fraud_signal_repo = FraudSignalRepository()
 whatif_repo = WhatIfScenarioRepository()
 human_review_repo = HumanReviewRepository()
@@ -78,6 +80,7 @@ __all__ = [
     "FinancialSnapshotRepository",
     "TrustGraphNodeRepository",
     "TrustGraphEdgeRepository",
+    "TrustGraphRepository",
     "FraudSignalRepository",
     "WhatIfScenarioRepository",
     "HumanReviewRepository",
@@ -99,6 +102,7 @@ __all__ = [
     "financial_snapshot_repo",
     "trust_node_repo",
     "trust_edge_repo",
+    "trust_graph_repo",
     "fraud_signal_repo",
     "whatif_repo",
     "human_review_repo",

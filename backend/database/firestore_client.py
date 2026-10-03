@@ -387,8 +387,10 @@ class _LegacyAdapter:
         self,
         collection: str,
         filter_by: Optional[Dict[str, Any]] = None,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        return firestore_client.list(collection, filters=filter_by)
+        f = filters if filters is not None else filter_by
+        return firestore_client.list(collection, filters=f)
 
     def delete(self, collection: str, doc_id: str) -> None:
         firestore_client.delete(collection, doc_id)

@@ -565,6 +565,54 @@ class TrustGraphEdgeRepository(BaseRepository[TrustGraphEdgeModel]):
         return self.update(edge_id, {"flagged": True, "flagReason": reason})
 
 
+class TrustGraphRepository:
+    """
+    Composite repository for the Financial Trust Graph.
+    Coordinates persistence across trust_graph_nodes, trust_graph_edges,
+    and trust_graphs snapshot collections in Firestore.
+    """
+
+    def __init__(self) -> None:
+        self.node_repo = TrustGraphNodeRepository()
+        self.edge_repo = TrustGraphEdgeRepository()
+
+    def save_graph(
+        self,
+        application_id: str,
+        graph_dict: Dict[str, Any],
+        nodes: List[TrustGraphNodeModel],
+        edges: List[TrustGraphEdgeModel],
+    ) -> str:
+        graph_id = f"grp_{application_id}"
+        for old_node in self.node_repo.list_by_application(application_id):
+            self.node_repo.delete(old_node.nodeId)
+        for old_edge in self.edge_repo.list_by_application(application_id):
+            self.edge_repo.delete(old_edge.edgeId)
+
+        for node in nodes:
+            self.node_repo.create(node)
+
+        for edge in edges:
+            self.edge_repo.create(edge)
+
+        from backend.database.firestore_client import db
+        graph_dict["graph_id"] = graph_id
+        graph_dict["application_id"] = application_id
+        db.set("trust_graphs", graph_id, graph_dict)
+        return graph_id
+
+    def get_graph(self, application_id: str) -> Optional[Dict[str, Any]]:
+        from backend.database.firestore_client import db
+        graph_id = f"grp_{application_id}"
+        return db.get("trust_graphs", graph_id)
+
+    def list_nodes(self, application_id: str) -> List[TrustGraphNodeModel]:
+        return self.node_repo.list_by_application(application_id)
+
+    def list_edges(self, application_id: str) -> List[TrustGraphEdgeModel]:
+        return self.edge_repo.list_by_application(application_id)
+
+
 # =============================================================================
 # 15. fraud_signals
 # =============================================================================
