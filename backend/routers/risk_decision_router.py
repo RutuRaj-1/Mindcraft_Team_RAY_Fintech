@@ -157,6 +157,15 @@ def generate_explainable_decision(
     journey = db.get("journeys", journey_id)
     if not journey:
         raise HTTPException(status_code=404, detail="Journey not found")
+
+    # TC-04: Structured 409 conflict if decision requested before risk/evidence complete
+    current_stage = journey.get("current_stage")
+    if current_stage == JourneyStage.INTENT_CAPTURE.value:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot generate decision before evidence collection and risk assessment are complete."
+        )
+
     app_id = journey.get("application_id", journey_id)
 
     decision = ExplainableDecisionEngine.generate_decision(
