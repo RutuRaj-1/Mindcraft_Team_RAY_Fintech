@@ -68,6 +68,16 @@ export interface DocumentRecord {
   uploaded_at: string;
   verified_at?: string;
   extracted_fields_count: number;
+  extracted_fields?: Record<string, any>;
+  is_duplicate?: boolean;
+  duplicate_of?: string | null;
+  source?: string;
+  issuer?: string;
+  badge?: string;
+  verification_status?: string;
+  ocr_status?: string;
+  storage_path?: string;
+  evidence_items?: EvidenceItem[];
 }
 
 export interface EvidenceItem {
@@ -76,12 +86,32 @@ export interface EvidenceItem {
   application_id: string;
   field_name: string;
   field_value: any;
+  normalized_value?: any;
   confidence: number;
   page_number: number;
   bounding_box?: { x: number; y: number; width: number; height: number };
   sha256_source_hash: string;
   extraction_engine: string;
-  timestamp: string;
+  extraction_method?: string;
+  verification_status?: string;
+  source_text?: string;
+  source_page?: number;
+  version?: number;
+  is_latest?: boolean;
+  timestamp?: string;
+  created_at?: string;
+}
+
+export interface DigiLockerCredential {
+  credential_type: string;
+  doc_type: string;
+  title: string;
+  issuer: string;
+  issuer_id: string;
+  doc_uri: string;
+  status: string;
+  badge: string;
+  issued_date: string;
 }
 
 export interface DiscrepancyItem {

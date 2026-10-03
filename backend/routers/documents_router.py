@@ -1,95 +1,355 @@
+"""
+FinFlow AI — Documents & Evidence Router
+========================================
+Authoritative REST endpoints for:
+- POST /api/v1/journeys/{id}/documents (Multi-Pass OCR & Field Extraction)
+- GET /api/v1/journeys/{id}/documents (List Journey Documents)
+- GET /api/v1/documents/{document_id} (Inspect Single Document & Extracted Evidence)
+- GET /api/v1/journeys/{id}/evidence (Version-Preserved Evidence Ledger)
+- POST /api/v1/journeys/{id}/digilocker/import (Official DigiLocker Lifelong Vault Ingestion)
+- GET /api/v1/journeys/{id}/digilocker/available (Available Government Credentials)
+"""
+
 import uuid
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from typing import List, Optional
-from backend.database.models import (
-    DocumentRecord, DocumentType, DocumentStatus, EvidenceItem, ConsistencyReport
-)
+from datetime import datetime, timezone
+from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from pydantic import BaseModel, ConfigDict
+
 from backend.auth.firebase_auth import get_current_user, AuthenticatedUser
-from backend.modules.module3_financial.provenance import ProvenanceEngine
-from backend.modules.module3_financial.ocr_extractor import DocumentOCRExtractor
-from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
+from backend.database.models import DocumentModel, DocumentRecord, DocumentStatus, now_utc_iso
+from backend.database.repositories import document_repo, evidence_repo
 from backend.database.firestore_client import db
-from backend.config import settings
+from backend.modules.module3_financial.storage_service import StorageService
+from backend.modules.module3_financial.ocr_providers import OCRCoordinator
+from backend.modules.module3_financial.field_extractor import FieldExtractor
+from backend.modules.module3_financial.evidence_ledger_service import EvidenceLedgerService
+from backend.modules.module3_financial.digilocker_service import DigiLockerService
+from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
 
-router = APIRouter(prefix="/api/v1/journeys/{journey_id}", tags=["Documents & Evidence Ledger"])
+router = APIRouter(tags=["Documents & Evidence Ledger"])
 
-@router.post("/documents/upload", response_model=DocumentRecord)
+ocr_coordinator = OCRCoordinator()
+
+ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/tiff",
+    "application/octet-stream",  # frequently sent by browsers for local files
+}
+
+MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25MB
+
+
+class DigiLockerImportRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    credential_type: str  # DIGILOCKER_AADHAAR | DIGILOCKER_PAN | DIGILOCKER_GSTR3B | DIGILOCKER_UDYAM | DIGILOCKER_BANK
+    business_name: Optional[str] = "Sharma Textiles Private Limited"
+
+
+def serialize_doc(doc: Any) -> Dict[str, Any]:
+    """Ensures both camelCase and snake_case keys are present for client compatibility."""
+    if isinstance(doc, DocumentModel):
+        d = doc.model_dump()
+        d["document_id"] = doc.documentId
+        d["application_id"] = doc.applicationId
+        d["doc_type"] = doc.type
+        d["file_name"] = doc.fileName
+        d["storage_path"] = doc.storagePath
+        d["mime_type"] = doc.mimeType
+        d["file_hash"] = doc.fileHash
+        d["uploaded_at"] = doc.uploadedAt
+        d["ocr_status"] = doc.ocrStatus
+        d["verification_status"] = doc.verificationStatus
+        d["page_count"] = doc.pageCount
+        return d
+    elif isinstance(doc, dict):
+        d = dict(doc)
+        if "documentId" in d and "document_id" not in d:
+            d["document_id"] = d["documentId"]
+        if "applicationId" in d and "application_id" not in d:
+            d["application_id"] = d["applicationId"]
+        if "verificationStatus" in d and "verification_status" not in d:
+            d["verification_status"] = d["verificationStatus"]
+        if "fileName" in d and "file_name" not in d:
+            d["file_name"] = d["fileName"]
+        if "fileHash" in d and "file_hash" not in d:
+            d["file_hash"] = d["fileHash"]
+        if "pageCount" in d and "page_count" not in d:
+            d["page_count"] = d["pageCount"]
+        if "type" in d and "doc_type" not in d:
+            d["doc_type"] = d["type"]
+        return d
+    return doc
+
+
+@router.post(
+    "/api/v1/journeys/{journey_id}/documents",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload Document & Run Multi-Pass OCR",
+    description="Accepts PDF or images, calculates SHA-256 hash, runs native text extraction / Tesseract OCR, normalizes financial fields, and records to Evidence Ledger."
+)
+@router.post(
+    "/api/v1/journeys/{journey_id}/documents/upload",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False  # Backward compatibility alias
+)
 async def upload_document(
     journey_id: str,
-    doc_type: DocumentType = Form(...),
+    doc_type: str = Form(...),
     file: UploadFile = File(...),
     user: AuthenticatedUser = Depends(get_current_user)
-):
+) -> Dict[str, Any]:
+    # 1. Validate Journey
     journey = db.get("journeys", journey_id)
     if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-    
+        raise HTTPException(status_code=404, detail=f"Journey '{journey_id}' not found")
+
     app_id = journey.get("application_id", journey_id)
-    doc_id = f"doc_{uuid.uuid4().hex[:10]}"
+    business_name = journey.get("business_name", "Sharma Textiles Private Limited")
 
+    # 2. Read and Validate File
     content = await file.read()
-    sha256 = ProvenanceEngine.compute_sha256(content)
+    if not content or len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes)")
 
-    # Save to disk locally as backup / upload target
-    saved_path = settings.UPLOAD_DIR / f"{doc_id}_{file.filename}"
-    with open(saved_path, "wb") as f:
-        f.write(content)
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File size exceeds maximum platform limit of 25MB")
 
-    # Run OCR & Structured field extraction
-    extracted_items = DocumentOCRExtractor.extract_structured_data(
-        doc_type=doc_type,
+    # 3. Cryptographic Hash & Duplicate Detection
+    sha256 = StorageService.compute_sha256(content)
+    existing_by_hash = document_repo.get_by_hash(sha256)
+    is_duplicate = False
+    duplicate_of_id = None
+
+    if existing_by_hash:
+        is_duplicate = True
+        duplicate_of_id = existing_by_hash.documentId
+
+    # 4. Save Binary File
+    doc_id = f"doc_{uuid.uuid4().hex[:10]}"
+    filename = file.filename or f"document_{doc_id}.pdf"
+    storage_path, file_url, _ = StorageService.save_document(
         file_bytes=content,
-        file_name=file.filename or "uploaded_file.pdf",
+        filename=filename,
         doc_id=doc_id,
-        app_id=app_id,
+        mime_type=file.content_type or "application/pdf"
+    )
+
+    # 5. Multi-Pass OCR Execution
+    pages = ocr_coordinator.process_document(file_bytes=content, filename=filename)
+    page_count = max(1, len(pages))
+
+    # 6. Extract and Normalize Structured Fields
+    extracted_fields = FieldExtractor.extract_fields(
+        doc_type=doc_type,
+        pages=pages,
+        fallback_business_name=business_name
+    )
+
+    # 7. Record to Evidence Ledger with Version Preservation
+    persisted_evidence = EvidenceLedgerService.record_extractions(
+        application_id=app_id,
+        document_id=doc_id,
+        extracted_fields=extracted_fields,
         source_hash=sha256
     )
 
-    doc_record = DocumentRecord(
+    # 8. Determine Overall Document Status
+    has_low_confidence = any(f.verificationStatus == "REVIEW_REQUIRED" for f in extracted_fields)
+    if is_duplicate:
+        doc_status = "FLAGGED"
+    elif has_low_confidence:
+        doc_status = "REVIEW_REQUIRED"
+    elif extracted_fields:
+        doc_status = "VERIFIED"
+    else:
+        doc_status = "PROCESSING"
+
+    now_iso = now_utc_iso()
+    doc_record = DocumentModel(
         document_id=doc_id,
         application_id=app_id,
-        doc_type=doc_type,
-        file_name=file.filename or "uploaded_file.pdf",
-        file_url=f"/uploads/{doc_id}_{file.filename}",
-        sha256_hash=sha256,
-        status=DocumentStatus.VERIFIED if extracted_items else DocumentStatus.PROCESSING,
-        page_count=max(1, len(extracted_items) // 3),
-        uploaded_at=datetime.utcnow(),
-        verified_at=datetime.utcnow(),
-        extracted_fields_count=len(extracted_items),
-        inconsistency_flags=[]
+        type=doc_type,
+        file_name=filename,
+        storage_path=storage_path,
+        mime_type=file.content_type or "application/pdf",
+        file_hash=sha256,
+        uploaded_at=now_iso,
+        ocr_status="COMPLETED",
+        verification_status=doc_status,
+        page_count=page_count,
+        file_url=file_url,
+        extracted_fields_count=len(extracted_fields),
+        is_duplicate=is_duplicate,
+        duplicate_of=duplicate_of_id,
+        extracted_fields={f.field: f.normalizedValue for f in extracted_fields},
+        extraction_method=pages[0].extraction_method if pages else "DETERMINISTIC_FALLBACK"
     )
 
+    # Persist Document
+    try:
+        document_repo.create(doc_record)
+    except Exception:
+        pass
     db.set("documents", doc_id, doc_record.model_dump())
 
-    # Re-evaluate cross-document consistency
-    ConsistencyEngine.verify_consistency(app_id)
+    # 9. Trigger Consistency Engine reconciliation
+    try:
+        ConsistencyEngine.verify_consistency(app_id)
+    except Exception:
+        pass
 
-    return doc_record
+    result = serialize_doc(doc_record)
+    result["evidence_items"] = persisted_evidence
+    return result
 
-@router.get("/documents", response_model=List[DocumentRecord])
-def list_documents(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/documents",
+    response_model=List[Dict[str, Any]],
+    summary="List Journey Documents",
+    description="Retrieves all documents uploaded or imported for this financial journey."
+)
+def list_journey_documents(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
     journey = db.get("journeys", journey_id)
     if not journey:
         raise HTTPException(status_code=404, detail="Journey not found")
     app_id = journey.get("application_id", journey_id)
-    docs = db.list("documents", {"application_id": app_id})
-    return [DocumentRecord(**d) for d in docs]
 
-@router.get("/evidence", response_model=List[EvidenceItem])
-def get_evidence_ledger(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+    # List from repository
+    try:
+        docs = document_repo.list_by_application(app_id)
+        if docs:
+            return [serialize_doc(d) for d in docs]
+    except Exception:
+        pass
+
+    # Fallback to direct client
+    raw_docs = db.list("documents", {"application_id": app_id})
+    return [serialize_doc(d) for d in raw_docs]
+
+
+@router.get(
+    "/api/v1/documents/{document_id}",
+    response_model=Dict[str, Any],
+    summary="Get Document by ID",
+    description="Retrieves metadata, storage path, verification status, and extracted evidence items for a single document."
+)
+def get_document_by_id(
+    document_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    # Check repository
+    doc = document_repo.get(document_id)
+    if not doc:
+        raw = db.get("documents", document_id)
+        if not raw:
+            raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found")
+        doc_data = serialize_doc(raw)
+    else:
+        doc_data = serialize_doc(doc)
+
+    # Attach associated evidence items
+    try:
+        evidence = evidence_repo.list_by_document(document_id)
+        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
+        doc_data["evidence_items"] = [serialize_evidence(e) for e in evidence]
+    except Exception:
+        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
+        doc_data["evidence_items"] = [serialize_evidence(e) for e in db.list("evidence_ledger", {"document_id": document_id})]
+
+    return doc_data
+
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/evidence",
+    response_model=List[Dict[str, Any]],
+    summary="Get Versioned Evidence Ledger",
+    description="Returns the chronological, tamper-proof Evidence Ledger with version numbers and extraction confidence."
+)
+def get_journey_evidence_ledger(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
     journey = db.get("journeys", journey_id)
     if not journey:
         raise HTTPException(status_code=404, detail="Journey not found")
     app_id = journey.get("application_id", journey_id)
-    evidence = db.list("evidence_ledger", {"application_id": app_id})
-    return [EvidenceItem(**e) for e in evidence]
+    return EvidenceLedgerService.get_ledger(app_id)
 
-@router.get("/consistency", response_model=ConsistencyReport)
-def get_consistency_report(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/consistency",
+    response_model=Dict[str, Any],
+    summary="Get Cross-Document Consistency Report",
+    description="Runs consistency rules across verified GST, ITR, and Bank evidence."
+)
+def get_journey_consistency_report(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
     journey = db.get("journeys", journey_id)
     if not journey:
         raise HTTPException(status_code=404, detail="Journey not found")
     app_id = journey.get("application_id", journey_id)
-    return ConsistencyEngine.verify_consistency(app_id)
+    rep = ConsistencyEngine.verify_consistency(app_id)
+    return rep.model_dump() if hasattr(rep, "model_dump") else rep
+
+
+# ── DigiLocker Ecosystem Endpoints ───────────────────────────────────────────
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/digilocker/available",
+    response_model=List[Dict[str, Any]],
+    summary="List Available DigiLocker Credentials",
+    description="Lists government credentials available in the official DigiLocker ecosystem for instant 1-click import."
+)
+def list_available_digilocker_credentials(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    journey = db.get("journeys", journey_id) or {}
+    business_name = journey.get("business_name", "Sharma Textiles Private Limited")
+    return DigiLockerService.list_available(business_name=business_name)
+
+
+@router.post(
+    "/api/v1/journeys/{journey_id}/digilocker/import",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Import DigiLocker Credential",
+    description="Imports verified government credentials (UIDAI Aadhaar, CBDT PAN, GSTN 3B, MoMSME Udyam) into the lifelong vault and Evidence Ledger."
+)
+def import_digilocker_credential(
+    journey_id: str,
+    req: DigiLockerImportRequest,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+
+    app_id = journey.get("application_id", journey_id)
+    business_name = journey.get("business_name") or req.business_name or "Sharma Textiles Private Limited"
+
+    imported_doc = DigiLockerService.import_credential(
+        journey_id=journey_id,
+        application_id=app_id,
+        credential_type=req.credential_type,
+        business_name=business_name
+    )
+
+    try:
+        ConsistencyEngine.verify_consistency(app_id)
+    except Exception:
+        pass
+
+    return imported_doc

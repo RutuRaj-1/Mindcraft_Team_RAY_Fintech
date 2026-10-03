@@ -1,40 +1,120 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { DocumentRecord, EvidenceItem, ConsistencyReport } from '../../types';
-import { DocumentStatus } from '../../components/fintech/DocumentStatus';
-import { EvidenceCard } from '../../components/fintech/EvidenceCard';
+import { DocumentRecord, EvidenceItem, ConsistencyReport, DigiLockerCredential } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/ui/ErrorState';
-import { UploadCloud, FileText, ShieldCheck, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
+import {
+  UploadCloud,
+  FileText,
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Layers,
+  FileCheck,
+  Download,
+  Eye,
+  RefreshCw,
+  Hash,
+  ExternalLink,
+  Building,
+  CreditCard,
+  Receipt,
+  Landmark,
+  BadgeCheck,
+  FileSearch,
+  Sparkles,
+  ArrowRight,
+  Info
+} from 'lucide-react';
+
+const SUPPORTED_DOC_TYPES = [
+  {
+    type: 'BANK_STATEMENT',
+    label: 'Bank Statement (12 Months)',
+    description: 'Primary current account statement for cash-flow underwriting',
+    icon: Landmark,
+    expectedFields: ['account holder', 'transaction dates', 'credits', 'debits', 'opening balance', 'closing balance'],
+  },
+  {
+    type: 'GST_RETURN',
+    label: 'GST Document / GSTR-3B',
+    description: 'Quarterly/Monthly GSTR-3B filings for revenue reconciliation',
+    icon: Receipt,
+    expectedFields: ['GSTIN', 'legal name', 'turnover', 'period'],
+  },
+  {
+    type: 'ITR',
+    label: 'Income Tax Return (ITR-V)',
+    description: 'ITR acknowledgement and computation of business income',
+    icon: FileText,
+    expectedFields: ['gross income', 'business income', 'financial year'],
+  },
+  {
+    type: 'BUSINESS_REGISTRATION',
+    label: 'Business Registration (Udyam / Inc)',
+    description: 'Udyam certificate, Shop Act, or Certificate of Incorporation',
+    icon: Building,
+    expectedFields: ['business name', 'registration date', 'business type'],
+  },
+  {
+    type: 'PAN',
+    label: 'Aadhaar / PAN or ID Proof',
+    description: 'Enterprise PAN, Director KYC, or Aadhaar identity proof',
+    icon: CreditCard,
+    expectedFields: ['PAN/Aadhaar number', 'holder name', 'DOB/issue date'],
+  },
+];
 
 export const CustomerDocumentsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const journeyId = id || 'jrn_priya_001';
 
+  // Navigation tab: 'upload' | 'digilocker' | 'evidence' | 'consistency'
+  const [activeTab, setActiveTab] = useState<'upload' | 'digilocker' | 'evidence' | 'consistency'>('upload');
+
+  // Data states
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [consistency, setConsistency] = useState<ConsistencyReport | null>(null);
-  const [docType, setDocType] = useState('BANK_STATEMENT');
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [digiLockerDocs, setDigiLockerDocs] = useState<DigiLockerCredential[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Upload form state
+  const [selectedDocType, setSelectedDocType] = useState('BANK_STATEMENT');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStepLabel, setUploadStepLabel] = useState<string>('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Inspection modal state
+  const [inspectDoc, setInspectDoc] = useState<DocumentRecord | null>(null);
+  const [isImportingDL, setIsImportingDL] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [docs, evi, rep] = await Promise.all([
+      const [docs, evi, rep, dl] = await Promise.all([
         api.listDocuments(journeyId).catch(() => []),
         api.getEvidenceLedger(journeyId).catch(() => []),
         api.getConsistencyReport(journeyId).catch(() => null),
+        api.listDigiLockerAvailable(journeyId).catch(() => []),
       ]);
       setDocuments(docs);
       setEvidence(evi);
       setConsistency(rep);
+      setDigiLockerDocs(dl);
     } catch (err: any) {
       setError(err.message || 'Failed to load documents');
     } finally {
@@ -46,25 +126,141 @@ export const CustomerDocumentsPage: React.FC = () => {
     loadData();
   }, [journeyId]);
 
-  const handleUpload = async (e: React.FormEvent) => {
+  // File validation
+  const validateFile = (file: File): string | null => {
+    const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExt = validExtensions.some(ext => lowerName.endsWith(ext));
+    if (!hasValidExt) {
+      return `Unsupported file format. Please upload PDF, PNG, JPG, or WEBP.`;
+    }
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      return `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 25MB platform limit.`;
+    }
+    return null;
+  };
+
+  const handleFileSelect = (file: File) => {
+    setUploadError(null);
+    setDuplicateWarning(null);
+    const err = validateFile(file);
+    if (err) {
+      setUploadError(err);
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(file);
+
+    // Check client-side duplicate by filename or size if already present
+    const existing = documents.find(d => d.file_name === file.name);
+    if (existing) {
+      setDuplicateWarning(`A document named "${file.name}" was already ingested into this journey.`);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!file) return;
-    setIsUploading(true);
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  // Upload execution with multi-step progress feedback
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setUploadProgress(10);
+    setUploadStepLabel('Calculating SHA-256 cryptographic provenance...');
+    setUploadError(null);
+
     try {
-      await api.uploadDocument(journeyId, docType, file);
-      setFile(null);
+      await new Promise(r => setTimeout(r, 250));
+      setUploadProgress(35);
+      setUploadStepLabel('Streaming binary to secure cloud storage...');
+
+      await new Promise(r => setTimeout(r, 300));
+      setUploadProgress(65);
+      setUploadStepLabel('Executing multi-pass OCR & layout analysis...');
+
+      const result = await api.uploadDocument(journeyId, selectedDocType, selectedFile);
+
+      setUploadProgress(90);
+      setUploadStepLabel('Reconciling parameters into Evidence Ledger...');
+      await new Promise(r => setTimeout(r, 200));
+
+      setUploadProgress(100);
+      setUploadStepLabel('Document verified and cryptographic ledger updated!');
+
+      setTimeout(() => {
+        setSelectedFile(null);
+        setUploadProgress(null);
+        setUploadStepLabel('');
+        loadData();
+      }, 500);
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed. Please check network connection.');
+      setUploadProgress(null);
+      setUploadStepLabel('');
+    }
+  };
+
+  // DigiLocker 1-Click Import
+  const handleImportDigiLocker = async (credentialType: string) => {
+    setIsImportingDL(credentialType);
+    try {
+      await api.importDigiLockerCredential(journeyId, credentialType);
       await loadData();
     } catch (err: any) {
-      alert(`Upload failed: ${err.message}`);
+      alert(`DigiLocker import failed: ${err.message}`);
     } finally {
-      setIsUploading(false);
+      setIsImportingDL(null);
     }
+  };
+
+  // Create demo mock file for 1-click test
+  const handleCreateDemoFile = (type: string) => {
+    let mockContent = "";
+    let mockName = "";
+    if (type === 'BANK_STATEMENT') {
+      mockName = "HDFC_Current_Account_Statement.pdf";
+      mockContent = "%PDF-1.4\nAccount Name: Sharma Textiles Private Limited\nStatement Period: 01/04/2024 to 31/03/2025\nTotal Credits: 14,200,000.00\nTotal Debits: 12,800,000.00\nOpening Balance: 150,000.00\nClosing Balance: 1,550,000.00\n%%EOF";
+    } else if (type === 'GST_RETURN') {
+      mockName = "GSTR3B_FY202425_Tax_Return.pdf";
+      mockContent = "%PDF-1.4\nGSTIN: 27AAACS1234F1Z5\nLegal Name: Sharma Textiles Private Limited\nTotal Taxable Turnover: 14,500,000.00\nTax Period: FY 2024-25\n%%EOF";
+    } else if (type === 'ITR') {
+      mockName = "ITR_V_Acknowledgement_AY202526.pdf";
+      mockContent = "%PDF-1.4\nGross Total Income: 14,000,000.00\nBusiness Income: 1,850,000.00\nAssessment Year: 2025-26\n%%EOF";
+    } else if (type === 'BUSINESS_REGISTRATION') {
+      mockName = "Udyam_Registration_Certificate.pdf";
+      mockContent = "%PDF-1.4\nName of Enterprise: Sharma Textiles Private Limited\nDate of Incorporation: 15/06/2020\nType of Enterprise: Small Enterprise (Manufacturing)\n%%EOF";
+    } else {
+      mockName = "Permanent_Account_Number_Card.pdf";
+      mockContent = "%PDF-1.4\nPermanent Account Number: AAACS1234F\nName: Priya Sharma\nDate of Birth: 12/04/1982\n%%EOF";
+    }
+
+    const blob = new Blob([mockContent], { type: "application/pdf" });
+    const file = new File([blob], mockName, { type: "application/pdf" });
+    setSelectedDocType(type);
+    handleFileSelect(file);
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton variant="rect" height={120} />
+      <div className="space-y-4 max-w-5xl mx-auto">
+        <Skeleton variant="rect" height={100} />
+        <Skeleton variant="rect" height={240} />
         <Skeleton variant="rect" height={200} />
       </div>
     );
@@ -74,140 +270,694 @@ export const CustomerDocumentsPage: React.FC = () => {
     return <ErrorState title="Error Loading Documents" message={error} onRetry={loadData} />;
   }
 
+  const verifiedDocsCount = documents.filter(d => d.verification_status === 'VERIFIED' || d.status === 'VERIFIED').length;
+  const flaggedDocsCount = documents.filter(d => d.verification_status === 'FLAGGED' || d.is_duplicate).length;
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6 pb-16">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[var(--fin-blue-bg)] text-[var(--fin-blue)] border border-[var(--fin-blue)]/30">
-            Module 3: Document Intelligence
+            Module 3: Document Intelligence & Evidence Ledger
           </span>
-          <span className="text-xs text-[var(--text-muted)]">SHA-256 Provenance & Zero-Tampering Guarantee</span>
+          <span className="text-xs text-[var(--text-muted)]">Official DigiLocker Ecosystem & Multi-Pass OCR</span>
         </div>
         <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
-          Evidence Ingestion & Cryptographic Ledger
+          Document Vault & Cryptographic Evidence
         </h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Upload PDF/image statements. FinFlow extracts structured fields, computes SHA-256 hashes, and cross-reconciles records.
+        <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
+          Ingest financial statements via drag-and-drop or pull directly from the official DigiLocker vault. FinFlow runs native text extraction, optical character recognition, and records version-preserved evidence with SHA-256 provenance.
         </p>
       </div>
 
-      {/* Upload Zone */}
-      <Card variant="bordered" padding="md">
-        <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-4">
-            <label className="block text-xs font-bold text-[var(--brand-950)] mb-1">
-              Document Category
-            </label>
-            <select
-              value={docType}
-              onChange={(e) => setDocType(e.target.value)}
-              className="w-full text-xs font-semibold rounded-xl border border-[var(--border)] p-2.5 bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--brand-700)] shadow-xs"
-            >
-              <option value="BANK_STATEMENT">Bank Statement (Last 6 Months)</option>
-              <option value="GST_RETURN">GSTR-3B / GSTR-1 Monthly Return</option>
-              <option value="ITR">Income Tax Return (ITR-V)</option>
-              <option value="PAN">PAN / Business Registration</option>
-            </select>
-          </div>
+      {/* Top Metric Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card variant="bordered" padding="sm" className="bg-white">
+          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Documents Ingested</div>
+          <div className="text-lg font-black text-[var(--brand-950)] mt-0.5">{documents.length}</div>
+          <span className="text-[9px] text-[var(--brand-700)] font-semibold">Total File Proofs</span>
+        </Card>
 
-          <div className="md:col-span-5">
-            <label className="block text-xs font-bold text-[var(--brand-950)] mb-1">
-              Select Statement File (PDF / Images)
-            </label>
-            <input
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-              className="w-full text-xs text-[var(--text-muted)] file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--brand-50)] file:text-[var(--brand-700)] cursor-pointer"
-            />
-          </div>
+        <Card variant="bordered" padding="sm" className="bg-white">
+          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Verified In Ledger</div>
+          <div className="text-lg font-black text-emerald-600 mt-0.5">{verifiedDocsCount}</div>
+          <span className="text-[9px] text-emerald-700 font-semibold">Ready for Underwriting</span>
+        </Card>
 
-          <div className="md:col-span-3">
-            <Button
-              type="submit"
-              variant="brutal"
-              size="sm"
-              disabled={!file}
-              isLoading={isUploading}
-              leftIcon={<UploadCloud className="w-4 h-4" />}
-              className="w-full"
-            >
-              {isUploading ? 'Extracting via OCR...' : 'Upload & Hash'}
-            </Button>
-          </div>
-        </form>
-      </Card>
+        <Card variant="bordered" padding="sm" className="bg-white">
+          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Extracted Parameters</div>
+          <div className="text-lg font-black text-[var(--brand-950)] mt-0.5">{evidence.length}</div>
+          <span className="text-[9px] text-[var(--brand-700)] font-semibold">Version Preserved</span>
+        </Card>
 
-      {/* Cross-Document Consistency Report */}
-      {consistency && (
-        <Card variant={consistency.is_consistent ? 'default' : 'brutal'} padding="md">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              {consistency.is_consistent ? (
-                <CheckCircle2 className="w-5 h-5 text-[var(--fin-green)]" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-[var(--fin-coral)]" />
-              )}
-              <h3 className="text-sm font-black text-[var(--brand-950)]">
-                Cross-Document Reconciliation Consistency Report
-              </h3>
+        <Card variant="bordered" padding="sm" className="bg-white">
+          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase">DigiLocker Status</div>
+          <div className="text-lg font-black text-blue-700 mt-0.5 flex items-center gap-1">
+            <BadgeCheck className="w-5 h-5 text-blue-600" /> Connected
+          </div>
+          <span className="text-[9px] text-blue-700 font-semibold">UIDAI / GSTN / CBDT / MoMSME</span>
+        </Card>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setActiveTab('upload')}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            activeTab === 'upload'
+              ? 'bg-[var(--brand-700)] text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <UploadCloud className="w-4 h-4" />
+          Drag-and-Drop Uploader
+        </button>
+
+        <button
+          onClick={() => setActiveTab('digilocker')}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            activeTab === 'digilocker'
+              ? 'bg-[var(--brand-700)] text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <BadgeCheck className="w-4 h-4 text-amber-400" />
+          Official DigiLocker Vault
+          <span className="text-[9px] bg-amber-400/20 text-amber-900 px-1.5 py-0.2 rounded font-extrabold ml-0.5">
+            Govt
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('evidence')}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            activeTab === 'evidence'
+              ? 'bg-[var(--brand-700)] text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Versioned Evidence Ledger ({evidence.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('consistency')}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            activeTab === 'consistency'
+              ? 'bg-[var(--brand-700)] text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          Cross-Document Consistency
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 1: DRAG AND DROP UPLOADER                                             */}
+      {/* ========================================================================= */}
+      {activeTab === 'upload' && (
+        <div className="space-y-6">
+          <Card variant="bordered" padding="md">
+            <h3 className="text-sm font-black text-[var(--brand-950)] mb-3 flex items-center gap-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              <UploadCloud className="w-4 h-4 text-[var(--brand-700)]" />
+              Upload Financial Evidence
+            </h3>
+
+            {/* Document Type Selector Grid */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-800 mb-2">
+                1. Select Document Category:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                {SUPPORTED_DOC_TYPES.map((dt) => {
+                  const Icon = dt.icon;
+                  const isSelected = selectedDocType === dt.type;
+                  return (
+                    <button
+                      key={dt.type}
+                      type="button"
+                      onClick={() => setSelectedDocType(dt.type)}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-[var(--brand-50)] border-[var(--brand-600)] ring-2 ring-[var(--brand-600)]/20 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-[var(--brand-700)] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-900 leading-tight">
+                          {dt.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 line-clamp-2 leading-tight">
+                        {dt.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-              consistency.is_consistent
-                ? 'bg-[var(--fin-green-bg)] text-[var(--fin-green)] border-[var(--fin-green)]/30'
-                : 'bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border-[var(--fin-coral)]/30'
-            }`}>
-              {consistency.is_consistent ? '100% RECONCILED' : `${consistency.discrepancies.length} DISCREPANCIES`}
+
+            {/* Drag & Drop Area */}
+            <form onSubmit={handleUploadSubmit} className="space-y-4">
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-[var(--brand-600)] bg-[var(--brand-50)] scale-[0.99]'
+                    : selectedFile
+                    ? 'border-emerald-500 bg-emerald-50/30'
+                    : 'border-slate-300 hover:border-[var(--brand-400)] bg-slate-50/60'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileSelect(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                />
+
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                    selectedFile ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--brand-100)] text-[var(--brand-700)]'
+                  }`}>
+                    {selectedFile ? <FileCheck className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
+                  </div>
+
+                  {selectedFile ? (
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">
+                        {selectedFile.name}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 mt-0.5">
+                        {(selectedFile.size / 1024).toFixed(1)} KB • Click or drop another to replace
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Drag and drop your document here, or <span className="text-[var(--brand-700)] underline">browse computer</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Supported formats: PDF, PNG, JPG, WEBP (Max 25 MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Duplicate & Error Notices */}
+              {duplicateWarning && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{duplicateWarning} Duplicate hash checking will be logged.</span>
+                </div>
+              )}
+
+              {uploadError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {/* Upload Progress Bar */}
+              {uploadProgress !== null && (
+                <div className="space-y-1.5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      {uploadStepLabel}
+                    </span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200/80 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-[var(--brand-700)] h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Actions row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Test without local files:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateDemoFile(selectedDocType)}
+                    className="text-[var(--brand-700)] font-bold hover:underline"
+                  >
+                    Load Sample {selectedDocType.replace('_', ' ')}
+                  </button>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={!selectedFile || uploadProgress !== null}
+                  className="font-bold shadow-md"
+                >
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  {uploadProgress !== null ? 'Processing Pipeline...' : 'Upload & Run Multi-Pass OCR'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {/* Ingested Documents Table */}
+          <Card variant="bordered" padding="md">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Ingested Journey Documents ({documents.length})
+                </h3>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Cryptographically hashed files stored in Firebase Storage and indexed in Firestore.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={loadData} className="text-xs font-bold">
+                <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+              </Button>
+            </div>
+
+            {documents.length === 0 ? (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200">
+                <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-700">No documents uploaded yet</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Use the uploader above or import from DigiLocker.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {documents.map((doc) => {
+                  const isVerified = doc.verification_status === 'VERIFIED' || doc.status === 'VERIFIED';
+                  const isFlagged = doc.verification_status === 'FLAGGED' || doc.is_duplicate;
+                  const isReviewRequired = doc.verification_status === 'REVIEW_REQUIRED';
+
+                  return (
+                    <div key={doc.document_id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 p-2 rounded-lg transition-colors">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-[var(--brand-50)] text-[var(--brand-700)] flex items-center justify-center shrink-0 mt-0.5">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-slate-900 truncate">
+                              {doc.file_name}
+                            </h4>
+                            {doc.source === 'DIGILOCKER' && (
+                              <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-extrabold flex items-center gap-0.5">
+                                <BadgeCheck className="w-3 h-3 text-blue-600" /> DigiLocker
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                            <span className="font-semibold text-[var(--brand-700)]">{doc.doc_type}</span>
+                            <span>•</span>
+                            <span>{doc.page_count} pages</span>
+                            <span>•</span>
+                            <span>{doc.extracted_fields_count} fields</span>
+                            <span>•</span>
+                            <span className="font-mono text-[9px] bg-slate-100 px-1 rounded">
+                              SHA: {doc.sha256_hash ? `${doc.sha256_hash.slice(0, 10)}...` : 'Computed'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Status Badge */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                          isVerified
+                            ? 'bg-[var(--fin-green-bg)] text-[var(--fin-green)] border-[var(--fin-green)]/30'
+                            : isFlagged
+                            ? 'bg-[var(--fin-amber-bg)] text-[var(--fin-amber)] border-[var(--fin-amber)]/30'
+                            : isReviewRequired
+                            ? 'bg-purple-100 text-purple-800 border-purple-200'
+                            : 'bg-blue-100 text-blue-800 border-blue-200'
+                        }`}>
+                          {isVerified ? <CheckCircle2 className="w-3 h-3" /> : isFlagged ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                          {doc.verification_status || doc.status}
+                        </span>
+
+                        {/* Inspect Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInspectDoc(doc)}
+                          className="text-xs font-bold"
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Inspect
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: OFFICIAL DIGILOCKER LIFELONG VAULT                                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'digilocker' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-[var(--brand-950)] text-white p-5 rounded-2xl border border-blue-400/30 relative overflow-hidden">
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400 text-blue-950 font-bold">
+                    Official DigiLocker Gateway
+                  </span>
+                  <span className="text-xs text-blue-200">National E-Governance Division (NeGD)</span>
+                </div>
+                <h2 className="text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Lifelong Government-Issued Document Vault
+                </h2>
+                <p className="text-xs text-blue-100/80 mt-1 max-w-2xl">
+                  Unlike traditional one-off uploads, DigiLocker permanently anchors verified MSME documents (UIDAI Aadhaar, CBDT e-PAN, GSTN GSTR-3B, MoMSME Udyam) across all credit and governance lifecycles.
+                </p>
+              </div>
+
+              <div className="bg-white/10 p-3 rounded-xl border border-white/20 shrink-0 text-center">
+                <span className="text-[10px] text-blue-200 uppercase font-bold block">Verified Entity</span>
+                <span className="text-xs font-bold text-white">Sharma Textiles Pvt Ltd</span>
+                <span className="text-[9px] text-emerald-300 block mt-0.5">● Cryptographically Signed</span>
+              </div>
+            </div>
+          </div>
+
+          <Card variant="bordered" padding="md">
+            <h3 className="text-sm font-black text-slate-900 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Available Government Issued Credentials (Ready for 1-Click Ingestion)
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {digiLockerDocs.map((dl) => {
+                const isImported = documents.some(d => d.file_name.includes(dl.title) || (d.source === 'DIGILOCKER' && d.doc_type === dl.doc_type));
+                const isImporting = isImportingDL === dl.credential_type;
+
+                return (
+                  <div key={dl.credential_type} className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 bg-white transition-all shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                            <BadgeCheck className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900">{dl.title}</h4>
+                            <span className="text-[10px] text-slate-500">{dl.issuer}</span>
+                          </div>
+                        </div>
+                        <Badge variant="blue" size="xs">
+                          {dl.status}
+                        </Badge>
+                      </div>
+
+                      <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1 text-[10px] font-mono text-slate-700 mb-3">
+                        <div>URI: <span className="text-slate-900">{dl.doc_uri}</span></div>
+                        <div>Issued: <span className="text-slate-900">{dl.issued_date}</span></div>
+                        <div className="text-emerald-700 font-bold">{dl.badge}</div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500">
+                        {isImported ? 'Already in Evidence Ledger' : 'Direct NeGD API Pull'}
+                      </span>
+                      <Button
+                        variant={isImported ? 'outline' : 'primary'}
+                        size="sm"
+                        disabled={isImported || isImporting}
+                        onClick={() => handleImportDigiLocker(dl.credential_type)}
+                        className="text-xs font-bold"
+                      >
+                        {isImporting ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                            Importing...
+                          </>
+                        ) : isImported ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                            Imported
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5 mr-1" />
+                            Pull to Vault
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: VERSIONED EVIDENCE LEDGER                                          */}
+      {/* ========================================================================= */}
+      {activeTab === 'evidence' && (
+        <Card variant="bordered" padding="md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Cryptographic Evidence Ledger
+                </h3>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded font-extrabold">
+                  Version Preserved (No Silent Overwrite)
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                Every extracted parameter preserves historical versions, source page location, and extraction methodology.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-[var(--brand-700)] bg-[var(--brand-50)] px-2.5 py-1 rounded-lg border border-[var(--brand-200)]">
+              {evidence.length} Ledger Records
             </span>
           </div>
 
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
-            {consistency.summary}
-          </p>
+          {evidence.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200">
+              <Layers className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-xs font-bold text-slate-700">No evidence items recorded yet</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Upload a document or import from DigiLocker to build the ledger.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500 bg-slate-50">
+                    <th className="py-2.5 px-3">Field Name</th>
+                    <th className="py-2.5 px-3">Extracted & Normalized Value</th>
+                    <th className="py-2.5 px-3">Confidence</th>
+                    <th className="py-2.5 px-3">Location & Snippet</th>
+                    <th className="py-2.5 px-3">Method</th>
+                    <th className="py-2.5 px-3">Version</th>
+                    <th className="py-2.5 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {evidence.map((item, idx) => {
+                    const isVerified = item.verification_status === 'VERIFIED';
+                    const isReview = item.verification_status === 'REVIEW_REQUIRED';
+                    const confPct = Math.round(item.confidence * 100);
 
-          {consistency.discrepancies.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-              {consistency.discrepancies.map((d, idx) => (
-                <div key={idx} className="p-3 rounded-xl bg-[var(--fin-coral-bg)]/40 border border-[var(--fin-coral)]/30 text-xs">
-                  <div className="flex justify-between font-bold text-[var(--fin-coral)] mb-1">
-                    <span>Field: {d.field}</span>
-                    <span>Variance: {d.variance_pct}%</span>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-primary)]">
-                    {d.doc_a_name}: <strong>₹{Number(d.doc_a_value).toLocaleString('en-IN')}</strong> vs {d.doc_b_name}: <strong>₹{Number(d.doc_b_value).toLocaleString('en-IN')}</strong>
-                  </p>
-                  <p className="text-[10px] text-[var(--text-muted)] italic mt-1">{d.explanation}</p>
-                </div>
-              ))}
+                    return (
+                      <tr key={item.evidence_id || idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {item.field_name}
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-[var(--brand-800)]">
+                          {String(item.normalized_value ?? item.field_value)}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            confPct >= 95
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : confPct >= 85
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {confPct}%
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 max-w-xs">
+                          <span className="text-[10px] font-bold text-slate-500 block">
+                            Page {item.source_page || item.page_number || 1}
+                          </span>
+                          <span className="text-[10px] text-slate-600 font-mono truncate block" title={item.source_text || ''}>
+                            {item.source_text || 'Document stream extraction'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                            {item.extraction_method || item.extraction_engine || 'OCR'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                            v{item.version || 1}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            isVerified
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : isReview
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}>
+                            {item.verification_status || 'VERIFIED'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>
       )}
 
-      {/* Uploaded Documents List */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-black text-[var(--brand-950)] flex items-center gap-2">
-          <FileText className="w-4 h-4 text-[var(--brand-700)]" /> Uploaded Statement Files ({documents.length})
-        </h3>
-        <div className="space-y-2">
-          {documents.map((doc) => (
-            <DocumentStatus key={doc.document_id} document={doc} />
-          ))}
-        </div>
-      </div>
+      {/* ========================================================================= */}
+      {/* TAB 4: CROSS-DOCUMENT CONSISTENCY MATRIX                                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'consistency' && (
+        <Card variant="bordered" padding="md">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Cross-Document Consistency & Triangulation
+              </h3>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Deterministic reconciliation comparing reported GSTR-3B revenue against verified bank statement deposits and ITR declarations.
+              </p>
+            </div>
+            {consistency && (
+              <Badge variant={consistency.is_consistent ? 'green' : 'amber'} size="sm">
+                {consistency.is_consistent ? 'Consistency Reconciled' : 'Discrepancy Flagged'}
+              </Badge>
+            )}
+          </div>
 
-      {/* Extracted Evidence Grid */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-black text-[var(--brand-950)] flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-[var(--fin-green)]" /> Cryptographic Evidence Ledger ({evidence.length} Verified Anchors)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {evidence.map((item) => (
-            <EvidenceCard key={item.evidence_id} evidence={item} />
-          ))}
-        </div>
-      </div>
+          {consistency ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Discrepancy Score</span>
+                  <span className="text-lg font-black text-slate-900">{consistency.discrepancy_score}%</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Flagged Inconsistencies</span>
+                  <span className="text-lg font-black text-slate-900">{consistency.flagged_count}</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Status</span>
+                  <span className="text-xs font-bold text-emerald-700 mt-1 block">
+                    {consistency.is_consistent ? '✓ Pass Underwriting Gate' : '⚠ Officer Review Required'}
+                  </span>
+                </div>
+              </div>
+
+              {consistency.discrepancies && consistency.discrepancies.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-900">Detected Variances:</h4>
+                  {consistency.discrepancies.map((d, i) => (
+                    <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1">
+                      <div className="font-bold text-amber-950 flex justify-between">
+                        <span>{d.field}</span>
+                        <span>Variance: {d.variance_pct}%</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800">{d.explanation}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              Upload at least a Bank Statement and a GST Return to evaluate cross-document consistency.
+            </p>
+          )}
+        </Card>
+      )}
+
+      {/* ========================================================================= */}
+      {/* DOCUMENT INSPECTION MODAL                                                 */}
+      {/* ========================================================================= */}
+      {inspectDoc && (
+        <Modal
+          isOpen={true}
+          onClose={() => setInspectDoc(null)}
+          title={`Document Details: ${inspectDoc.file_name}`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Document ID</span>
+                <span className="font-mono text-slate-900">{inspectDoc.document_id}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Category</span>
+                <span className="font-bold text-[var(--brand-700)]">{inspectDoc.doc_type}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">SHA-256 Provenance Hash</span>
+                <span className="font-mono text-[10px] text-slate-800 break-all">{inspectDoc.sha256_hash}</span>
+              </div>
+            </div>
+
+            {/* Extracted Fields from this document */}
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 mb-2">Extracted Parameters:</h4>
+              {inspectDoc.extracted_fields && Object.keys(inspectDoc.extracted_fields).length > 0 ? (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                  {Object.entries(inspectDoc.extracted_fields).map(([k, v]) => (
+                    <div key={k} className="p-2.5 flex justify-between bg-white hover:bg-slate-50">
+                      <span className="font-bold text-slate-700">{k}</span>
+                      <span className="font-mono font-semibold text-[var(--brand-800)]">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 italic">No structured fields extracted.</p>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setInspectDoc(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

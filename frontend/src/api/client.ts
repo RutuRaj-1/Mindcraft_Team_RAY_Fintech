@@ -14,7 +14,7 @@ import {
   DocumentRecord, EvidenceItem, ConsistencyReport, CashFlowMetrics,
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
   TrustGraph, WhatIfRequest, WhatIfResponse, JourneyFrictionMetrics,
-  QueueItem, NormalizedIntent, IntentSubmitResponse
+  QueueItem, NormalizedIntent, IntentSubmitResponse, DigiLockerCredential
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -138,14 +138,22 @@ export const api = {
     const formData = new FormData();
     formData.append('doc_type', docType);
     formData.append('file', file);
-    return request<DocumentRecord>(`/journeys/${journeyId}/documents/upload`, {
+    return request<DocumentRecord>(`/journeys/${journeyId}/documents`, {
       method: 'POST',
       body: formData,
     });
   },
   listDocuments:        (journeyId: string) => request<DocumentRecord[]>(`/journeys/${journeyId}/documents`),
+  getDocument:          (documentId: string) => request<DocumentRecord>(`/documents/${documentId}`),
   getEvidenceLedger:    (journeyId: string) => request<EvidenceItem[]>(`/journeys/${journeyId}/evidence`),
   getConsistencyReport: (journeyId: string) => request<ConsistencyReport>(`/journeys/${journeyId}/consistency`),
+  listDigiLockerAvailable: (journeyId: string) =>
+    request<DigiLockerCredential[]>(`/journeys/${journeyId}/digilocker/available`),
+  importDigiLockerCredential: (journeyId: string, credentialType: string) =>
+    request<DocumentRecord>(`/journeys/${journeyId}/digilocker/import`, {
+      method: 'POST',
+      body: JSON.stringify({ credential_type: credentialType }),
+    }),
 
   // Financial Intelligence & Graph
   getCashFlowMetrics: (journeyId: string) => request<CashFlowMetrics>(`/journeys/${journeyId}/cashflow`),
