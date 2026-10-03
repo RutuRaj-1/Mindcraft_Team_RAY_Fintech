@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 # --- Core Enums ---
 
@@ -616,19 +616,83 @@ class PolicyCitation(BaseModel):
     relevance_score: float
 
 class DecisionRecord(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
     decision_id: str
     application_id: str
     outcome: DecisionOutcome
-    approved_amount: float
-    interest_rate: float
-    tenor_months: int
-    confidence_score: float
-    reasoning: str
+    approved_amount: float = 0.0
+    interest_rate: float = 0.0
+    tenor_months: int = 0
+    confidence_score: float = 0.95
+    reasoning: str = ""
     policy_citations: List[PolicyCitation] = []
     evidence_citations: List[str] = []
     decided_by: str = "AI_ORCHESTRATOR"
     decided_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Extended Explainable Decision Engine fields
+    summary: str = ""
+    risk_score: float = 0.0
+    risk_band: str = "LOW_RISK"
+    key_reasons: List[str] = Field(default_factory=list)
+    shap_factors: Dict[str, Any] = Field(default_factory=dict)
+    policy_references: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_references: List[Dict[str, Any]] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    missing_evidence: List[str] = Field(default_factory=list)
+    hard_policy_constraints: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence: float = 0.95
+    generatedAt: str = Field(default_factory=now_utc_iso)
+    modelVersion: str = "scikit-learn-sme-v2.1"
+    explanationVersion: str = "v1.0-rag-shap"
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_decision_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Sync summary and reasoning
+            if not data.get("summary") and data.get("reasoning"):
+                data["summary"] = data["reasoning"]
+            elif not data.get("reasoning") and data.get("summary"):
+                data["reasoning"] = data["summary"]
+
+            # Sync confidence and confidence_score
+            if "confidence" in data and "confidence_score" not in data:
+                data["confidence_score"] = float(data["confidence"])
+            elif "confidence_score" in data and "confidence" not in data:
+                data["confidence"] = float(data["confidence_score"])
+
+            # Sync generatedAt / decided_at
+            if "decided_at" in data and "generatedAt" not in data:
+                dat = data["decided_at"]
+                data["generatedAt"] = dat.isoformat() if hasattr(dat, "isoformat") else str(dat)
+            elif "generatedAt" in data and "decided_at" not in data:
+                try:
+                    data["decided_at"] = datetime.fromisoformat(str(data["generatedAt"]).replace("Z", "+00:00"))
+                except Exception:
+                    pass
+
+            # Sync policy citations to policy_references
+            if not data.get("policy_references") and data.get("policy_citations"):
+                refs = []
+                for p in data["policy_citations"]:
+                    if isinstance(p, dict):
+                        refs.append(p)
+                    elif hasattr(p, "model_dump"):
+                        refs.append(p.model_dump())
+                data["policy_references"] = refs
+
+            # Sync evidence citations to evidence_references
+            if not data.get("evidence_references") and data.get("evidence_citations"):
+                ev_refs = []
+                for ev in data["evidence_citations"]:
+                    if isinstance(ev, str):
+                        ev_refs.append({"field_name": ev, "value": ev})
+                    elif isinstance(ev, dict):
+                        ev_refs.append(ev)
+                data["evidence_references"] = ev_refs
+
+        return data
 
 class NextBestActionItem(BaseModel):
     model_config = ConfigDict(extra="allow")

@@ -168,6 +168,8 @@ export const api = {
   getRiskAssessment: (journeyId: string) => request<RiskAssessment>(`/journeys/${journeyId}/risk`),
   getSHAP:           (journeyId: string) => request<SHAPAttribution>(`/journeys/${journeyId}/shap`),
   getDecision:       (journeyId: string) => request<DecisionRecord>(`/journeys/${journeyId}/decision`),
+  generateDecision:  (journeyId: string) =>
+    request<DecisionRecord>(`/journeys/${journeyId}/decision/generate`, { method: 'POST' }),
   simulateWhatIf:    (journeyId: string, req: WhatIfRequest) =>
     request<WhatIfResponse>(`/journeys/${journeyId}/simulate`, {
       method: 'POST',

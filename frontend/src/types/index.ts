@@ -316,6 +316,51 @@ export interface PolicyCitation {
   relevance_score: number;
 }
 
+export interface SHAPFactor {
+  feature_name: string;
+  feature_display_name: string;
+  feature_value: number;
+  shap_value: number;
+  direction: 'REDUCES_RISK' | 'INCREASES_RISK' | string;
+  importance_rank: number;
+  impact_type?: string;
+}
+
+export interface SHAPFactorsPayload {
+  positive_factors: SHAPFactor[];
+  negative_factors: SHAPFactor[];
+  base_value: number;
+  model_output: number;
+  all_factors: SHAPFactor[];
+}
+
+export interface PolicyReference {
+  clause_id: string;
+  title: string;
+  excerpt: string;
+  relevance_score?: number;
+  effective_date?: string;
+}
+
+export interface EvidenceReference {
+  field_name: string;
+  value: string;
+  source_document?: string;
+  confidence?: number;
+  document_id?: string;
+  page?: number;
+}
+
+export interface HardPolicyConstraint {
+  rule_id: string;
+  rule_name: string;
+  passed: boolean;
+  threshold?: any;
+  actual_value?: any;
+  failure_reason?: string;
+  policy_citation?: string;
+}
+
 export interface DecisionRecord {
   decision_id: string;
   application_id: string;
@@ -329,6 +374,22 @@ export interface DecisionRecord {
   evidence_citations: string[];
   decided_by: string;
   decided_at: string;
+
+  // Extended Explainable Decision fields
+  summary?: string;
+  risk_score?: number;
+  risk_band?: string;
+  key_reasons?: string[];
+  shap_factors?: SHAPFactorsPayload;
+  policy_references?: PolicyReference[];
+  evidence_references?: EvidenceReference[];
+  warnings?: string[];
+  missing_evidence?: string[];
+  hard_policy_constraints?: HardPolicyConstraint[];
+  confidence?: number;
+  generatedAt?: string;
+  modelVersion?: string;
+  explanationVersion?: string;
 }
 
 export interface NextBestActionItem {

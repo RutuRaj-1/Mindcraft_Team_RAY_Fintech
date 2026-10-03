@@ -27,6 +27,7 @@ from backend.database.models import (
 from backend.auth.firebase_auth import get_current_user, AuthenticatedUser
 from backend.modules.module4_decision.risk_orchestrator import RiskOrchestrator
 from backend.modules.module4_decision.rag_decision_engine import RAGDecisionEngine
+from backend.modules.module4_decision.explainable_decision_engine import ExplainableDecisionEngine
 from backend.modules.module6_product.whatif_simulator import WhatIfSimulator
 from backend.modules.module6_product.decision_replay import DecisionReplayService
 from backend.modules.module2_journey.journey_orchestrator import JourneyOrchestrator
@@ -138,41 +139,27 @@ def get_shap_attribution(
     return SHAPAttribution(**latest)
 
 
-# ── GET /decision ─────────────────────────────────────────────────────────────
-@router.get("/decision", response_model=DecisionRecord)
-def get_decision(
-    journey_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
-):
-    journey = db.get("journeys", journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-    app_id = journey.get("application_id", journey_id)
-    decisions = db.list("decisions", {"application_id": app_id})
-    if not decisions:
-        raise HTTPException(status_code=404, detail="Decision not yet formulated. Trigger evaluate-risk first.")
-    latest = sorted(decisions, key=lambda x: x.get("decided_at", ""), reverse=True)[0]
-    return DecisionRecord(**latest)
-
-
-# ── POST /evaluate-risk (legacy — full pipeline incl. RAG decision) ───────────
-@router.post("/evaluate-risk", response_model=DecisionRecord)
-def evaluate_risk_and_decision(
+# ── POST /decision/generate ──────────────────────────────────────────────────
+@router.post("/decision/generate", response_model=DecisionRecord)
+def generate_explainable_decision(
     journey_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
-    Full pipeline: Risk Assessment → SHAP Attribution → RAG Decision.
-    Kept for backward compatibility with demo seeder and integration tests.
-    Prefer POST /risk/assess for risk-only assessment.
+    Generate an authoritative Explainable Decision combining:
+      - Deterministic Policy Gate (Hard rule evaluation)
+      - ML Risk Model & Decision Matrix
+      - SHAP Feature Attribution (TreeExplainer: Positive vs Negative factors)
+      - Policy RAG Grounding
+      - Evidence Provenance & Consistency Warnings
+      - LLM Explanation Synthesis with Deterministic Fallback Generator
     """
     journey = db.get("journeys", journey_id)
     if not journey:
         raise HTTPException(status_code=404, detail="Journey not found")
     app_id = journey.get("application_id", journey_id)
 
-    # Step 1: Full hybrid risk assessment
-    risk_assessment = RiskOrchestrator.assess(
+    decision = ExplainableDecisionEngine.generate_decision(
         journey_id=journey_id,
         application_id=app_id,
         actor_id=user.uid,
@@ -180,21 +167,7 @@ def evaluate_risk_and_decision(
         force_recalculate=True,
     )
 
-    # Step 2: Consistency report for RAG context
-    from backend.modules.module3_financial.consistency_engine import ConsistencyEngine
-    try:
-        consistency_rep = ConsistencyEngine.verify_consistency(app_id)
-    except Exception:
-        consistency_rep = None
-
-    # Step 3: RAG Explainable Decision
-    decision = RAGDecisionEngine.generate_decision(
-        application_id=app_id,
-        risk_assessment=risk_assessment,
-        consistency_report=consistency_rep,
-    )
-
-    # Step 4: Advance journey stage
+    # Advance journey stage if appropriate
     current_stage = journey.get("current_stage")
     if current_stage in [
         JourneyStage.VERIFICATION.value,
@@ -207,7 +180,79 @@ def evaluate_risk_and_decision(
                 target_stage=JourneyStage.EXPLAINABLE_DECISION,
                 actor_id=user.uid,
                 actor_role=user.role.value if hasattr(user.role, "value") else str(user.role),
-                notes="Risk assessment & explainable decision generated",
+                notes="Explainable Decision generated via API",
+            )
+        except Exception as exc:
+            logger.warning("Stage advance failed (non-fatal): %s", exc)
+
+    return decision
+
+
+# ── GET /decision ─────────────────────────────────────────────────────────────
+@router.get("/decision", response_model=DecisionRecord)
+def get_decision(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Retrieve the latest decision record for this journey.
+    If no decision exists yet, automatically generates one using the
+    Explainable Decision Engine.
+    """
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+    decisions = db.list("decisions", {"application_id": app_id})
+    if not decisions:
+        # Auto-generate if not yet formulated
+        decision = ExplainableDecisionEngine.generate_decision(
+            journey_id=journey_id,
+            application_id=app_id,
+            actor_id=user.uid,
+            actor_role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        )
+        return decision
+    latest = sorted(decisions, key=lambda x: x.get("decided_at", "") or x.get("generatedAt", ""), reverse=True)[0]
+    return DecisionRecord(**latest)
+
+
+# ── POST /evaluate-risk (legacy — full pipeline incl. RAG decision) ───────────
+@router.post("/evaluate-risk", response_model=DecisionRecord)
+def evaluate_risk_and_decision(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Full pipeline: Risk Assessment → SHAP Attribution → Explainable RAG Decision.
+    Kept for backward compatibility with demo seeder and integration tests.
+    """
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+
+    decision = ExplainableDecisionEngine.generate_decision(
+        journey_id=journey_id,
+        application_id=app_id,
+        actor_id=user.uid,
+        actor_role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        force_recalculate=True,
+    )
+
+    current_stage = journey.get("current_stage")
+    if current_stage in [
+        JourneyStage.VERIFICATION.value,
+        JourneyStage.RISK_ASSESSMENT.value,
+        JourneyStage.EVIDENCE_COLLECTION.value,
+    ]:
+        try:
+            JourneyOrchestrator.advance_stage(
+                journey_id=journey_id,
+                target_stage=JourneyStage.EXPLAINABLE_DECISION,
+                actor_id=user.uid,
+                actor_role=user.role.value if hasattr(user.role, "value") else str(user.role),
+                notes="Explainable decision generated via evaluate-risk",
             )
         except Exception as exc:
             logger.warning("Stage advance failed (non-fatal): %s", exc)

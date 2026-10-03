@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { DecisionRecord, RiskAssessment, SHAPAttribution, CashFlowMetrics } from '../../types';
 import { DecisionCard } from '../../components/fintech/DecisionCard';
-import { ExplainabilityPanel } from '../../components/fintech/ExplainabilityPanel';
+import { ExplainableDecisionSuite } from '../../components/fintech/ExplainableDecisionSuite';
 import { FinancialChart } from '../../components/fintech/FinancialChart';
 import { WhatIfSimulatorCard } from '../../components/customer/WhatIfSimulatorCard';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -19,6 +19,7 @@ export const CustomerDecisionPage: React.FC = () => {
   const [shap, setShap] = useState<SHAPAttribution | null>(null);
   const [cashflow, setCashflow] = useState<CashFlowMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -45,6 +46,26 @@ export const CustomerDecisionPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [journeyId]);
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      const updated = await api.generateDecision(journeyId);
+      setDecision(updated);
+      const [rsk, shp, cf] = await Promise.all([
+        api.getRiskAssessment(journeyId).catch(() => null),
+        api.getSHAP(journeyId).catch(() => null),
+        api.getCashFlowMetrics(journeyId).catch(() => null),
+      ]);
+      setRisk(rsk);
+      setShap(shp);
+      setCashflow(cf);
+    } catch (err: any) {
+      alert(`Decision generation failed: ${err.message}`);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   const handleAcceptOffer = async () => {
     confetti({
@@ -86,35 +107,36 @@ export const CustomerDecisionPage: React.FC = () => {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)]">
-            Module 4: Decision Intelligence
+            Module 4: Explainable Decision Engine
           </span>
-          <span className="text-xs text-[var(--text-muted)]">RAG Grounded Synthesis & TreeExplainer Attribution</span>
+          <span className="text-xs text-[var(--text-muted)]">Rule Gate + ML + TreeExplainer SHAP + Policy RAG + Evidence Provenance</span>
         </div>
         <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
           Credit Sanction & Explainability Suite
         </h1>
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Review transparent financial terms, audit marginal risk drivers, and simulate terms counterfactually.
+          Audit the multi-layer decision rationale, inspect marginal risk drivers, and verify institutional policy adherence.
         </p>
       </div>
 
-      {/* Decision Card */}
+      {/* Decision Sanction Hero Card */}
       <DecisionCard
         decision={decision}
         riskAssessment={risk || undefined}
         onAcceptOffer={handleAcceptOffer}
       />
 
+      {/* Structured Explainability Suite: Why?, Evidence, Model factors, Policy, Warnings */}
+      <ExplainableDecisionSuite
+        decision={decision}
+        onRegenerate={handleRegenerate}
+        isRegenerating={isRegenerating}
+      />
+
       {/* Cash-Flow Trend */}
       {cashflow && (
         <FinancialChart data={cashflow.monthly_trend} />
       )}
-
-      {/* SHAP & Policy Citations */}
-      <ExplainabilityPanel
-        shapData={shap || undefined}
-        citations={decision.policy_citations || []}
-      />
 
       {/* Interactive What-If Counterfactual Simulator */}
       <WhatIfSimulatorCard journeyId={journeyId} />
