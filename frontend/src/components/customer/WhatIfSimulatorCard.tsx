@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
-import { WhatIfResponse, WhatIfRequest } from '../../types';
-import { Sliders, TrendingUp, ShieldCheck, Zap, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { WhatIfResponse } from '../../types';
+import { Sliders, TrendingUp, Zap, CheckCircle2, DollarSign, Calendar, ShieldCheck, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface SimulatorProps {
   journeyId: string;
@@ -36,33 +36,40 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
   }, [journeyId, revenueDelta, tenorMonths, collateralAmount]);
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[#EEF8F7] flex items-center justify-center text-[#237277]">
-            <Sliders className="w-4 h-4" />
+    <div className="card p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[var(--brand-50)] flex items-center justify-center text-[var(--brand-700)]">
+            <Sliders className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#123E40]">Interactive What-If Counterfactual Simulator</h3>
-            <p className="text-xs text-[#687A75]">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-[var(--neutral-900)] tracking-tight">
+                Interactive What-If Counterfactual Simulator
+              </h3>
+              <span className="badge badge-primary text-[10px]">Real-Time ML</span>
+            </div>
+            <p className="text-xs text-[var(--neutral-500)] mt-0.5">
               Simulate how revenue expansion, extended tenure, or collateral changes optimize your sanction terms.
             </p>
           </div>
         </div>
-        <span className="bg-[#E8F7F1] text-[#169C73] text-xs font-semibold px-2.5 py-1 rounded-full border border-[#169C73]/20 flex items-center gap-1">
-          <Zap className="w-3 h-3" /> Live Recalculation
+
+        <span className="badge badge-success px-3 py-1 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto shadow-xs">
+          <Zap className="w-3.5 h-3.5" /> Instant Recalibration
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Controls Column */}
-        <div className="lg:col-span-6 space-y-5 bg-[#F7FAF9] p-4 rounded-xl border border-[#E3ECE9]">
+        <div className="lg:col-span-6 space-y-5 bg-[var(--neutral-50)] p-5 rounded-xl border border-[var(--border-subtle)]">
           {/* Revenue Delta Slider */}
           <div>
-            <div className="flex justify-between items-center text-xs font-semibold text-[#40524E] mb-1.5">
+            <div className="flex justify-between items-center text-xs font-semibold text-[var(--neutral-700)] mb-2">
               <span>Expected Revenue Variation</span>
-              <span className={`px-2 py-0.5 rounded font-bold ${
-                revenueDelta > 0 ? 'bg-[#E8F7F1] text-[#169C73]' : revenueDelta < 0 ? 'bg-[#FDECEA] text-[#D96559]' : 'bg-gray-100 text-gray-700'
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                revenueDelta > 0 ? 'bg-[var(--fin-green-soft)] text-[var(--fin-green)]' : revenueDelta < 0 ? 'bg-[var(--fin-coral-soft)] text-[var(--fin-coral)]' : 'bg-gray-100 text-gray-700'
               }`}>
                 {revenueDelta > 0 ? `+${revenueDelta}%` : `${revenueDelta}%`}
               </span>
@@ -74,9 +81,9 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
               step="5"
               value={revenueDelta}
               onChange={(e) => setRevenueDelta(Number(e.target.value))}
-              className="w-full accent-[#237277] cursor-pointer"
+              className="w-full accent-[var(--brand-600)] cursor-pointer h-2 bg-[var(--neutral-200)] rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-[#687A75] mt-1">
+            <div className="flex justify-between text-[11px] text-[var(--neutral-400)] mt-1.5 font-medium">
               <span>-25% Stress</span>
               <span>Baseline (0%)</span>
               <span>+35% Growth</span>
@@ -85,8 +92,8 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
 
           {/* Tenor Selector */}
           <div>
-            <label className="block text-xs font-semibold text-[#40524E] mb-1.5">
-              Proposed Facility Tenure
+            <label className="block text-xs font-semibold text-[var(--neutral-700)] mb-2">
+              Proposed Facility Tenor
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[6, 12, 18, 24].map((t) => (
@@ -94,10 +101,10 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
                   key={t}
                   type="button"
                   onClick={() => setTenorMonths(t)}
-                  className={`py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                  className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
                     tenorMonths === t
-                      ? 'bg-[#237277] text-white border-[#237277] shadow-xs'
-                      : 'bg-white text-[#40524E] border-[#CBD9D5] hover:bg-[#EEF8F7]'
+                      ? 'bg-[var(--brand-700)] text-white border-[var(--brand-700)] shadow-xs'
+                      : 'bg-white text-[var(--neutral-700)] border-[var(--border-subtle)] hover:bg-[var(--brand-50)] hover:border-[var(--brand-200)]'
                   }`}
                 >
                   {t} Months
@@ -108,9 +115,9 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
 
           {/* Collateral Pledge */}
           <div>
-            <div className="flex justify-between items-center text-xs font-semibold text-[#40524E] mb-1.5">
+            <div className="flex justify-between items-center text-xs font-semibold text-[var(--neutral-700)] mb-2">
               <span>Additional Promoter Collateral</span>
-              <span className="font-bold text-[#123E40]">₹{(collateralAmount / 100000).toFixed(1)} Lakhs</span>
+              <span className="font-bold text-[var(--neutral-900)]">₹{(collateralAmount / 100000).toFixed(1)} Lakhs</span>
             </div>
             <input
               type="range"
@@ -119,12 +126,12 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
               step="250000"
               value={collateralAmount}
               onChange={(e) => setCollateralAmount(Number(e.target.value))}
-              className="w-full accent-[#237277] cursor-pointer"
+              className="w-full accent-[var(--brand-600)] cursor-pointer h-2 bg-[var(--neutral-200)] rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-[#687A75] mt-1">
-              <span>Unsecured (₹0)</span>
-              <span>₹7.5 Lakhs</span>
-              <span>₹15 Lakhs Pledged</span>
+            <div className="flex justify-between text-[11px] text-[var(--neutral-400)] mt-1.5 font-medium">
+              <span>Clean / Unsecured (₹0)</span>
+              <span>₹7.5L</span>
+              <span>₹15L Pledged</span>
             </div>
           </div>
         </div>
@@ -133,60 +140,63 @@ export const WhatIfSimulatorCard: React.FC<SimulatorProps> = ({ journeyId }) => 
         <div className="lg:col-span-6 flex flex-col justify-between">
           {simulation ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#EEF8F7] p-3.5 rounded-xl border border-[#D9F0EE]">
-                  <p className="text-[11px] font-semibold text-[#687A75]">Debt Service (DSCR)</p>
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="bg-[var(--neutral-50)] p-4 rounded-xl border border-[var(--border-subtle)]">
+                  <p className="text-[11px] font-semibold text-[var(--neutral-500)]">Simulated DSCR</p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-xl font-extrabold text-[#123E40]">{simulation.simulated_dscr}x</span>
-                    <span className="text-xs text-[#169C73] font-semibold">
-                      (from {simulation.original_dscr}x)
+                    <span className="text-2xl font-extrabold text-[var(--neutral-900)]">{simulation.simulated_dscr}x</span>
+                    <span className="text-xs text-[var(--fin-green)] font-semibold flex items-center">
+                      <ArrowUpRight className="w-3 h-3" /> from {simulation.original_dscr}x
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-[#EEF8F7] p-3.5 rounded-xl border border-[#D9F0EE]">
-                  <p className="text-[11px] font-semibold text-[#687A75]">FinFlow Trust Score</p>
+                <div className="bg-[var(--neutral-50)] p-4 rounded-xl border border-[var(--border-subtle)]">
+                  <p className="text-[11px] font-semibold text-[var(--neutral-500)]">Simulated Trust Score</p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-xl font-extrabold text-[#123E40]">{simulation.simulated_risk_score}</span>
-                    <span className="text-xs text-[#169C73] font-semibold">
+                    <span className="text-2xl font-extrabold text-[var(--neutral-900)]">{simulation.simulated_risk_score}</span>
+                    <span className="text-xs text-[var(--fin-green)] font-semibold">
                       ({simulation.simulated_risk_score >= simulation.original_risk_score ? `+${simulation.simulated_risk_score - simulation.original_risk_score}` : `${simulation.simulated_risk_score - simulation.original_risk_score}`})
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-[#EEF8F7] p-3.5 rounded-xl border border-[#D9F0EE]">
-                  <p className="text-[11px] font-semibold text-[#687A75]">Simulated Facility Limit</p>
+                <div className="bg-[var(--neutral-50)] p-4 rounded-xl border border-[var(--border-subtle)]">
+                  <p className="text-[11px] font-semibold text-[var(--neutral-500)]">Optimized Facility Limit</p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-lg font-extrabold text-[#123E40]">₹{(simulation.simulated_approved_amount / 100000).toFixed(2)}L</span>
+                    <span className="text-2xl font-extrabold text-[var(--brand-700)]">
+                      ₹{(simulation.simulated_approved_amount / 100000).toFixed(2)}L
+                    </span>
                   </div>
                 </div>
 
-                <div className="bg-[#EEF8F7] p-3.5 rounded-xl border border-[#D9F0EE]">
-                  <p className="text-[11px] font-semibold text-[#687A75]">Simulated Interest Rate</p>
+                <div className="bg-[var(--neutral-50)] p-4 rounded-xl border border-[var(--border-subtle)]">
+                  <p className="text-[11px] font-semibold text-[var(--neutral-500)]">Optimized Interest Rate</p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-lg font-extrabold text-[#123E40]">{simulation.simulated_interest_rate}%</span>
-                    <span className="text-xs text-[#169C73] font-semibold">
-                      ({simulation.simulated_interest_rate < simulation.original_interest_rate ? `-${(simulation.original_interest_rate - simulation.simulated_interest_rate).toFixed(2)}%` : 'Standard'})
+                    <span className="text-2xl font-extrabold text-[var(--neutral-900)]">{simulation.simulated_interest_rate}%</span>
+                    <span className="text-xs text-[var(--fin-green)] font-semibold flex items-center">
+                      <ArrowDownRight className="w-3 h-3" />
+                      {simulation.simulated_interest_rate < simulation.original_interest_rate ? `-${(simulation.original_interest_rate - simulation.simulated_interest_rate).toFixed(2)}%` : 'Standard'}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Insights */}
-              <div className="bg-[#F7FAF9] p-3 rounded-xl border border-[#E3ECE9] space-y-1.5">
-                <p className="text-xs font-bold text-[#123E40] flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-[#237277]" /> AI Underwriting Insights:
+              <div className="bg-[var(--brand-50)] p-4 rounded-xl border border-[var(--brand-200)] space-y-2">
+                <p className="text-xs font-bold text-[var(--neutral-900)] flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-700)]" /> AI Underwriting Insights:
                 </p>
                 {simulation.insights.map((ins, i) => (
-                  <p key={i} className="text-xs text-[#40524E] flex items-start gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#169C73] shrink-0 mt-0.5" />
+                  <p key={i} className="text-xs text-[var(--neutral-700)] flex items-start gap-2 leading-relaxed">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[var(--fin-green)] shrink-0 mt-0.5" />
                     <span>{ins}</span>
                   </p>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-[#687A75] text-xs">
+            <div className="h-full flex items-center justify-center text-[var(--neutral-500)] text-xs">
               Calculating counterfactual model...
             </div>
           )}

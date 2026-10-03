@@ -1,7 +1,7 @@
 import React from 'react';
 import { SHAPAttribution } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { Sparkles, HelpCircle } from 'lucide-react';
+import { Sparkles, HelpCircle, Info } from 'lucide-react';
 
 interface SHAPProps {
   shapData?: SHAPAttribution;
@@ -10,8 +10,10 @@ interface SHAPProps {
 export const SHAPWaterfallChart: React.FC<SHAPProps> = ({ shapData }) => {
   if (!shapData || !shapData.features || shapData.features.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] text-center text-[#687A75]">
-        <p>No SHAP attribution generated yet. Run risk evaluation to see feature contributions.</p>
+      <div className="card p-8 text-center text-[var(--neutral-500)]">
+        <Sparkles className="w-8 h-8 text-[var(--fin-violet)] mx-auto mb-2 opacity-60" />
+        <p className="font-semibold text-sm text-[var(--neutral-700)]">No SHAP attribution generated yet</p>
+        <p className="text-xs text-[var(--neutral-500)] mt-1">Run risk evaluation to view marginal feature contributions.</p>
       </div>
     );
   }
@@ -26,27 +28,32 @@ export const SHAPWaterfallChart: React.FC<SHAPProps> = ({ shapData }) => {
   }));
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#7457C8]" />
-            <h3 className="text-base font-bold text-[#123E40]">SHAP Explainability Waterfall</h3>
-            <span className="bg-[#F2EEFF] text-[#7457C8] text-[11px] font-semibold px-2 py-0.5 rounded-full border border-[#7457C8]/20">
-              TreeExplainer Attribution
-            </span>
+            <div className="w-8 h-8 rounded-lg bg-[var(--fin-violet-soft)] flex items-center justify-center text-[var(--fin-violet)]">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <h3 className="text-base font-bold text-[var(--neutral-900)] tracking-tight">
+              SHAP Feature Attribution (TreeExplainer)
+            </h3>
+            <span className="badge badge-purple text-[10px]">Explainable AI</span>
           </div>
-          <p className="text-xs text-[#687A75] mt-0.5">
-            Marginal contribution of each financial driver towards the borrower default probability.
+          <p className="text-xs text-[var(--neutral-500)] mt-1">
+            Quantifies the marginal contribution of each financial driver towards the borrower's default risk.
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-[#687A75]">Base Default Rate E[f(x)]</p>
-          <p className="text-sm font-bold text-[#123E40]">{(shapData.base_value * 100).toFixed(1)}%</p>
+
+        <div className="bg-[var(--neutral-50)] px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] text-right self-start sm:self-auto">
+          <p className="text-[10px] text-[var(--neutral-500)] font-medium">Base Portfolio Default Rate E[f(x)]</p>
+          <p className="text-sm font-black text-[var(--neutral-900)]">{(shapData.base_value * 100).toFixed(1)}%</p>
         </div>
       </div>
 
-      <div className="h-64 w-full">
+      {/* Chart */}
+      <div className="h-64 w-full bg-[var(--neutral-50)] rounded-xl p-3 border border-[var(--border-subtle)]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
@@ -59,6 +66,7 @@ export const SHAPWaterfallChart: React.FC<SHAPProps> = ({ shapData }) => {
               tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
               stroke="#94A7A1"
               fontSize={11}
+              tickLine={false}
             />
             <YAxis
               type="category"
@@ -66,13 +74,20 @@ export const SHAPWaterfallChart: React.FC<SHAPProps> = ({ shapData }) => {
               stroke="#40524E"
               fontSize={11}
               tickLine={false}
+              axisLine={false}
             />
             <Tooltip
               formatter={(value: any, _: any, item: any) => [
                 `${(Number(value) * 100).toFixed(2)}% (${item.payload.direction === 'REDUCES_RISK' ? 'Favorable / Improves Score' : 'Adverse / Increases Risk'})`,
-                'Contribution'
+                'SHAP Impact'
               ]}
-              contentStyle={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #CBD9D5', fontSize: '12px' }}
+              contentStyle={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #CBD9D5',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                fontSize: '12px'
+              }}
             />
             <ReferenceLine x={0} stroke="#CBD9D5" strokeWidth={1.5} />
             <Bar dataKey="impact" radius={[4, 4, 4, 4]}>
@@ -87,20 +102,22 @@ export const SHAPWaterfallChart: React.FC<SHAPProps> = ({ shapData }) => {
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-[#E3ECE9] flex items-center justify-between text-xs text-[#687A75]">
+      {/* Footer Legend */}
+      <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[var(--neutral-600)]">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-[#169C73] inline-block"></span>
-            Green = Favorable (Reduces Default Risk)
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-3 h-3 rounded-full bg-[var(--fin-green)] inline-block"></span>
+            Green: Favorable (Reduces Default Risk)
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-[#D96559] inline-block"></span>
-            Red = Adverse (Increases Default Risk)
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-3 h-3 rounded-full bg-[var(--fin-coral)] inline-block"></span>
+            Red: Adverse (Increases Default Risk)
           </span>
         </div>
-        <span className="text-[11px] font-medium text-[#123E40]">
-          Model Output f(x): {(shapData.model_output * 100).toFixed(1)}% PD
-        </span>
+        <div className="flex items-center gap-1.5 font-semibold text-[var(--neutral-900)]">
+          <Info className="w-3.5 h-3.5 text-[var(--brand-600)]" />
+          <span>Calibrated PD f(x): {(shapData.model_output * 100).toFixed(1)}%</span>
+        </div>
       </div>
     </div>
   );

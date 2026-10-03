@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../api/client';
 import { DocumentRecord, EvidenceItem } from '../../types';
-import { UploadCloud, FileText, CheckCircle2, ShieldCheck, Hash, Eye, AlertCircle } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle2, ShieldCheck, Hash, Eye, AlertCircle, FileCheck, Layers } from 'lucide-react';
 
 interface DocUploadProps {
   journeyId: string;
@@ -19,7 +19,6 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
   const [docType, setDocType] = useState<string>('BANK_STATEMENT');
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,23 +39,30 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
   return (
     <div className="space-y-6">
       {/* Upload Zone */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <h3 className="text-base font-bold text-[#123E40] mb-1">
-          Document Intelligence & Evidence Provenance
-        </h3>
-        <p className="text-xs text-[#687A75] mb-4">
-          Upload PDF or image statements. FinFlow extracts structured fields, computes SHA-256 immutability hashes, and anchors provenance.
-        </p>
+      <div className="card p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-[var(--brand-50)] flex items-center justify-center text-[var(--brand-700)]">
+            <UploadCloud className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-[var(--neutral-900)] tracking-tight">
+              Evidence Ingestion & Document Provenance
+            </h3>
+            <p className="text-xs text-[var(--neutral-500)]">
+              Upload bank statements, GST returns, or ITR. FinFlow computes SHA-256 hashes and extracts verifiable fields.
+            </p>
+          </div>
+        </div>
 
-        <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+        <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end mt-4">
           <div className="md:col-span-4">
-            <label className="block text-xs font-semibold text-[#40524E] mb-1">
+            <label className="fin-label">
               Document Category
             </label>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              className="w-full text-xs rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825] focus:outline-none focus:border-[#237277]"
+              className="fin-input text-xs"
             >
               <option value="BANK_STATEMENT">Bank Statement (Last 6 Months)</option>
               <option value="GST_RETURN">GSTR-3B / GSTR-1 Monthly Return</option>
@@ -66,14 +72,14 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
           </div>
 
           <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-[#40524E] mb-1">
+            <label className="fin-label">
               Select Statement File (PDF / Images)
             </label>
             <input
               type="file"
               accept=".pdf,.png,.jpg,.jpeg"
               onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-              className="w-full text-xs text-[#687A75] file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF8F7] file:text-[#237277] hover:file:bg-[#D9F0EE] cursor-pointer"
+              className="fin-input text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--brand-50)] file:text-[var(--brand-700)] hover:file:bg-[var(--brand-100)] cursor-pointer"
             />
           </div>
 
@@ -81,7 +87,7 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
             <button
               type="submit"
               disabled={!file || isUploading}
-              className="w-full py-2.5 px-4 bg-[#237277] hover:bg-[#18575A] text-white text-xs font-semibold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-xs"
+              className="btn-primary w-full py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <UploadCloud className="w-4 h-4" />
               <span>{isUploading ? 'Extracting via OCR...' : 'Upload & Extract'}</span>
@@ -91,41 +97,52 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
       </div>
 
       {/* Uploaded Documents List */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <h4 className="text-sm font-bold text-[#123E40] mb-3 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-[#237277]" /> Verified Ingestion Records ({documents.length})
-        </h4>
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-[var(--neutral-900)] flex items-center gap-2">
+            <FileText className="w-4 h-4 text-[var(--brand-700)]" /> Verified Ingestion Records ({documents.length})
+          </h4>
+          <span className="badge badge-primary text-[10px]">Tamper-Proof Ledger</span>
+        </div>
 
         {documents.length === 0 ? (
-          <p className="text-xs text-[#687A75]">No documents uploaded yet for this application.</p>
+          <div className="p-8 text-center text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-xl border border-dashed border-[var(--border-subtle)]">
+            <FileText className="w-8 h-8 text-[var(--neutral-400)] mx-auto mb-2 opacity-50" />
+            <p className="text-xs">No documents uploaded yet for this application.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#F7FAF9] text-[#687A75] border-b border-[#E3ECE9]">
+              <thead className="bg-[var(--neutral-50)] text-[var(--neutral-500)] border-b border-[var(--border-subtle)]">
                 <tr>
-                  <th className="py-2.5 px-3 font-semibold">Document Name</th>
-                  <th className="py-2.5 px-3 font-semibold">Type</th>
-                  <th className="py-2.5 px-3 font-semibold">Status</th>
-                  <th className="py-2.5 px-3 font-semibold">SHA-256 Provenance Fingerprint</th>
-                  <th className="py-2.5 px-3 font-semibold">Fields Extracted</th>
+                  <th className="py-3 px-3.5 font-semibold">Document Name</th>
+                  <th className="py-3 px-3.5 font-semibold">Type</th>
+                  <th className="py-3 px-3.5 font-semibold">Status</th>
+                  <th className="py-3 px-3.5 font-semibold">SHA-256 Provenance Fingerprint</th>
+                  <th className="py-3 px-3.5 font-semibold">Extracted Fields</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E3ECE9]">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {documents.map((d) => (
-                  <tr key={d.document_id} className="hover:bg-[#F7FAF9]/60">
-                    <td className="py-2.5 px-3 font-medium text-[#172825]">{d.file_name}</td>
-                    <td className="py-2.5 px-3 text-[#40524E]">{d.doc_type}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="bg-[#E8F7F1] text-[#169C73] text-[11px] font-semibold px-2 py-0.5 rounded-full border border-[#169C73]/20 flex items-center gap-1 w-max">
+                  <tr key={d.document_id} className="hover:bg-[var(--neutral-50)] transition-colors">
+                    <td className="py-3 px-3.5 font-semibold text-[var(--neutral-900)] flex items-center gap-2">
+                      <FileCheck className="w-4 h-4 text-[var(--brand-600)] shrink-0" />
+                      {d.file_name}
+                    </td>
+                    <td className="py-3 px-3.5 text-[var(--neutral-600)] font-medium">{d.doc_type}</td>
+                    <td className="py-3 px-3.5">
+                      <span className="badge badge-success text-[11px] flex items-center gap-1 w-max">
                         <CheckCircle2 className="w-3 h-3" /> {d.status}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-[#687A75] font-mono text-[10px]">
-                      <span className="bg-[#EFF5F3] px-1.5 py-0.5 rounded border border-[#CBD9D5]" title={d.sha256_hash}>
+                    <td className="py-3 px-3.5">
+                      <code className="text-[10px] font-mono bg-[var(--neutral-100)] text-[var(--neutral-700)] px-2 py-0.5 rounded border border-[var(--border-subtle)]" title={d.sha256_hash}>
                         {d.sha256_hash.substring(0, 16)}...
-                      </span>
+                      </code>
                     </td>
-                    <td className="py-2.5 px-3 text-[#237277] font-semibold">{d.extracted_fields_count} fields</td>
+                    <td className="py-3 px-3.5 text-[var(--brand-700)] font-bold">
+                      {d.extracted_fields_count} verified fields
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -135,46 +152,54 @@ export const DocumentUploadLedger: React.FC<DocUploadProps> = ({
       </div>
 
       {/* Structured Evidence Ledger */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <h4 className="text-sm font-bold text-[#123E40] mb-3 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-[#169C73]" /> Cryptographic Evidence Ledger ({evidence.length} Fields)
-        </h4>
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-[var(--neutral-900)] flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[var(--fin-green)]" /> Cryptographic Evidence Ledger ({evidence.length} Fields)
+          </h4>
+          <span className="badge badge-success text-[10px]">Zero Hallucination Anchors</span>
+        </div>
 
         {evidence.length === 0 ? (
-          <p className="text-xs text-[#687A75]">No evidence items generated yet.</p>
+          <div className="p-8 text-center text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-xl border border-dashed border-[var(--border-subtle)]">
+            <Layers className="w-8 h-8 text-[var(--neutral-400)] mx-auto mb-2 opacity-50" />
+            <p className="text-xs">No evidence items generated yet.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#F7FAF9] text-[#687A75] border-b border-[#E3ECE9]">
+              <thead className="bg-[var(--neutral-50)] text-[var(--neutral-500)] border-b border-[var(--border-subtle)]">
                 <tr>
-                  <th className="py-2.5 px-3 font-semibold">Evidence Field</th>
-                  <th className="py-2.5 px-3 font-semibold">Extracted Value</th>
-                  <th className="py-2.5 px-3 font-semibold">Confidence</th>
-                  <th className="py-2.5 px-3 font-semibold">Page & Bounding Box</th>
-                  <th className="py-2.5 px-3 font-semibold">Source Hash</th>
+                  <th className="py-3 px-3.5 font-semibold">Evidence Field</th>
+                  <th className="py-3 px-3.5 font-semibold">Extracted Value</th>
+                  <th className="py-3 px-3.5 font-semibold">Confidence</th>
+                  <th className="py-3 px-3.5 font-semibold">Page & Coordinate Box</th>
+                  <th className="py-3 px-3.5 font-semibold">Source Hash</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E3ECE9]">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {evidence.map((item) => (
-                  <tr key={item.evidence_id} className="hover:bg-[#F7FAF9]/60">
-                    <td className="py-2.5 px-3 font-medium text-[#123E40]">{item.field_name}</td>
-                    <td className="py-2.5 px-3 font-semibold text-[#172825]">
+                  <tr key={item.evidence_id} className="hover:bg-[var(--neutral-50)] transition-colors">
+                    <td className="py-3 px-3.5 font-semibold text-[var(--neutral-900)]">{item.field_name}</td>
+                    <td className="py-3 px-3.5 font-bold text-[var(--brand-800)]">
                       {typeof item.field_value === 'number' && item.field_value > 1000
                         ? `₹${item.field_value.toLocaleString('en-IN')}`
                         : String(item.field_value)}
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        item.confidence >= 0.95 ? 'bg-[#E8F7F1] text-[#169C73]' : 'bg-[#FFF6DF] text-[#D89B22]'
-                      }`}>
+                    <td className="py-3 px-3.5">
+                      <span className={`badge ${
+                        item.confidence >= 0.95 ? 'badge-success' : 'badge-warning'
+                      } text-[10px]`}>
                         {(item.confidence * 100).toFixed(0)}%
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-[#687A75] text-[11px]">
-                      P.{item.page_number} (x:{item.bounding_box?.x}, y:{item.bounding_box?.y})
+                    <td className="py-3 px-3.5 text-[var(--neutral-500)] text-[11px]">
+                      Page {item.page_number} (x:{item.bounding_box?.x}, y:{item.bounding_box?.y})
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[10px] text-[#687A75]">
-                      {item.sha256_source_hash.substring(0, 12)}...
+                    <td className="py-3 px-3.5">
+                      <code className="text-[10px] font-mono text-[var(--neutral-500)]">
+                        {item.sha256_source_hash.substring(0, 12)}...
+                      </code>
                     </td>
                   </tr>
                 ))}

@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import {
   JourneyRecord, DocumentRecord, EvidenceItem, CashFlowMetrics,
   RiskAssessment, SHAPAttribution, DecisionRecord, NextBestActionsResponse,
-  JourneyStage, JourneyFrictionMetrics
+  JourneyFrictionMetrics
 } from '../../types';
 import { JourneyStepper } from '../journey/JourneyStepper';
 import { SafeActionBanner } from './SafeActionBanner';
@@ -12,25 +12,38 @@ import { CashFlowIntelligenceCard } from './CashFlowIntelligenceCard';
 import { DecisionExplainableCard } from './DecisionExplainableCard';
 import { SHAPWaterfallChart } from './SHAPWaterfallChart';
 import { WhatIfSimulatorCard } from './WhatIfSimulatorCard';
-import { Sparkles, FileText, Activity, Sliders, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
+import {
+  Sparkles, FileText, Activity, Sliders, ShieldCheck,
+  ArrowRight, Clock, TrendingUp, AlertCircle, Zap, RefreshCw
+} from 'lucide-react';
 
 interface CustomerViewProps {
   journeyId: string;
 }
 
+const TABS = [
+  { id: 'overview',        label: 'Decision & Sanction',       Icon: ShieldCheck,  color: 'var(--brand-700)' },
+  { id: 'documents',       label: 'Evidence & OCR',             Icon: FileText,     color: 'var(--fin-blue)'  },
+  { id: 'cashflow',        label: 'Cash-Flow Intelligence',     Icon: Activity,     color: 'var(--fin-green)' },
+  { id: 'explainability',  label: 'SHAP Explainability',        Icon: Sparkles,     color: 'var(--fin-violet)'},
+  { id: 'simulator',       label: 'What-If Simulator',          Icon: Sliders,      color: 'var(--fin-amber)' },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
+
 export const CustomerJourneyView: React.FC<CustomerViewProps> = ({ journeyId }) => {
-  const [journey, setJourney] = useState<JourneyRecord | null>(null);
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
-  const [cashflow, setCashflow] = useState<CashFlowMetrics | null>(null);
+  const [journey,        setJourney]        = useState<JourneyRecord | null>(null);
+  const [documents,      setDocuments]      = useState<DocumentRecord[]>([]);
+  const [evidence,       setEvidence]       = useState<EvidenceItem[]>([]);
+  const [cashflow,       setCashflow]       = useState<CashFlowMetrics | null>(null);
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
-  const [shapData, setShapData] = useState<SHAPAttribution | null>(null);
-  const [decision, setDecision] = useState<DecisionRecord | null>(null);
-  const [nba, setNba] = useState<NextBestActionsResponse | null>(null);
-  const [friction, setFriction] = useState<JourneyFrictionMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'cashflow' | 'explainability' | 'simulator'>('overview');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [shapData,       setShapData]       = useState<SHAPAttribution | null>(null);
+  const [decision,       setDecision]       = useState<DecisionRecord | null>(null);
+  const [nba,            setNba]            = useState<NextBestActionsResponse | null>(null);
+  const [friction,       setFriction]       = useState<JourneyFrictionMetrics | null>(null);
+  const [activeTab,      setActiveTab]      = useState<TabId>('overview');
+  const [isLoading,      setIsLoading]      = useState<boolean>(true);
+  const [isEvaluating,   setIsEvaluating]   = useState<boolean>(false);
 
   const fetchJourneyData = async () => {
     setIsLoading(true);
@@ -41,26 +54,18 @@ export const CustomerJourneyView: React.FC<CustomerViewProps> = ({ journeyId }) 
         api.getEvidenceLedger(journeyId).catch(() => []),
         api.getCashFlowMetrics(journeyId).catch(() => null),
         api.getNextBestActions(journeyId).catch(() => null),
-        api.getFriction(journeyId).catch(() => null)
+        api.getFriction(journeyId).catch(() => null),
       ]);
+      setJourney(jrn); setDocuments(docs); setEvidence(evi);
+      setCashflow(cf); setNba(act); setFriction(frict);
 
-      setJourney(jrn);
-      setDocuments(docs);
-      setEvidence(evi);
-      setCashflow(cf);
-      setNba(act);
-      setFriction(frict);
-
-      // Try fetching decision & risk if available
       try {
         const [rsk, shp, dec] = await Promise.all([
           api.getRiskAssessment(journeyId),
           api.getSHAP(journeyId),
-          api.getDecision(journeyId)
+          api.getDecision(journeyId),
         ]);
-        setRiskAssessment(rsk);
-        setShapData(shp);
-        setDecision(dec);
+        setRiskAssessment(rsk); setShapData(shp); setDecision(dec);
       } catch (_) {}
     } catch (err) {
       console.error('Error fetching journey:', err);
@@ -69,9 +74,7 @@ export const CustomerJourneyView: React.FC<CustomerViewProps> = ({ journeyId }) 
     }
   };
 
-  useEffect(() => {
-    fetchJourneyData();
-  }, [journeyId]);
+  useEffect(() => { fetchJourneyData(); }, [journeyId]);
 
   const handleRunEvaluation = async () => {
     setIsEvaluating(true);
@@ -88,192 +91,255 @@ export const CustomerJourneyView: React.FC<CustomerViewProps> = ({ journeyId }) 
 
   if (isLoading && !journey) {
     return (
-      <div className="max-w-7xl mx-auto py-12 px-4 text-center text-[#687A75]">
-        <div className="w-8 h-8 border-3 border-[#237277] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-sm font-semibold">Loading journey orchestration...</p>
+      <div className="page-container">
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-[var(--text-muted)]">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-4 border-[var(--brand-100)]" />
+            <div className="absolute inset-0 rounded-full border-4 border-[var(--brand-600)] border-t-transparent animate-spin" />
+            <div className="absolute inset-3 rounded-full bg-[var(--brand-50)] flex items-center justify-center">
+              <Zap className="w-4 h-4 text-[var(--brand-600)]" />
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-bold text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Orchestrating Journey...
+            </p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Fetching financial data & running intelligence engines</p>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!journey) {
-    return (
-      <div className="max-w-7xl mx-auto py-12 px-4 text-center text-[#687A75]">
-        <p>Journey not found.</p>
+  if (!journey) return (
+    <div className="page-container">
+      <div className="alert-panel danger text-center">
+        <AlertCircle className="w-5 h-5 text-[var(--fin-coral)] mx-auto mb-2" />
+        <p className="text-sm font-semibold">Journey not found.</p>
       </div>
-    );
-  }
+    </div>
+  );
+
+  const outcome = decision?.outcome;
+  const outcomeGradient =
+    outcome === 'APPROVED'            ? 'from-[#0E9B6D] to-[#169C73]' :
+    outcome === 'CONDITIONAL_APPROVAL'? 'from-[#C98A10] to-[#D89B22]' :
+    outcome === 'REJECTED'            ? 'from-[#CC4B3E] to-[#D96559]' :
+    'from-[var(--brand-800)] to-[var(--brand-600)]';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Top Hero Card */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-[#237277] uppercase tracking-wider">
-              {journey.intent.industry_sector || 'SME Working Capital Facility'}
-            </span>
-            <span className="text-xs text-[#CBD9D5]">•</span>
-            <span className="text-xs text-[#687A75]">Case ID: {journey.journey_id}</span>
-          </div>
-          <h1 className="text-2xl font-black text-[#123E40]">{journey.intent.business_name}</h1>
-          <p className="text-xs text-[#687A75] mt-1">
-            Requested: <strong className="text-[#172825]">₹{journey.intent.requested_amount.toLocaleString('en-IN')}</strong> for {journey.intent.tenor_months} months • Purpose: {journey.intent.purpose}
-          </p>
-        </div>
+    <div className="page-container space-y-5">
 
-        <div className="flex items-center gap-3">
-          {/* Friction Indicator */}
-          {friction && (
-            <div className="text-right hidden sm:block">
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                friction.friction_score < 30 ? 'bg-[#E8F7F1] text-[#169C73]' : friction.friction_score < 60 ? 'bg-[#FFF6DF] text-[#D89B22]' : 'bg-[#FDECEA] text-[#D96559]'
-              }`}>
-                Friction Score: {friction.friction_score}/100
-              </span>
-              <p className="text-[10px] text-[#687A75] mt-0.5">Journey Time: {Math.round(friction.total_time_seconds / 60)} mins</p>
-            </div>
-          )}
+      {/* ── Hero Journey Card ── */}
+      <div className={`card overflow-hidden animate-fadeInUp`}>
+        {/* Gradient accent bar */}
+        <div className={`h-1.5 w-full bg-gradient-to-r ${outcomeGradient}`} />
 
-          {(!decision || decision.outcome === 'NEEDS_REVIEW') && (
-            <button
-              onClick={handleRunEvaluation}
-              disabled={isEvaluating}
-              className="py-2.5 px-4 bg-[#237277] hover:bg-[#18575A] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 disabled:opacity-50"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{isEvaluating ? 'Evaluating Model...' : 'Re-Run Risk Model'}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 7-Stage Interactive Journey Stepper */}
-      <JourneyStepper currentStage={journey.current_stage} />
-
-      {/* Safe Action Hero Banner */}
-      <SafeActionBanner
-        nba={nba || undefined}
-        onExecuteAction={(type) => {
-          if (type === 'UPLOAD_DOCUMENT') setActiveTab('documents');
-          else if (type === 'OFFER_ACCEPTANCE') setActiveTab('overview');
-        }}
-      />
-
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-[#E3ECE9] gap-4 text-xs font-semibold">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`pb-3 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'overview'
-              ? 'text-[#237277] border-b-2 border-[#237277] font-bold'
-              : 'text-[#687A75] hover:text-[#172825]'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Decision & Sanction</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('documents')}
-          className={`pb-3 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'documents'
-              ? 'text-[#237277] border-b-2 border-[#237277] font-bold'
-              : 'text-[#687A75] hover:text-[#172825]'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>Evidence & OCR ({documents.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('cashflow')}
-          className={`pb-3 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'cashflow'
-              ? 'text-[#237277] border-b-2 border-[#237277] font-bold'
-              : 'text-[#687A75] hover:text-[#172825]'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Cash-Flow Intelligence</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('explainability')}
-          className={`pb-3 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'explainability'
-              ? 'text-[#237277] border-b-2 border-[#237277] font-bold'
-              : 'text-[#687A75] hover:text-[#172825]'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-[#7457C8]" />
-          <span>SHAP Explainability</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('simulator')}
-          className={`pb-3 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'simulator'
-              ? 'text-[#237277] border-b-2 border-[#237277] font-bold'
-              : 'text-[#687A75] hover:text-[#172825]'
-          }`}
-        >
-          <Sliders className="w-4 h-4 text-[#D89B22]" />
-          <span>What-If Simulator</span>
-        </button>
-      </div>
-
-      {/* Tab Panels */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <DecisionExplainableCard
-            decision={decision || undefined}
-            riskAssessment={riskAssessment || undefined}
-            onAcceptOffer={() => {
-              api.advanceStage(journeyId, 'SANCTIONED', 'Applicant e-signed sanction letter');
-              fetchJourneyData();
-            }}
-          />
-          {cashflow && <CashFlowIntelligenceCard metrics={cashflow} />}
-          {shapData && <SHAPWaterfallChart shapData={shapData} />}
-        </div>
-      )}
-
-      {activeTab === 'documents' && (
-        <DocumentUploadLedger
-          journeyId={journeyId}
-          documents={documents}
-          evidence={evidence}
-          onRefresh={fetchJourneyData}
-        />
-      )}
-
-      {activeTab === 'cashflow' && (
-        <div className="space-y-6">
-          <CashFlowIntelligenceCard metrics={cashflow || undefined} />
-        </div>
-      )}
-
-      {activeTab === 'explainability' && (
-        <div className="space-y-6">
-          <SHAPWaterfallChart shapData={shapData || undefined} />
-          {decision && (
-            <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-              <h4 className="text-sm font-bold text-[#123E40] mb-2">RAG Context Grounding Sources</h4>
-              <p className="text-xs text-[#687A75] mb-4">
-                The decision reasoning cites verified extracted evidence items and underwriting policy corpus clauses:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {decision.policy_citations.map((c, i) => (
-                  <div key={i} className="p-3 bg-[#EEF8F7] rounded-xl border border-[#D9F0EE]">
-                    <span className="text-xs font-bold text-[#237277]">{c.clause_id}: {c.title}</span>
-                    <p className="text-xs text-[#40524E] mt-1 italic">"{c.excerpt}"</p>
-                  </div>
-                ))}
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                <span className="badge badge-teal text-[10px]">
+                  {journey.intent.industry_sector || 'SME Working Capital'}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                  ID: {journey.journey_id}
+                </span>
+                <span className={`badge text-[10px] ${
+                  journey.status === 'FLAGGED' ? 'badge-coral' :
+                  journey.status === 'COMPLETED' ? 'badge-green' : 'badge-teal'
+                }`}>
+                  {journey.status}
+                </span>
               </div>
+              <h1
+                className="text-2xl sm:text-3xl font-black text-[var(--brand-950)] leading-tight"
+                style={{ fontFamily: 'Outfit, sans-serif' }}
+              >
+                {journey.intent.business_name}
+              </h1>
+              <p className="text-xs text-[var(--text-muted)] mt-1.5 flex items-center flex-wrap gap-2">
+                <span>
+                  Requested <strong className="text-[var(--text-primary)]">
+                    ₹{(journey.intent.requested_amount / 100000).toFixed(1)}L
+                  </strong>
+                </span>
+                <span className="text-[var(--border-strong)]">•</span>
+                <span>{journey.intent.tenor_months} months</span>
+                <span className="text-[var(--border-strong)]">•</span>
+                <span className="italic">{journey.intent.purpose}</span>
+              </p>
             </div>
-          )}
-        </div>
-      )}
 
-      {activeTab === 'simulator' && (
-        <WhatIfSimulatorCard journeyId={journeyId} />
-      )}
+            {/* Right controls */}
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Friction indicator */}
+              {friction && (
+                <div className="hidden sm:block text-right">
+                  <div className={`badge text-[11px] ${
+                    friction.friction_score < 30 ? 'badge-green' :
+                    friction.friction_score < 60 ? 'badge-amber' : 'badge-coral'
+                  }`}>
+                    Friction {friction.friction_score}/100
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1 justify-end">
+                    <Clock className="w-3 h-3" />
+                    {Math.round(friction.total_time_seconds / 60)}m journey
+                  </p>
+                </div>
+              )}
+
+              {/* Decision quick score */}
+              {riskAssessment && (
+                <div className="bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-xl px-3 py-2 text-center hidden md:block">
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)]">Trust Score</p>
+                  <p className="text-xl font-black text-[var(--brand-800)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    {riskAssessment.risk_score}
+                  </p>
+                  <p className="text-[9px] font-bold text-[var(--text-muted)]">/1000</p>
+                </div>
+              )}
+
+              {(!decision || decision.outcome === 'NEEDS_REVIEW') && (
+                <button
+                  onClick={handleRunEvaluation}
+                  disabled={isEvaluating}
+                  className="btn-primary"
+                >
+                  {isEvaluating ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isEvaluating ? 'Running AI Model...' : 'Run Risk Model'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Stats strip */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+            {[
+              { label: 'Turnover', value: `₹${(journey.intent.annual_turnover / 10000000).toFixed(2)}Cr`, icon: TrendingUp, color: 'var(--fin-green)' },
+              { label: 'Vintage', value: `${journey.intent.vintage_months}m`, icon: Clock, color: 'var(--brand-600)' },
+              { label: 'Documents', value: String(documents.length), icon: FileText, color: 'var(--fin-blue)' },
+              { label: 'Evidence', value: String(evidence.length), icon: Sparkles, color: 'var(--fin-violet)' },
+              { label: 'DSCR', value: cashflow ? `${cashflow.dscr}x` : '—', icon: Activity, color: cashflow && cashflow.dscr >= 1.25 ? 'var(--fin-green)' : 'var(--fin-amber)' },
+              { label: 'PAN', value: journey.intent.pan || '—', icon: ShieldCheck, color: 'var(--brand-600)' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-2 py-1">
+                <item.icon className="w-3.5 h-3.5 shrink-0" style={{ color: item.color }} />
+                <div className="min-w-0">
+                  <p className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{item.label}</p>
+                  <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{item.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Journey Stepper ── */}
+      <div className="animate-fadeInUp stagger-1">
+        <JourneyStepper currentStage={journey.current_stage} />
+      </div>
+
+      {/* ── Safe Action Banner ── */}
+      <div className="animate-fadeInUp stagger-2">
+        <SafeActionBanner
+          nba={nba || undefined}
+          onExecuteAction={(type) => {
+            if (type === 'UPLOAD_DOCUMENT') setActiveTab('documents');
+            else if (type === 'OFFER_ACCEPTANCE') setActiveTab('overview');
+          }}
+        />
+      </div>
+
+      {/* ── Tab Navigation ── */}
+      <div className="animate-fadeInUp stagger-3">
+        <div className="tab-bar overflow-x-auto">
+          {TABS.map(({ id, label, Icon, color }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`tab-item ${activeTab === id ? 'active' : ''}`}
+              style={activeTab === id ? { color } : {}}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span>{label}
+                {id === 'documents' && documents.length > 0 && (
+                  <span className="ml-1 text-[9px] font-bold bg-[var(--brand-100)] text-[var(--brand-700)] rounded-full px-1.5 py-0.5">
+                    {documents.length}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab Panels ── */}
+      <div className="animate-fadeInUp stagger-4">
+        {activeTab === 'overview' && (
+          <div className="space-y-5">
+            <DecisionExplainableCard
+              decision={decision || undefined}
+              riskAssessment={riskAssessment || undefined}
+              onAcceptOffer={() => {
+                api.advanceStage(journeyId, 'SANCTIONED', 'Applicant e-signed sanction letter');
+                fetchJourneyData();
+              }}
+            />
+            {cashflow && <CashFlowIntelligenceCard metrics={cashflow} />}
+            {shapData && <SHAPWaterfallChart shapData={shapData} />}
+          </div>
+        )}
+
+        {activeTab === 'documents' && (
+          <DocumentUploadLedger
+            journeyId={journeyId}
+            documents={documents}
+            evidence={evidence}
+            onRefresh={fetchJourneyData}
+          />
+        )}
+
+        {activeTab === 'cashflow' && (
+          <CashFlowIntelligenceCard metrics={cashflow || undefined} />
+        )}
+
+        {activeTab === 'explainability' && (
+          <div className="space-y-5">
+            <SHAPWaterfallChart shapData={shapData || undefined} />
+            {decision && (
+              <div className="card p-6">
+                <h4 className="text-sm font-bold text-[var(--brand-900)] mb-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  RAG Grounding Sources
+                </h4>
+                <p className="text-xs text-[var(--text-muted)] mb-4">
+                  Decision reasoning cites verified evidence items and underwriting policy corpus clauses:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {decision.policy_citations.map((c, i) => (
+                    <div key={i} className="p-3 bg-[var(--brand-50)] rounded-xl border border-[var(--brand-100)]">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-bold text-[var(--brand-700)]">{c.clause_id}</span>
+                        <span className="text-[10px] badge badge-teal">{(c.relevance_score * 100).toFixed(0)}% match</span>
+                      </div>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">{c.title}</p>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-1 italic">"{c.excerpt}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'simulator' && (
+          <WhatIfSimulatorCard journeyId={journeyId} />
+        )}
+      </div>
     </div>
   );
 };

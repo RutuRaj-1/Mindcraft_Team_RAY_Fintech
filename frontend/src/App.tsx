@@ -7,6 +7,7 @@ import { CustomerJourneyView } from './components/customer/CustomerJourneyView';
 import { RMQueueView } from './components/rm/RMQueueView';
 import { RiskOfficerConsole } from './components/risk/RiskOfficerConsole';
 import { AdminConsole } from './components/admin/AdminConsole';
+import { Zap } from 'lucide-react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,9 +19,9 @@ const queryClient = new QueryClient({
 });
 
 export const AppContent: React.FC = () => {
-  const [currentRole, setCurrentRole] = useState<UserRole>(getActiveRole());
-  const [activeJourneyId, setActiveJourneyId] = useState<string>('jrn_priya_001');
-  const [isSeeding, setIsSeeding] = useState<boolean>(false);
+  const [currentRole,    setCurrentRole]    = useState<UserRole>(getActiveRole());
+  const [activeJourneyId,setActiveJourneyId]= useState<string>('jrn_priya_001');
+  const [isSeeding,      setIsSeeding]      = useState<boolean>(false);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const handleRoleChange = (role: UserRole) => {
@@ -30,7 +31,6 @@ export const AppContent: React.FC = () => {
 
   const handleSelectCase = (journeyId: string) => {
     setActiveJourneyId(journeyId);
-    // If selecting Case 3 (Apex - fraud flag), auto switch to Risk Officer for demo impact
     if (journeyId === 'jrn_apex_003' && currentRole === 'CUSTOMER') {
       handleRoleChange('RISK_OFFICER');
     }
@@ -41,7 +41,6 @@ export const AppContent: React.FC = () => {
     try {
       await api.seedDemo();
       setRefreshTrigger(prev => prev + 1);
-      alert('Demo benchmark cases re-seeded with fresh synthetic evidence.');
     } catch (e: any) {
       alert(`Seed failed: ${e.message}`);
     } finally {
@@ -50,7 +49,7 @@ export const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7FAF9] text-[#172825] flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <Navbar
         currentRole={currentRole}
         onRoleChange={handleRoleChange}
@@ -94,8 +93,37 @@ export const AppContent: React.FC = () => {
         )}
       </main>
 
-      <footer className="border-t border-[#E3ECE9] bg-white py-4 px-6 text-center text-xs text-[#687A75]">
-        FinFlow AI — Intelligent & Explainable Financial Journey Orchestration • MindCraft Fintech MVP
+      {/* Premium Footer */}
+      <footer style={{
+        borderTop: '1px solid var(--border)',
+        background: 'var(--surface)',
+        padding: '12px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            width: '20px', height: '20px', borderRadius: '6px',
+            background: 'linear-gradient(135deg, #123E40, #3DA5A6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Zap size={10} color="white" />
+          </div>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-900)', fontFamily: 'Outfit, sans-serif' }}>
+            FinFlow AI
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+            Intelligent & Explainable Financial Journey Orchestration
+          </span>
+        </div>
+        <div style={{ display: 'flex', items: 'center', gap: '16px', fontSize: '10px', color: 'var(--text-muted)' }}>
+          <span>MindCraft Fintech Hackathon MVP v2.1</span>
+          <span style={{ color: 'var(--border-strong)' }}>•</span>
+          <span>7 Modules · 3 Personas · SHAP + RAG + ML</span>
+        </div>
       </footer>
     </div>
   );

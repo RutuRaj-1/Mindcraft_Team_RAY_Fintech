@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
-import { Settings, ShieldCheck, Database, FileText, Cpu, CheckCircle2 } from 'lucide-react';
+import { Settings, ShieldCheck, Database, FileText, Cpu, CheckCircle2, RefreshCw, Activity, ArrowUpRight, Lock } from 'lucide-react';
 
 interface AdminProps {
   journeyId: string;
@@ -12,128 +12,178 @@ export const AdminConsole: React.FC<AdminProps> = ({ journeyId }) => {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const fetchAdminData = async () => {
+    setIsLoading(true);
+    try {
+      const [m, l, a] = await Promise.all([
+        api.getPortfolioMetrics().catch(() => ({})),
+        api.getLearningStats().catch(() => ({})),
+        api.getAuditTrail(journeyId).catch(() => [])
+      ]);
+      setMetrics(m);
+      setLearningStats(l);
+      setAuditLogs(a);
+    } catch (err) {
+      console.error('Error fetching admin data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAdminData = async () => {
-      setIsLoading(true);
-      try {
-        const [m, l, a] = await Promise.all([
-          api.getPortfolioMetrics().catch(() => ({})),
-          api.getLearningStats().catch(() => ({})),
-          api.getAuditTrail(journeyId).catch(() => [])
-        ]);
-        setMetrics(m);
-        setLearningStats(l);
-        setAuditLogs(a);
-      } catch (err) {
-        console.error('Error fetching admin data:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchAdminData();
   }, [journeyId]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="bg-[#EEF8F7] text-[#237277] text-xs font-bold px-2.5 py-0.5 rounded-full border border-[#D9F0EE]">
-            System Administration
-          </span>
-          <span className="text-xs text-[#687A75]">Persona: System Administrator</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="badge badge-purple text-xs font-bold px-3 py-1">
+              System Administration
+            </span>
+            <span className="text-xs text-[var(--neutral-500)]">Persona: System Administrator / Compliance Officer</span>
+          </div>
+          <h1 className="text-2xl font-black text-[var(--neutral-900)] tracking-tight">
+            Institutional Governance & System Observability
+          </h1>
         </div>
-        <h1 className="text-2xl font-black text-[#123E40] mt-1">Institutional Governance & System Observability</h1>
+
+        <button
+          onClick={fetchAdminData}
+          disabled={isLoading}
+          className="btn-secondary py-2 px-4 text-xs font-semibold flex items-center gap-2 self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>Refresh Telemetry</span>
+        </button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-[#E3ECE9] shadow-xs">
-          <p className="text-xs font-semibold text-[#687A75]">Straight-Through Processing (STP)</p>
-          <p className="text-2xl font-black text-[#169C73] mt-1">{metrics.ai_straight_through_processing_pct || 66.7}%</p>
-          <p className="text-[10px] text-[#687A75]">Zero-touch AI decisions</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="metric-card">
+          <div className="flex items-center justify-between text-xs text-[var(--neutral-500)] font-semibold">
+            <span>Straight-Through Processing</span>
+            <Activity className="w-4 h-4 text-[var(--fin-green)]" />
+          </div>
+          <div className="metric-card-value text-[var(--fin-green)] mt-2">
+            {metrics.ai_straight_through_processing_pct || 66.7}%
+          </div>
+          <p className="text-[11px] text-[var(--neutral-500)] mt-1">Zero-touch AI decisions</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-[#E3ECE9] shadow-xs">
-          <p className="text-xs font-semibold text-[#687A75]">Underwriter Overrides Executed</p>
-          <p className="text-2xl font-black text-[#237277] mt-1">{metrics.human_overrides_executed || 1}</p>
-          <p className="text-[10px] text-[#237277]">Learning loop anchored</p>
+
+        <div className="metric-card">
+          <div className="flex items-center justify-between text-xs text-[var(--neutral-500)] font-semibold">
+            <span>Underwriter Overrides</span>
+            <ShieldCheck className="w-4 h-4 text-[var(--brand-600)]" />
+          </div>
+          <div className="metric-card-value text-[var(--brand-700)] mt-2">
+            {metrics.human_overrides_executed || 1}
+          </div>
+          <p className="text-[11px] text-[var(--neutral-500)] mt-1">Active learning loop anchored</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-[#E3ECE9] shadow-xs">
-          <p className="text-xs font-semibold text-[#687A75]">Average Portfolio DSCR</p>
-          <p className="text-2xl font-black text-[#123E40] mt-1">{metrics.average_dscr || 1.62}x</p>
-          <p className="text-[10px] text-[#169C73]">Prudent solvency buffer</p>
+
+        <div className="metric-card">
+          <div className="flex items-center justify-between text-xs text-[var(--neutral-500)] font-semibold">
+            <span>Portfolio Avg DSCR</span>
+            <ArrowUpRight className="w-4 h-4 text-[var(--fin-blue)]" />
+          </div>
+          <div className="metric-card-value text-[var(--neutral-900)] mt-2">
+            {metrics.average_dscr || 1.62}x
+          </div>
+          <p className="text-[11px] text-[var(--fin-green)] font-semibold mt-1">Prudent solvency buffer</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-[#E3ECE9] shadow-xs">
-          <p className="text-xs font-semibold text-[#687A75]">Decision Latency</p>
-          <p className="text-2xl font-black text-[#123E40] mt-1">{metrics.average_turnaround_minutes || 1.8}m</p>
-          <p className="text-[10px] text-[#687A75]">Sub-2 minute end-to-end</p>
+
+        <div className="metric-card">
+          <div className="flex items-center justify-between text-xs text-[var(--neutral-500)] font-semibold">
+            <span>Decision Latency</span>
+            <Lock className="w-4 h-4 text-[var(--fin-violet)]" />
+          </div>
+          <div className="metric-card-value text-[var(--neutral-900)] mt-2">
+            {metrics.average_turnaround_minutes || 1.8}m
+          </div>
+          <p className="text-[11px] text-[var(--neutral-500)] mt-1">Sub-2 minute turnaround</p>
         </div>
       </div>
 
       {/* Feedback & Model Retraining Loop */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-[#EEF8F7] flex items-center justify-center text-[#237277]">
-            <Cpu className="w-4 h-4" />
+      <div className="card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-[var(--fin-violet-soft)] flex items-center justify-center text-[var(--fin-violet)]">
+            <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#123E40]">Active Learning & Calibration Loop</h3>
-            <p className="text-xs text-[#687A75]">
-              Officer override reasons feed back into credit rule calibration and threshold optimization.
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-[var(--neutral-900)] tracking-tight">
+                Active Learning & Calibration Loop
+              </h3>
+              <span className="badge badge-purple text-[10px]">Continuous Feedback</span>
+            </div>
+            <p className="text-xs text-[var(--neutral-500)] mt-0.5">
+              Officer override rationale and credit committee verdicts feed back into policy rule weights.
             </p>
           </div>
         </div>
 
-        <div className="p-4 bg-[#F7FAF9] rounded-xl border border-[#E3ECE9] text-xs space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-[#40524E]">Model Retraining Readiness:</span>
-            <span className="bg-[#E8F7F1] text-[#169C73] font-bold px-2 py-0.5 rounded-full border border-[#169C73]/20">
+        <div className="p-4 bg-[var(--neutral-50)] rounded-xl border border-[var(--border-subtle)] text-xs space-y-2.5">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="font-semibold text-[var(--neutral-700)]">Model Retraining Readiness:</span>
+            <span className="badge badge-success text-xs font-bold px-3 py-1">
               {learningStats.model_retraining_readiness || 'CALIBRATED_STABLE'}
             </span>
           </div>
-          <p className="text-[#172825]">
-            <strong>Calibration Recommendation:</strong> {learningStats.calibration_signal || 'Threshold for DSCR unhedged limit may be relaxed from 1.25x to 1.20x for borrowers with > 36m vintage.'}
+          <p className="text-[var(--neutral-800)] leading-relaxed">
+            <strong className="text-[var(--brand-700)]">Calibration Recommendation:</strong> {learningStats.calibration_signal || 'Threshold for DSCR unhedged limit may be relaxed from 1.25x to 1.20x for borrowers with > 36m vintage.'}
           </p>
         </div>
       </div>
 
       {/* Append-Only Audit Trail */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <h3 className="text-base font-bold text-[#123E40] mb-3 flex items-center gap-2">
-          <Database className="w-4 h-4 text-[#237277]" /> Immutable Cryptographic Audit Ledger
-        </h3>
-        <p className="text-xs text-[#687A75] mb-4">
-          All state machine advances, OCR extractions, model runs, and human overrides are append-only.
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-[var(--brand-700)]" />
+            <h3 className="text-base font-bold text-[var(--neutral-900)] tracking-tight">
+              Cryptographic Audit Ledger & Event Log
+            </h3>
+          </div>
+          <span className="badge badge-primary text-[10px]">Append-Only SHA-256</span>
+        </div>
+        <p className="text-xs text-[var(--neutral-500)] mb-4">
+          All state machine advances, OCR extractions, model runs, and human overrides are hashed and immutable.
         </p>
 
         {auditLogs.length === 0 ? (
-          <p className="text-xs text-[#687A75]">No audit logs recorded yet for this journey.</p>
+          <div className="p-8 text-center text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-xl border border-dashed border-[var(--border-subtle)]">
+            <p className="text-xs">No audit logs recorded yet for this journey.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#F7FAF9] text-[#687A75] border-b border-[#E3ECE9]">
+              <thead className="bg-[var(--neutral-50)] text-[var(--neutral-500)] border-b border-[var(--border-subtle)]">
                 <tr>
-                  <th className="py-2.5 px-3 font-semibold">Timestamp</th>
-                  <th className="py-2.5 px-3 font-semibold">Actor & Role</th>
-                  <th className="py-2.5 px-3 font-semibold">Action</th>
-                  <th className="py-2.5 px-3 font-semibold">Event Details</th>
+                  <th className="py-3 px-3.5 font-semibold">Timestamp</th>
+                  <th className="py-3 px-3.5 font-semibold">Actor & Role</th>
+                  <th className="py-3 px-3.5 font-semibold">Action</th>
+                  <th className="py-3 px-3.5 font-semibold">Event Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E3ECE9]">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {auditLogs.map((log) => (
-                  <tr key={log.audit_id} className="hover:bg-[#F7FAF9]/60">
-                    <td className="py-2.5 px-3 text-[#687A75] font-mono text-[11px]">
+                  <tr key={log.audit_id} className="hover:bg-[var(--neutral-50)] transition-colors">
+                    <td className="py-3 px-3.5 text-[var(--neutral-500)] font-mono text-[11px] whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleTimeString()}
                     </td>
-                    <td className="py-2.5 px-3 text-[#123E40] font-bold">
-                      {log.actor_role} ({log.actor_id})
+                    <td className="py-3 px-3.5 text-[var(--neutral-900)] font-bold whitespace-nowrap">
+                      {log.actor_role} <span className="text-[var(--neutral-500)] font-normal text-[11px]">({log.actor_id})</span>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className="bg-[#EEF8F7] text-[#237277] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#D9F0EE]">
+                    <td className="py-3 px-3.5 whitespace-nowrap">
+                      <span className="badge badge-primary text-[10px]">
                         {log.action}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-[#40524E] text-[11px] font-mono">
+                    <td className="py-3 px-3.5 text-[var(--neutral-600)] text-[11px] font-mono max-w-md truncate">
                       {JSON.stringify(log.details)}
                     </td>
                   </tr>

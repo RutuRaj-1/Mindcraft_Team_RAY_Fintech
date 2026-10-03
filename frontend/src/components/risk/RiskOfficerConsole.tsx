@@ -5,35 +5,42 @@ import {
   RiskAssessment, DecisionOutcome
 } from '../../types';
 import {
-  AlertTriangle, ShieldAlert, GitGraph, RotateCcw, Edit3,
-  CheckCircle2, XCircle, FileWarning, Network, UserCheck, Check
+  AlertTriangle, ShieldAlert, RotateCcw, Edit3,
+  CheckCircle2, XCircle, FileWarning, UserCheck, GitBranch,
+  ShieldCheck, BarChart2, Layers, Clock
 } from 'lucide-react';
+import { TrustGraphVisual } from './TrustGraphVisual';
 
 interface RiskConsoleProps {
   journeyId: string;
   onRefreshJourney: () => void;
 }
 
-export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
-  journeyId,
-  onRefreshJourney
-}) => {
-  const [consistency, setConsistency] = useState<ConsistencyReport | null>(null);
-  const [trustGraph, setTrustGraph] = useState<TrustGraph | null>(null);
-  const [decision, setDecision] = useState<DecisionRecord | null>(null);
-  const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
-  const [replayData, setReplayData] = useState<Record<string, any> | null>(null);
-  const [learningStats, setLearningStats] = useState<Record<string, any> | null>(null);
+const REASON_CODES = [
+  { value: 'COLLATERAL_BACKED',    label: 'COLLATERAL_BACKED — Commercial Property / FD Pledged' },
+  { value: 'PROVEN_CASHFLOW',      label: 'PROVEN_CASHFLOW — Strong Historical Seasonality Buffer' },
+  { value: 'RELATIONSHIP_EXCEPTION',label: 'RELATIONSHIP_EXCEPTION — Tier-1 Anchor Corporate Guarantee' },
+  { value: 'FIELD_VERIFIED',       label: 'FIELD_VERIFIED — Physical Stock & Depot Inspection Passed' },
+];
 
-  // Override Modal State
-  const [showOverrideModal, setShowOverrideModal] = useState<boolean>(false);
-  const [overrideOutcome, setOverrideOutcome] = useState<DecisionOutcome>('APPROVED');
-  const [overrideAmount, setOverrideAmount] = useState<number>(1500000);
-  const [overrideRate, setOverrideRate] = useState<number>(11.5);
-  const [overrideReasonCode, setOverrideReasonCode] = useState<string>('COLLATERAL_BACKED');
-  const [overrideNotes, setOverrideNotes] = useState<string>('');
-  const [coSigner, setCoSigner] = useState<string>('Ananya Iyer (Chief Risk Officer)');
+export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({ journeyId, onRefreshJourney }) => {
+  const [consistency,     setConsistency]     = useState<ConsistencyReport | null>(null);
+  const [trustGraph,      setTrustGraph]      = useState<TrustGraph | null>(null);
+  const [decision,        setDecision]        = useState<DecisionRecord | null>(null);
+  const [riskAssessment,  setRiskAssessment]  = useState<RiskAssessment | null>(null);
+  const [replayData,      setReplayData]      = useState<Record<string, any> | null>(null);
+  const [learningStats,   setLearningStats]   = useState<Record<string, any> | null>(null);
+
+  // Override state
+  const [showOverrideModal,    setShowOverrideModal]    = useState<boolean>(false);
+  const [overrideOutcome,      setOverrideOutcome]      = useState<DecisionOutcome>('APPROVED');
+  const [overrideAmount,       setOverrideAmount]       = useState<number>(1500000);
+  const [overrideRate,         setOverrideRate]         = useState<number>(11.5);
+  const [overrideReasonCode,   setOverrideReasonCode]   = useState<string>('COLLATERAL_BACKED');
+  const [overrideNotes,        setOverrideNotes]        = useState<string>('');
+  const [coSigner,             setCoSigner]             = useState<string>('Ananya Iyer (Chief Risk Officer)');
   const [isSubmittingOverride, setIsSubmittingOverride] = useState<boolean>(false);
+  const [activeTab,            setActiveTab]            = useState<'consistency' | 'trust_graph' | 'replay'>('consistency');
 
   const fetchRiskData = async () => {
     try {
@@ -43,7 +50,7 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
         api.getDecision(journeyId).catch(() => null),
         api.getRiskAssessment(journeyId).catch(() => null),
         api.replayDecision(journeyId).catch(() => null),
-        api.getLearningStats().catch(() => null)
+        api.getLearningStats().catch(() => null),
       ]);
       setConsistency(rep);
       setTrustGraph(grp);
@@ -61,9 +68,7 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
     }
   };
 
-  useEffect(() => {
-    fetchRiskData();
-  }, [journeyId]);
+  useEffect(() => { fetchRiskData(); }, [journeyId]);
 
   const handleExecuteOverride = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +76,6 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
       alert('Mandatory justification rationale is required for credit override.');
       return;
     }
-
     setIsSubmittingOverride(true);
     try {
       await api.submitOverride(journeyId, {
@@ -80,13 +84,12 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
         new_interest_rate: overrideRate,
         reason_code: overrideReasonCode,
         rationale_notes: overrideNotes,
-        co_signed_by: coSigner
+        co_signed_by: coSigner,
       });
       setShowOverrideModal(false);
       setOverrideNotes('');
       await fetchRiskData();
       onRefreshJourney();
-      alert('Override successfully committed to immutable audit ledger.');
     } catch (err: any) {
       alert(`Override failed: ${err.message}`);
     } finally {
@@ -95,315 +98,440 @@ export const RiskOfficerConsole: React.FC<RiskConsoleProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+    <div className="page-container space-y-5">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 animate-fadeInUp">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="bg-[#FDECEA] text-[#D96559] text-xs font-bold px-2.5 py-0.5 rounded-full border border-[#D96559]/20 flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5" /> Risk & Compliance Command Center
+          <div className="flex items-center gap-2 mb-1">
+            <span className="badge badge-coral flex items-center gap-1">
+              <ShieldAlert className="w-3 h-3" /> Risk & Compliance
             </span>
-            <span className="text-xs text-[#687A75]">Persona: Ananya Iyer (Credit Risk & Fraud Control)</span>
+            <span className="text-[11px] text-[var(--text-muted)]">
+              Ananya Iyer · Credit Risk & Fraud Control
+            </span>
           </div>
-          <h1 className="text-2xl font-black text-[#123E40] mt-1">Financial Trust & Consistency Intelligence</h1>
+          <h1 className="text-2xl font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Financial Trust Intelligence Command
+          </h1>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            Case: <span className="font-mono font-bold text-[var(--brand-700)]">{journeyId}</span>
+          </p>
         </div>
 
-        <button
-          onClick={() => setShowOverrideModal(true)}
-          className="py-2.5 px-4 bg-[#123E40] hover:bg-[#18575A] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2"
-        >
-          <Edit3 className="w-4 h-4 text-[#3DA5A6]" />
-          <span>Execute Human Review / Override</span>
-        </button>
-      </div>
-
-      {/* Cross-Document Consistency Matrix */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#FDECEA] flex items-center justify-center text-[#D96559]">
-              <FileWarning className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-[#123E40]">Cross-Document Consistency Engine</h3>
-              <p className="text-xs text-[#687A75]">
-                Cross-validates declared intent, bank statement totals, GSTR-3B filings, and ITR-V data.
+        <div className="flex items-center gap-2">
+          {/* Quick decision badge */}
+          {decision && (
+            <div className={`px-3 py-2 rounded-xl border text-center ${
+              decision.outcome === 'APPROVED' ? 'bg-[var(--fin-green-bg)] border-[var(--fin-green)]/25' :
+              decision.outcome === 'CONDITIONAL_APPROVAL' ? 'bg-[var(--fin-amber-bg)] border-[var(--fin-amber)]/25' :
+              'bg-[var(--fin-coral-bg)] border-[var(--fin-coral)]/25'
+            }`}>
+              <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest">AI Decision</p>
+              <p className={`text-[11px] font-black ${
+                decision.outcome === 'APPROVED' ? 'text-[var(--fin-green)]' :
+                decision.outcome === 'CONDITIONAL_APPROVAL' ? 'text-[var(--fin-amber)]' : 'text-[var(--fin-coral)]'
+              }`}>
+                {decision.outcome.replace(/_/g, ' ')}
               </p>
             </div>
-          </div>
-          {consistency && (
-            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-              consistency.is_consistent
-                ? 'bg-[#E8F7F1] text-[#169C73] border-[#169C73]/20'
-                : 'bg-[#FDECEA] text-[#D96559] border-[#D96559]/20'
-            }`}>
-              {consistency.is_consistent ? 'Data Fully Consistent' : `${consistency.flagged_count} Discrepancy Flagged`}
-            </span>
           )}
-        </div>
 
-        {consistency && consistency.discrepancies.length > 0 ? (
-          <div className="space-y-3">
-            {consistency.discrepancies.map((d, i) => (
-              <div key={i} className="p-4 bg-[#FDECEA]/30 border border-[#D96559]/30 rounded-xl space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-[#D96559]">{d.field}</span>
-                  <span className="bg-[#D96559] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {d.severity} SEVERITY ({d.variance_pct}% Variance)
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs bg-white p-2.5 rounded-lg border border-[#E3ECE9] mt-2">
-                  <div>
-                    <span className="text-[#687A75] text-[11px]">{d.doc_a_name}:</span>
-                    <p className="font-bold text-[#172825]">{String(d.doc_a_value)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#687A75] text-[11px]">{d.doc_b_name}:</span>
-                    <p className="font-bold text-[#172825]">{String(d.doc_b_value)}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-[#40524E] pt-1">{d.explanation}</p>
+          <button
+            onClick={() => setShowOverrideModal(true)}
+            className="btn-primary"
+            style={{ background: 'linear-gradient(135deg, #0F2220, #237277)' }}
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Human Override</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Risk KPI Strip ── */}
+      {riskAssessment && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeInUp stagger-1">
+          {[
+            {
+              label: 'Trust Score',
+              value: String(riskAssessment.risk_score),
+              sub: '/1000',
+              color: riskAssessment.risk_score > 800 ? 'var(--fin-green)' : riskAssessment.risk_score > 600 ? 'var(--fin-amber)' : 'var(--fin-coral)',
+              icon: ShieldCheck,
+            },
+            {
+              label: 'Prob. of Default',
+              value: `${(riskAssessment.probability_of_default * 100).toFixed(1)}%`,
+              sub: 'ML-predicted',
+              color: riskAssessment.probability_of_default < 0.1 ? 'var(--fin-green)' : riskAssessment.probability_of_default < 0.25 ? 'var(--fin-amber)' : 'var(--fin-coral)',
+              icon: BarChart2,
+            },
+            {
+              label: 'Risk Band',
+              value: riskAssessment.risk_band.replace('_', ' '),
+              sub: riskAssessment.model_version,
+              color: riskAssessment.risk_band === 'LOW_RISK' ? 'var(--fin-green)' : riskAssessment.risk_band === 'MEDIUM_RISK' ? 'var(--fin-amber)' : 'var(--fin-coral)',
+              icon: Layers,
+            },
+            {
+              label: 'Eligibility Gates',
+              value: riskAssessment.all_hard_rules_passed ? 'All Passed' : 'Gate Failed',
+              sub: `${riskAssessment.hard_rules.filter(r => r.passed).length}/${riskAssessment.hard_rules.length} rules`,
+              color: riskAssessment.all_hard_rules_passed ? 'var(--fin-green)' : 'var(--fin-coral)',
+              icon: riskAssessment.all_hard_rules_passed ? CheckCircle2 : XCircle,
+            },
+          ].map((kpi, i) => (
+            <div key={i} className="card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="metric-label">{kpi.label}</p>
+                <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 bg-[#E8F7F1]/40 border border-[#169C73]/20 rounded-xl text-xs text-[#169C73] flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>Turnover, entity legal name, and tax filings cross-verified with zero variance exceeding tolerance limits.</span>
-          </div>
-        )}
+              <p className="metric-value text-2xl" style={{ color: kpi.color }}>{kpi.value}</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">{kpi.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Tab Navigation ── */}
+      <div className="tab-bar animate-fadeInUp stagger-2">
+        {[
+          { id: 'consistency' as const, label: 'Consistency Engine', Icon: FileWarning, color: 'var(--fin-coral)' },
+          { id: 'trust_graph' as const, label: 'Financial Trust Graph', Icon: GitBranch, color: 'var(--fin-violet)' },
+          { id: 'replay' as const, label: 'Decision Replay', Icon: RotateCcw, color: 'var(--brand-700)' },
+        ].map(({ id, label, Icon, color }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`tab-item ${activeTab === id ? 'active' : ''}`}
+            style={activeTab === id ? { color } : {}}
+          >
+            <Icon className="w-3.5 h-3.5 shrink-0" />
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Financial Trust Graph & Fraud Network */}
-      <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#EEF8F7] flex items-center justify-center text-[#237277]">
-              <Network className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-[#123E40]">Financial Trust Graph & Counterparty Network</h3>
-              <p className="text-xs text-[#687A75]">
-                Inter-entity relational mapping: Directors, GSTIN, Operating Bank Accounts, Suppliers, and Buyers.
-              </p>
-            </div>
-          </div>
-          {trustGraph && (
-            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-              trustGraph.circular_trading_detected
-                ? 'bg-[#FDECEA] text-[#D96559] border-[#D96559]/30 animate-pulse'
-                : 'bg-[#E8F7F1] text-[#169C73] border-[#169C73]/30'
-            }`}>
-              {trustGraph.circular_trading_detected ? '⚠️ Circular Trading Signal Flagged' : '✓ Clean Network Topology'}
-            </span>
-          )}
-        </div>
+      {/* ── Tab Panels ── */}
+      <div className="animate-fadeInUp stagger-3">
 
-        {/* Graph Visual Canvas / Nodes Display */}
-        {trustGraph && (
-          <div className="space-y-4">
-            {/* Visual SVG Network Representation */}
-            <div className="w-full bg-[#F7FAF9] rounded-xl border border-[#E3ECE9] p-4 flex flex-col items-center justify-center overflow-x-auto">
-              <div className="flex flex-wrap items-center justify-center gap-4 py-4 max-w-4xl">
-                {trustGraph.nodes.map((node) => {
-                  const isHighRisk = node.risk_level === 'HIGH';
-                  const isMediumRisk = node.risk_level === 'MEDIUM';
+        {/* Consistency Engine */}
+        {activeTab === 'consistency' && (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[var(--fin-coral-bg)] flex items-center justify-center">
+                  <FileWarning className="w-4 h-4 text-[var(--fin-coral)]" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Cross-Document Consistency Engine
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    Cross-validates intent, bank statements, GSTR-3B, and ITR-V data
+                  </p>
+                </div>
+              </div>
+              {consistency && (
+                <span className={`badge ${consistency.is_consistent ? 'badge-green' : 'badge-coral'}`}>
+                  {consistency.is_consistent ? '✓ Fully Consistent' : `${consistency.flagged_count} Discrepancy Flagged`}
+                </span>
+              )}
+            </div>
 
-                  return (
-                    <div
-                      key={node.id}
-                      className={`p-3 rounded-xl border transition-all shadow-2xs min-w-[170px] ${
-                        isHighRisk
-                          ? 'bg-[#FDECEA] border-[#D96559] text-[#96382F]'
-                          : isMediumRisk
-                          ? 'bg-[#FFF6DF] border-[#D89B22] text-[#825D0D]'
-                          : 'bg-white border-[#CBD9D5] text-[#172825]'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center text-[10px] uppercase font-bold mb-1 opacity-80">
-                        <span>{node.node_type}</span>
-                        <span>{node.trust_score}/1000</span>
-                      </div>
-                      <p className="text-xs font-bold truncate">{node.label}</p>
-                      {node.details?.annual_volume && (
-                        <p className="text-[10px] text-[#687A75] mt-0.5">{node.details.annual_volume}</p>
-                      )}
+            {consistency && consistency.discrepancies.length > 0 ? (
+              <div className="space-y-3">
+                {consistency.discrepancies.map((d, i) => (
+                  <div key={i} className="alert-panel danger">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-bold text-[var(--fin-coral)]">{d.field}</span>
+                      <span className="badge badge-coral">{d.severity} · {d.variance_pct}% Var</span>
                     </div>
-                  );
-                })}
+                    <div className="grid grid-cols-2 gap-3 bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--border)] mt-2">
+                      <div>
+                        <span className="text-[10px] text-[var(--text-muted)] font-semibold">{d.doc_a_name}:</span>
+                        <p className="text-xs font-bold text-[var(--text-primary)] mt-0.5">{String(d.doc_a_value)}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[var(--text-muted)] font-semibold">{d.doc_b_name}:</span>
+                        <p className="text-xs font-bold text-[var(--text-primary)] mt-0.5">{String(d.doc_b_value)}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] mt-2">{d.explanation}</p>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <div className="alert-panel success flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-[var(--fin-green)] shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-[var(--fin-green)]">All Data Sources Consistent</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Turnover, entity name, and tax filings cross-verified with zero variance exceeding tolerance limits.
+                  </p>
+                </div>
+              </div>
+            )}
 
-              {/* Edge connections summary */}
-              <div className="w-full border-t border-[#E3ECE9] pt-3 mt-2">
-                <p className="text-[11px] font-bold text-[#40524E] mb-2">Verified Relational Edges:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  {trustGraph.edges.map((e, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-2 rounded-lg border text-[11px] ${
-                        e.flagged ? 'bg-[#FDECEA] border-[#D96559] text-[#96382F] font-bold' : 'bg-white border-[#E3ECE9] text-[#40524E]'
-                      }`}
-                    >
-                      <span className="font-semibold">{e.relation}</span>
-                      {e.flag_reason && <p className="text-[10px] text-[#D96559] font-normal mt-0.5">{e.flag_reason}</p>}
+            {/* Hard Rules breakdown */}
+            {riskAssessment && riskAssessment.hard_rules.length > 0 && (
+              <div className="mt-5">
+                <h4 className="text-xs font-bold text-[var(--brand-900)] mb-3 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[var(--brand-600)]" />
+                  Deterministic Eligibility Gate Results
+                </h4>
+                <div className="space-y-2">
+                  {riskAssessment.hard_rules.map((r, i) => (
+                    <div key={i} className={`flex items-center justify-between text-xs p-3 rounded-xl border ${
+                      r.passed
+                        ? 'bg-[var(--fin-green-bg)] border-[var(--fin-green)]/20'
+                        : 'bg-[var(--fin-coral-bg)] border-[var(--fin-coral)]/20'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {r.passed
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--fin-green)] shrink-0" />
+                          : <XCircle className="w-3.5 h-3.5 text-[var(--fin-coral)] shrink-0" />
+                        }
+                        <div>
+                          <span className="font-semibold text-[var(--text-primary)]">{r.rule_name}</span>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{r.policy_citation}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={`font-bold ${r.passed ? 'text-[var(--fin-green)]' : 'text-[var(--fin-coral)]'}`}>
+                          {String(r.actual_value)}
+                        </span>
+                        <p className="text-[10px] text-[var(--text-muted)]">Threshold: {String(r.threshold_value)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+        )}
 
-            {trustGraph.cross_app_duplicate_signals.length > 0 && (
-              <div className="p-3 bg-[#FFF6DF] border border-[#D89B22]/30 rounded-xl text-xs space-y-1">
-                <p className="font-bold text-[#825D0D]">Cross-Application Graph Anomaly Warnings:</p>
-                {trustGraph.cross_app_duplicate_signals.map((sig, i) => (
-                  <p key={i} className="text-[#825D0D] text-[11px]">• {sig}</p>
-                ))}
+        {/* Trust Graph */}
+        {activeTab === 'trust_graph' && (
+          trustGraph
+            ? <TrustGraphVisual trustGraph={trustGraph} />
+            : (
+              <div className="card p-12 text-center">
+                <GitBranch className="w-10 h-10 text-[var(--border-strong)] mx-auto mb-3" />
+                <p className="text-sm font-semibold text-[var(--text-secondary)]">Trust Graph not yet generated</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  Run the risk evaluation to build the entity relationship network
+                </p>
+              </div>
+            )
+        )}
+
+        {/* Decision Replay */}
+        {activeTab === 'replay' && (
+          <div className="space-y-4">
+            {replayData ? (
+              <div className="card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--fin-violet-bg)] flex items-center justify-center">
+                    <RotateCcw className="w-4 h-4 text-[var(--fin-violet)]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Decision Replay & Time-Travel Snapshot
+                    </h3>
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      Exact deterministic reconstruction of all decision inputs, policy versions, and evidence at time of sanction
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    {
+                      label: 'Snapshot Version',
+                      value: replayData.snapshot_version || '—',
+                      sub: `${replayData.audit_trail_events_count || 0} audit events recorded`,
+                      Icon: Layers, color: 'var(--brand-700)'
+                    },
+                    {
+                      label: 'Verified Evidence Fields',
+                      value: String(replayData.evidence_snapshot?.total_verified_fields || '—'),
+                      sub: replayData.evidence_snapshot?.consistency_status ? '✓ Consistency Verified' : '⚠ Consistency Flagged',
+                      Icon: CheckCircle2, color: 'var(--fin-green)'
+                    },
+                    {
+                      label: 'Model Decision',
+                      value: replayData.decision_record?.outcome || '—',
+                      sub: `Trust Score: ${replayData.risk_snapshot?.finflow_trust_score || '—'}/1000`,
+                      Icon: ShieldCheck, color: 'var(--fin-violet)'
+                    },
+                  ].map((item, i) => (
+                    <div key={i} className="bg-[var(--surface-subtle)] p-4 rounded-xl border border-[var(--border)]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <item.Icon className="w-3.5 h-3.5" style={{ color: item.color }} />
+                        <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{item.label}</span>
+                      </div>
+                      <p className="text-sm font-bold text-[var(--text-primary)]">{item.value}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{item.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="card p-12 text-center">
+                <RotateCcw className="w-10 h-10 text-[var(--border-strong)] mx-auto mb-3" />
+                <p className="text-sm font-semibold text-[var(--text-secondary)]">No decision replay available yet</p>
+              </div>
+            )}
+
+            {/* Active Learning Stats */}
+            {learningStats && (
+              <div className="card p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--brand-50)] flex items-center justify-center">
+                    <UserCheck className="w-4 h-4 text-[var(--brand-700)]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-[var(--brand-900)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Active Learning & Calibration Loop
+                    </h3>
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      Officer override reasons feed back into credit rule calibration
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-[var(--surface-subtle)] p-4 rounded-xl border border-[var(--border)]">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-semibold text-[var(--text-secondary)]">Model Retraining Readiness:</span>
+                    <span className="badge badge-green">
+                      {learningStats.model_retraining_readiness || 'CALIBRATED_STABLE'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-primary)]">
+                    <strong>Calibration:</strong>{' '}
+                    {learningStats.calibration_signal || 'DSCR threshold for unhedged limit may relax from 1.25x to 1.20x for borrowers with >36m vintage.'}
+                  </p>
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Decision Replay & Audit Snapshot */}
-      {replayData && (
-        <div className="bg-white rounded-2xl p-6 border border-[#E3ECE9] shadow-xs">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-[#F2EEFF] flex items-center justify-center text-[#7457C8]">
-              <RotateCcw className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-[#123E40]">Decision Replay & Time-Travel Snapshot</h3>
-              <p className="text-xs text-[#687A75]">
-                Exact deterministic reconstruction of decision inputs, policy versions, and evidence at time of sanction.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#F7FAF9] p-4 rounded-xl border border-[#E3ECE9] text-xs">
-            <div>
-              <span className="text-[#687A75] font-semibold">Snapshot Version:</span>
-              <p className="font-bold text-[#123E40]">{replayData.snapshot_version}</p>
-              <p className="text-[10px] text-[#687A75] mt-1">Audit Events: {replayData.audit_trail_events_count} recorded</p>
-            </div>
-            <div>
-              <span className="text-[#687A75] font-semibold">Verified Evidence Fields:</span>
-              <p className="font-bold text-[#123E40]">{replayData.evidence_snapshot?.total_verified_fields} Fields</p>
-              <p className="text-[10px] text-[#169C73] mt-1">Consistency: {replayData.evidence_snapshot?.consistency_status ? 'Verified' : 'Flagged'}</p>
-            </div>
-            <div>
-              <span className="text-[#687A75] font-semibold">Model Decision State:</span>
-              <p className="font-bold text-[#123E40]">{replayData.decision_record?.outcome}</p>
-              <p className="text-[10px] text-[#237277] mt-1">Score: {replayData.risk_snapshot?.finflow_trust_score}/1000</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Human Review & Override Modal */}
+      {/* ── Human Override Modal ── */}
       {showOverrideModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#CBD9D5] space-y-4">
-            <div className="flex justify-between items-center border-b border-[#E3ECE9] pb-3">
-              <h3 className="text-base font-bold text-[#123E40] flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-[#237277]" /> Credit Decision Human Override
-              </h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-xl border border-[var(--border)] overflow-hidden">
+            {/* Modal header */}
+            <div className="bg-gradient-to-r from-[var(--brand-900)] to-[var(--brand-700)] px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white">
+                <Edit3 className="w-4 h-4 text-[var(--brand-300)]" />
+                <h3 className="text-sm font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Credit Decision Human Override
+                </h3>
+              </div>
               <button
                 onClick={() => setShowOverrideModal(false)}
-                className="text-[#687A75] hover:text-[#172825] font-bold text-sm"
+                className="text-white/60 hover:text-white text-lg leading-none"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleExecuteOverride} className="space-y-4 text-xs">
+            <div className="alert-panel warning mx-4 mt-4 flex items-start gap-2 text-[11px]">
+              <AlertTriangle className="w-4 h-4 text-[var(--fin-amber)] shrink-0 mt-0.5" />
+              <span>Override will be recorded immutably in the audit ledger with full co-signing attribution.</span>
+            </div>
+
+            <form onSubmit={handleExecuteOverride} className="p-5 space-y-4">
               <div>
-                <label className="block font-semibold text-[#40524E] mb-1">Override Decision Outcome</label>
+                <label className="fin-label">Override Decision Outcome</label>
                 <select
                   value={overrideOutcome}
                   onChange={(e) => setOverrideOutcome(e.target.value as DecisionOutcome)}
-                  className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                  className="fin-input text-xs"
                 >
-                  <option value="APPROVED">APPROVED (Prime Facility)</option>
-                  <option value="CONDITIONAL_APPROVAL">CONDITIONAL APPROVAL (Tranche Structured)</option>
-                  <option value="NEEDS_REVIEW">NEEDS REVIEW (Exception Committee)</option>
-                  <option value="REJECTED">REJECTED (Hard Gate Failed)</option>
+                  <option value="APPROVED">APPROVED — Prime Facility</option>
+                  <option value="CONDITIONAL_APPROVAL">CONDITIONAL APPROVAL — Tranche Structured</option>
+                  <option value="NEEDS_REVIEW">NEEDS REVIEW — Exception Committee</option>
+                  <option value="REJECTED">REJECTED — Hard Gate Failed</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#40524E] mb-1">Approved Facility (INR)</label>
+                  <label className="fin-label">Approved Facility (INR)</label>
                   <input
                     type="number"
                     value={overrideAmount}
                     onChange={(e) => setOverrideAmount(Number(e.target.value))}
-                    className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                    className="fin-input text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#40524E] mb-1">Interest Rate (% p.a.)</label>
+                  <label className="fin-label">Interest Rate (% p.a.)</label>
                   <input
                     type="number"
                     step="0.25"
                     value={overrideRate}
                     onChange={(e) => setOverrideRate(Number(e.target.value))}
-                    className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                    className="fin-input text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#40524E] mb-1">Institutional Reason Code</label>
+                <label className="fin-label">Institutional Reason Code</label>
                 <select
                   value={overrideReasonCode}
                   onChange={(e) => setOverrideReasonCode(e.target.value)}
-                  className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                  className="fin-input text-xs"
                 >
-                  <option value="COLLATERAL_BACKED">COLLATERAL_BACKED (Commercial Property / FD Pledged)</option>
-                  <option value="PROVEN_CASHFLOW">PROVEN_CASHFLOW (Strong Historical Seasonality Buffer)</option>
-                  <option value="RELATIONSHIP_EXCEPTION">RELATIONSHIP_EXCEPTION (Tier-1 Anchor Corporate Guarantee)</option>
-                  <option value="FIELD_VERIFIED">FIELD_VERIFIED (Physical Stock & Depot Inspection Passed)</option>
+                  {REASON_CODES.map(rc => (
+                    <option key={rc.value} value={rc.value}>{rc.label}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#40524E] mb-1">
-                  Mandatory Underwriting Justification Rationale
+                <label className="fin-label">
+                  Mandatory Underwriting Justification Rationale <span className="text-[var(--fin-coral)]">*</span>
                 </label>
                 <textarea
                   rows={3}
                   value={overrideNotes}
                   onChange={(e) => setOverrideNotes(e.target.value)}
                   placeholder="State the factual basis for overriding AI recommendation..."
-                  className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                  className="fin-input text-xs resize-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[#40524E] mb-1">Co-Signing Officer / Supervisor</label>
+                <label className="fin-label">Co-Signing Officer / Supervisor</label>
                 <input
                   type="text"
                   value={coSigner}
                   onChange={(e) => setCoSigner(e.target.value)}
-                  className="w-full rounded-xl border border-[#CBD9D5] p-2.5 bg-white text-[#172825]"
+                  className="fin-input text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#E3ECE9]">
+              <div className="flex justify-end gap-3 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setShowOverrideModal(false)}
-                  className="py-2.5 px-4 bg-[#EFF5F3] hover:bg-[#E3ECE9] text-[#40524E] rounded-xl font-semibold"
+                  className="btn-secondary text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingOverride}
-                  className="py-2.5 px-5 bg-[#237277] hover:bg-[#18575A] text-white rounded-xl font-bold shadow-xs disabled:opacity-50"
+                  className="btn-primary text-xs"
                 >
-                  {isSubmittingOverride ? 'Committing Override...' : 'Commit Override to Audit Ledger'}
+                  {isSubmittingOverride ? 'Committing...' : 'Commit Override to Audit Ledger'}
                 </button>
               </div>
             </form>
