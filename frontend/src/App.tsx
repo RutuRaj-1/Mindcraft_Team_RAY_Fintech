@@ -12,27 +12,52 @@ import { LandingPage } from './pages/LandingPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 
-// Authenticated Application Pages
+// Core Customer and Officer Pages
 import { CustomerDashboardPage } from './pages/customer/CustomerDashboardPage';
 import { ApplyLoanPage } from './pages/customer/ApplyLoanPage';
 import { CustomerJourneyPage } from './pages/customer/CustomerJourneyPage';
 import { CustomerDocumentsPage } from './pages/customer/CustomerDocumentsPage';
 import { CustomerDecisionPage } from './pages/customer/CustomerDecisionPage';
-import { CustomerWhatIfPage } from './pages/customer/CustomerWhatIfPage';
-import { CashFlowIntelligencePage } from './pages/customer/CashFlowIntelligencePage';
 import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
-import { RMSupervisorDashboardPage } from './pages/rm/RMSupervisorDashboardPage';
 import { RiskConsolePage } from './pages/risk/RiskConsolePage';
 import { RiskCaseDetailPage } from './pages/risk/RiskCaseDetailPage';
-import { RiskManagerDeskPage } from './pages/risk/RiskManagerDeskPage';
-import { CreditSanctionChamberPage } from './pages/risk/CreditSanctionChamberPage';
-import { AuditGovernanceConsolePage } from './pages/audit/AuditGovernanceConsolePage';
-import { DecisionReplayPage } from './pages/risk/DecisionReplayPage';
-import { AdminPage } from './pages/admin/AdminPage';
+
+// Part 51 Performance: Lazy-loaded Heavy Pages
+const CustomerWhatIfPage = React.lazy(() =>
+  import('./pages/customer/CustomerWhatIfPage').then((m) => ({ default: m.CustomerWhatIfPage }))
+);
+const CashFlowIntelligencePage = React.lazy(() =>
+  import('./pages/customer/CashFlowIntelligencePage').then((m) => ({ default: m.CashFlowIntelligencePage }))
+);
+const RMSupervisorDashboardPage = React.lazy(() =>
+  import('./pages/rm/RMSupervisorDashboardPage').then((m) => ({ default: m.RMSupervisorDashboardPage }))
+);
+const RiskManagerDeskPage = React.lazy(() =>
+  import('./pages/risk/RiskManagerDeskPage').then((m) => ({ default: m.RiskManagerDeskPage }))
+);
+const CreditSanctionChamberPage = React.lazy(() =>
+  import('./pages/risk/CreditSanctionChamberPage').then((m) => ({ default: m.CreditSanctionChamberPage }))
+);
+const AuditGovernanceConsolePage = React.lazy(() =>
+  import('./pages/audit/AuditGovernanceConsolePage').then((m) => ({ default: m.AuditGovernanceConsolePage }))
+);
+const DecisionReplayPage = React.lazy(() =>
+  import('./pages/risk/DecisionReplayPage').then((m) => ({ default: m.DecisionReplayPage }))
+);
+const AdminPage = React.lazy(() =>
+  import('./pages/admin/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
 
 import { DemoHubPage } from './pages/demo/DemoHubPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+
+const PageFallback: React.FC = () => (
+  <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
+    <div className="w-8 h-8 rounded-full border-2 border-[var(--border)] border-t-[var(--brand-700)] animate-spin" />
+    <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wide">Loading module...</span>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,7 +118,8 @@ export default function App() {
         <AuthProvider>
           <NotificationProvider>
             <BrowserRouter>
-              <Routes>
+              <React.Suspense fallback={<PageFallback />}>
+                <Routes>
                 {/* ── Public standalone routes ── */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/signin" element={<SignInPage />} />
@@ -357,7 +383,8 @@ export default function App() {
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
               </Routes>
-            </BrowserRouter>
+            </React.Suspense>
+          </BrowserRouter>
           </NotificationProvider>
         </AuthProvider>
       </QueryClientProvider>

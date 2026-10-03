@@ -23,8 +23,69 @@ import {
   Lock,
   ChevronRight,
   X,
-  FileText
+  FileText,
+  UserCheck,
+  Compass
 } from 'lucide-react';
+import { UserRole } from '../../types';
+
+interface DemoScenarioOption {
+  key: 'CASE_A' | 'CASE_B' | 'CASE_C' | 'CASE_D' | 'CASE_E';
+  caseNum: string;
+  label: string;
+  company: string;
+  caseId: string;
+  badgeText: string;
+  badgeClass: string;
+}
+
+const DEMO_SCENARIO_OPTIONS: DemoScenarioOption[] = [
+  {
+    key: 'CASE_A',
+    caseNum: 'CASE A',
+    label: 'Strong Application',
+    company: 'Sharma Textiles Pvt Ltd',
+    caseId: 'jrn_priya_001',
+    badgeText: 'Approved',
+    badgeClass: 'bg-[var(--fin-green-bg)] text-[var(--fin-green)] border border-[var(--fin-green)]/30',
+  },
+  {
+    key: 'CASE_B',
+    caseNum: 'CASE B',
+    label: 'Missing Evidence',
+    company: 'Kavita Electronics LLP',
+    caseId: 'jrn_kavita_002',
+    badgeText: 'Needs Review',
+    badgeClass: 'bg-[var(--fin-amber-bg)] text-[var(--fin-amber)] border border-[var(--fin-amber)]/30',
+  },
+  {
+    key: 'CASE_C',
+    caseNum: 'CASE C',
+    label: 'Inconsistent Evidence',
+    company: 'Apex Logistics & Freight',
+    caseId: 'jrn_apex_003',
+    badgeText: 'Review Mismatch',
+    badgeClass: 'bg-[var(--fin-coral-bg)] text-[var(--fin-coral)] border border-[var(--fin-coral)]/30',
+  },
+  {
+    key: 'CASE_D',
+    caseNum: 'CASE D',
+    label: 'Linked Application',
+    company: 'SwiftTrans Freightways',
+    caseId: 'jrn_swifttrans_004',
+    badgeText: 'Graph Signal',
+    badgeClass: 'bg-purple-100 text-purple-800 border border-purple-200',
+  },
+  {
+    key: 'CASE_E',
+    caseNum: 'CASE E',
+    label: 'What-If Scenario',
+    company: 'Sharma Textiles Sandbox',
+    caseId: 'jrn_priya_001',
+    badgeText: 'Counterfactual',
+    badgeClass: 'bg-teal-100 text-teal-800 border border-teal-200',
+  },
+];
 
 interface BenchmarkCase {
   id: string;
@@ -41,6 +102,7 @@ export const DemoHubPage: React.FC = () => {
   const navigate = useNavigate();
   const { switchRole, setActiveJourneyId, role: currentRole } = useAuth();
 
+  const [selectedScenarioKey, setSelectedScenarioKey] = useState<'CASE_A' | 'CASE_B' | 'CASE_C' | 'CASE_D' | 'CASE_E'>('CASE_A');
   const [cases, setCases] = useState<BenchmarkCase[]>([]);
   const [isLoadingCases, setIsLoadingCases] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
@@ -98,6 +160,36 @@ export const DemoHubPage: React.FC = () => {
     switchRole(c.role);
     setActiveJourneyId(c.id);
     navigate(c.recommended_view);
+  };
+
+  const handleGovernedRoleLaunch = (targetRole: UserRole) => {
+    const sc = DEMO_SCENARIO_OPTIONS.find((s) => s.key === selectedScenarioKey) || DEMO_SCENARIO_OPTIONS[0];
+    switchRole(targetRole);
+    setActiveJourneyId(sc.caseId);
+
+    if (targetRole === 'CUSTOMER') {
+      if (sc.key === 'CASE_E') {
+        navigate(`/customer/what-if/${sc.caseId}`);
+      } else {
+        navigate(`/customer/journey/${sc.caseId}`);
+      }
+    } else if (targetRole === 'RM') {
+      navigate(`/rm/cases/${sc.caseId}`);
+    } else if (targetRole === 'RISK_OFFICER') {
+      if (sc.key === 'CASE_D') {
+        navigate('/risk?tab=fraud_signals');
+      } else {
+        navigate(`/risk/cases/${sc.caseId}`);
+      }
+    } else if (targetRole === 'RM_SUPERVISOR') {
+      navigate('/operations');
+    } else if (targetRole === 'CREDIT_APPROVER') {
+      navigate('/approvals');
+    } else if (targetRole === 'AUDIT_OFFICER') {
+      navigate(`/risk/replay/${sc.caseId}`);
+    } else {
+      navigate('/admin');
+    }
   };
 
   // Automated One-Click Walkthrough Stepper (Part 30)
@@ -201,6 +293,129 @@ export const DemoHubPage: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* ── PART 55: Governed Demo Mode Role-Aware Launcher ── */}
+      <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--brand-50)] text-[var(--brand-800)] border border-[var(--brand-200)] flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-[var(--brand-700)]" />
+                Part 55 · Governed Demo Control Bar
+              </span>
+              <span className="text-xs text-[var(--text-muted)] font-mono">100% RBAC Enforced</span>
+            </div>
+            <h2 className="text-xl font-black text-[var(--brand-950)] mt-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Select Scenario & Launch Governed Role View
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Select a benchmark case and open it directly inside the authorized persona's workspace with real session tokens.
+            </p>
+          </div>
+          <div className="bg-[var(--surface-subtle)] p-3 rounded-2xl border border-[var(--border)] shrink-0 text-left sm:text-right">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Selected Target Case</span>
+            <p className="text-xs font-mono font-bold text-[var(--brand-950)]">
+              {DEMO_SCENARIO_OPTIONS.find((s) => s.key === selectedScenarioKey)?.company || 'Sharma Textiles'}
+            </p>
+            <span className="text-[10px] font-mono text-[var(--brand-700)] font-bold">
+              ID: {DEMO_SCENARIO_OPTIONS.find((s) => s.key === selectedScenarioKey)?.caseId || 'jrn_priya_001'}
+            </span>
+          </div>
+        </div>
+
+        {/* 1. Case Selector */}
+        <div>
+          <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-2.5">
+            1. Case Selector (Part 54 & 55)
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+            {DEMO_SCENARIO_OPTIONS.map((sc) => {
+              const isSelected = selectedScenarioKey === sc.key;
+              return (
+                <button
+                  key={sc.key}
+                  type="button"
+                  onClick={() => setSelectedScenarioKey(sc.key)}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-[var(--brand-50)] border-2 border-[var(--brand-950)] shadow-[2px_2px_0px_#0A1F20]'
+                      : 'bg-[var(--surface)] border-[var(--border)] hover:bg-[var(--surface-subtle)]'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className="text-[10px] font-mono font-extrabold text-[var(--text-muted)]">{sc.caseNum}</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${sc.badgeClass}`}>
+                        {sc.badgeText}
+                      </span>
+                    </div>
+                    <p className="text-xs font-black text-[var(--brand-950)] leading-tight">{sc.label}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">{sc.company}</p>
+                  </div>
+                  <span className="text-[10px] font-mono text-[var(--text-muted)] font-bold mt-2.5">{sc.caseId}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Role Views Buttons */}
+        <div>
+          <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-2.5">
+            2. Governed Role Views (Switches Session Persona & Authenticated Token)
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-emerald-800 text-white hover:bg-emerald-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('CUSTOMER')}
+            >
+              OPEN CUSTOMER VIEW
+            </Button>
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-sky-800 text-white hover:bg-sky-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('RM')}
+            >
+              OPEN RM VIEW
+            </Button>
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-amber-800 text-white hover:bg-amber-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('RISK_OFFICER')}
+            >
+              OPEN RISK VIEW
+            </Button>
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-teal-800 text-white hover:bg-teal-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('RM_SUPERVISOR')}
+            >
+              OPEN SUPERVISOR VIEW
+            </Button>
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-rose-800 text-white hover:bg-rose-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('CREDIT_APPROVER')}
+            >
+              OPEN APPROVER VIEW
+            </Button>
+            <Button
+              variant="brutal"
+              size="sm"
+              className="bg-purple-800 text-white hover:bg-purple-900 justify-center text-[10px] font-black tracking-tight"
+              onClick={() => handleGovernedRoleLaunch('AUDIT_OFFICER')}
+            >
+              OPEN AUDIT VIEW
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* ── 5 Canonical Scenario Cards (Part 29) ── */}
       <div className="space-y-4">
