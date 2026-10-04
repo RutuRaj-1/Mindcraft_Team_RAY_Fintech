@@ -19,6 +19,7 @@ import { whatIfApi } from './whatIf';
 import { dashboardApi } from './dashboard';
 import { analyticsApi } from './analytics';
 import { policyApi } from './policy';
+import { systemApi } from './system';
 
 export const api = {
   ...authApi,
@@ -35,6 +36,7 @@ export const api = {
   ...dashboardApi,
   ...analyticsApi,
   ...policyApi,
+  ...systemApi,
 };
 
 // Re-export core client utilities & domain modules
@@ -53,5 +55,6 @@ export * from './whatIf';
 export * from './dashboard';
 export * from './analytics';
 export * from './policy';
+export * from './system';
 
 export default api;

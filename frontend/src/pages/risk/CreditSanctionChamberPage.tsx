@@ -447,15 +447,15 @@ export const CreditSanctionChamberPage: React.FC = () => {
                   {/* Dimension 1: Customer */}
                   <div className="p-3.5 bg-[var(--surface-subtle)] rounded-2xl border border-[var(--border)]">
                     <p className="font-extrabold text-[10px] uppercase text-[var(--text-muted)]">1. Customer</p>
-                    <p className="font-bold text-sm text-[var(--brand-950)] mt-0.5">{selectedCase.applicant_name || 'Priya Sharma'}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Managing Director · CIBIL Bureau: 785 (No Delinquencies)</p>
+                    <p className="font-bold text-sm text-[var(--brand-950)] mt-0.5">{selectedCase.applicant_name || selectedCase.promoter_name || 'Applicant'}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Managing Director · Bureau Score: {selectedCase.credit_score || 'Pending'}</p>
                   </div>
 
                   {/* Dimension 2: Business */}
                   <div className="p-3.5 bg-[var(--surface-subtle)] rounded-2xl border border-[var(--border)]">
                     <p className="font-extrabold text-[10px] uppercase text-[var(--text-muted)]">2. Business</p>
                     <p className="font-bold text-sm text-[var(--brand-950)] mt-0.5">{selectedCase.business_name}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">GSTIN: 27AAACS1234F1Z5 · Vintage: 48m · Manufacturing Sector</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">GSTIN: {selectedCase.gstin || 'Not Available'} · Vintage: {selectedCase.vintage_months ? `${selectedCase.vintage_months}m` : 'N/A'} · {selectedCase.industry_sector || 'Business Sector'}</p>
                   </div>
 
                   {/* Dimension 3: Requested Amount */}

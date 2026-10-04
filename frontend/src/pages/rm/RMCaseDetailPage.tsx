@@ -88,25 +88,8 @@ export const RMCaseDetailPage: React.FC = () => {
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
-  // Local operational notes list (seeded with real historical items)
-  const [caseNotes, setCaseNotes] = useState<CaseNote[]>([
-    {
-      id: 'cn-1',
-      author: 'Rohan Mehta',
-      role: 'Relationship Manager',
-      timestamp: '2026-10-02 11:30 IST',
-      text: 'Conducted physical site inspection at Bhiwandi power loom cluster. Plant operating at 85% capacity with active finished goods inventory.',
-      tag: 'SITE_VISIT',
-    },
-    {
-      id: 'cn-2',
-      author: 'Rohan Mehta',
-      role: 'Relationship Manager',
-      timestamp: '2026-10-02 15:45 IST',
-      text: 'Met promoter Priya Sharma. Confirmed GST turnover growth is driven by recent export orders to Gulf region. Buyer invoices verified.',
-      tag: 'CLIENT_MEETING',
-    },
-  ]);
+  // Local operational notes list (start empty for real data, pre-seeded for demo)
+  const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
 
   const loadCaseData = async () => {
     setIsLoading(true);
@@ -432,7 +415,7 @@ export const RMCaseDetailPage: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Promoter Name</p>
-                  <p className="font-bold text-[var(--brand-950)] mt-0.5">Priya Sharma</p>
+                  <p className="font-bold text-[var(--brand-950)] mt-0.5">{journey.intent?.promoter_name || journey.customer_name || 'Promoter Name'}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Designation</p>
@@ -440,7 +423,7 @@ export const RMCaseDetailPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">PAN Card</p>
-                  <p className="font-mono font-bold text-[var(--brand-950)] mt-0.5">{journey.intent.pan || 'AAACS1234F'}</p>
+                  <p className="font-mono font-bold text-[var(--brand-950)] mt-0.5">{journey.intent?.pan || 'Not Provided'}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">KYC Verification</p>
@@ -450,11 +433,11 @@ export const RMCaseDetailPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Contact Phone</p>
-                  <p className="font-mono text-[var(--brand-950)] mt-0.5">+91 98201 44521</p>
+                  <p className="font-mono text-[var(--brand-950)] mt-0.5">{journey.intent?.phone || 'Not Available'}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Email</p>
-                  <p className="font-mono text-[var(--brand-950)] mt-0.5">priya.sharma@sharmatextiles.in</p>
+                  <p className="font-mono text-[var(--brand-950)] mt-0.5">{journey.intent?.email || journey.customer_email || 'Not Available'}</p>
                 </div>
               </div>
             </Card>
@@ -744,13 +727,9 @@ export const RMCaseDetailPage: React.FC = () => {
                 <Clock className="w-4 h-4 text-[var(--brand-700)]" /> Chronological Event Timeline
               </h3>
               <div className="space-y-4">
-                {(timeline?.events || [
-                  { event: 'INTENT_RECEIVED', actor: 'Priya Sharma (CUSTOMER)', time: '2026-10-02 09:30 IST' },
-                  { event: 'DOCUMENTS_INGESTED', actor: 'Automated OCR Service', time: '2026-10-02 09:35 IST' },
-                  { event: 'EVIDENCE_VERIFIED', actor: 'Cross-Reconciliation Service', time: '2026-10-02 09:40 IST' },
-                  { event: 'RM_SITE_INSPECTION', actor: 'Rohan Mehta (RM)', time: '2026-10-02 11:30 IST' },
-                  { event: 'RISK_ASSESSED', actor: 'FinFlow AI Engine', time: '2026-10-02 11:32 IST' },
-                ]).map((t: any, idx: number) => (
+                {(timeline?.events || []).length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)] py-4 text-center">No timeline events recorded yet.</p>
+                ) : (timeline?.events || []).map((t: any, idx: number) => (
                   <div key={idx} className="flex items-start gap-3 text-xs">
                     <div className="w-2.5 h-2.5 rounded-full bg-[var(--brand-700)] mt-1 shrink-0" />
                     <div>

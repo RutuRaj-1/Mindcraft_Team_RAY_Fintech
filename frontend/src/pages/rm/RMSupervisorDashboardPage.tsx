@@ -478,23 +478,20 @@ export const RMSupervisorDashboardPage: React.FC = () => {
       )}
 
       {activeTab === 'team_activity' && (
-        <div className="p-6 bg-white border-2 border-[var(--brand-950)] rounded-3xl shadow-[4px_4px_0px_#0A1F20] space-y-4">
+      <div className="p-6 bg-white border-2 border-[var(--brand-950)] rounded-3xl shadow-[4px_4px_0px_#0A1F20] space-y-4">
           <h3 className="text-base font-black text-[var(--brand-950)]">Live Team Activity Feed</h3>
           <div className="space-y-2 text-xs">
-            <div className="p-3 bg-[var(--surface-subtle)] rounded-xl border border-[var(--border)] flex items-center justify-between">
-              <div>
-                <span className="font-bold text-[var(--brand-950)]">Rohan Mehta added note on Sharma Textiles</span>
-                <p className="text-[10px] text-[var(--text-muted)]">Site visit concluded at Bhiwandi power loom cluster.</p>
+            {queue.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)] py-4 text-center">No recent team activity. Activity will appear here as cases are processed.</p>
+            ) : queue.slice(0, 5).map((item) => (
+              <div key={item.journey_id} className="p-3 bg-[var(--surface-subtle)] rounded-xl border border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-[var(--brand-950)]">{item.business_name} — Stage: {item.current_stage?.replace(/_/g, ' ')}</span>
+                  <p className="text-[10px] text-[var(--text-muted)]">Journey: {item.journey_id} · Amount: ₹{((item.requested_amount || 0) / 100000).toFixed(1)}L</p>
+                </div>
+                <span className="text-[10px] text-[var(--text-muted)]">{item.risk_band || 'ACTIVE'}</span>
               </div>
-              <span className="text-[10px] text-[var(--text-muted)]">12m ago</span>
-            </div>
-            <div className="p-3 bg-[var(--surface-subtle)] rounded-xl border border-[var(--border)] flex items-center justify-between">
-              <div>
-                <span className="font-bold text-[var(--brand-950)]">Neha Gupta dispatched document request for GSTR-3B</span>
-                <p className="text-[10px] text-[var(--text-muted)]">Sent to Priya Sharma via automated WhatsApp / SMS trigger.</p>
-              </div>
-              <span className="text-[10px] text-[var(--text-muted)]">45m ago</span>
-            </div>
+            ))}
           </div>
         </div>
       )}

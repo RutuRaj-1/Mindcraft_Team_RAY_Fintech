@@ -101,10 +101,12 @@ def serialize_doc(doc: Any) -> Dict[str, Any]:
 )
 async def upload_document(
     journey_id: str,
-    doc_type: str = Form(...),
+    doc_type: Optional[str] = Form(None),
+    category: Optional[str] = Form(None),
     file: UploadFile = File(...),
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> Dict[str, Any]:
+    resolved_doc_type = doc_type or category or "BANK_STATEMENT"
     # 1. Validate Journey
     journey = db.get("journeys", journey_id)
     if not journey:
@@ -147,7 +149,7 @@ async def upload_document(
 
     # 6. Extract and Normalize Structured Fields
     extracted_fields = FieldExtractor.extract_fields(
-        doc_type=doc_type,
+        doc_type=resolved_doc_type,
         pages=pages,
         fallback_business_name=business_name
     )
@@ -175,7 +177,7 @@ async def upload_document(
     doc_record = DocumentModel(
         document_id=doc_id,
         application_id=app_id,
-        type=doc_type,
+        type=resolved_doc_type,
         file_name=filename,
         storage_path=storage_path,
         mime_type=file.content_type or "application/pdf",
@@ -405,11 +407,13 @@ def list_vault_documents(user: AuthenticatedUser = Depends(get_current_user)) ->
     description="Uploads a reusable document to the user's permanent Document Vault with automatic SHA-256 fingerprinting."
 )
 async def upload_vault_document(
-    category: str = Form(...),
+    category: Optional[str] = Form(None),
+    doc_type: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     file: UploadFile = File(...),
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> Dict[str, Any]:
+    resolved_category = category or doc_type or "OTHER"
     content = await file.read()
     if not content or len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes)")
@@ -417,7 +421,7 @@ async def upload_vault_document(
     doc_id = f"vlt_{uuid.uuid4().hex[:10]}"
     storage_path, local_url, sha256_hash = StorageService.save_document(
         file_bytes=content,
-        filename=file.filename or f"{category.lower()}.pdf",
+        filename=file.filename or f"{resolved_category.lower()}.pdf",
         doc_id=doc_id,
         mime_type=file.content_type or "application/pdf"
     )
@@ -426,8 +430,9 @@ async def upload_vault_document(
     vault_record = {
         "doc_id": doc_id,
         "user_id": user.uid,
-        "category": category,
-        "file_name": file.filename or f"{category.lower()}.pdf",
+        "category": resolved_category,
+        "doc_type": resolved_category,
+        "file_name": file.filename or f"{resolved_category.lower()}.pdf",
         "file_url": local_url,
         "storage_path": storage_path,
         "file_size_bytes": len(content),
@@ -451,6 +456,7 @@ async def upload_vault_document(
 async def update_vault_document(
     doc_id: str,
     category: Optional[str] = Form(None),
+    doc_type: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     user: AuthenticatedUser = Depends(get_current_user)
@@ -477,8 +483,10 @@ async def update_vault_document(
             record["sha256_hash"] = sha256_hash
             record["version"] = record.get("version", 1) + 1
 
-    if category:
-        record["category"] = category
+    resolved_category = category or doc_type
+    if resolved_category:
+        record["category"] = resolved_category
+        record["doc_type"] = resolved_category
     if notes is not None:
         record["notes"] = notes
     record["updated_at"] = now_iso

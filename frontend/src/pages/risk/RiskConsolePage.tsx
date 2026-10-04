@@ -41,18 +41,22 @@ export const RiskConsolePage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [items, grp, revList, cases, fNet] = await Promise.all([
+      const [items, revList, cases, fNet] = await Promise.all([
         dashboardApi.getOfficerQueue(),
-        riskApi.getTrustGraph('jrn_apex_003').catch(() => null),
         reviewApi.listReviews().catch(() => []),
         auditApi.getAuditCases(50).catch(() => []),
         riskApi.getFraudNetwork().catch(() => null),
       ]);
       setQueue(items);
-      setGraphData(grp);
       setReviews(revList);
       setAuditCases(cases);
       setFraudNetwork(fNet);
+      // Load trust graph for first high-risk case in queue
+      if (items && items.length > 0) {
+        const topCase = items.find((q: QueueItem) => q.risk_band === 'HIGH_RISK') || items[0];
+        const grp = await riskApi.getTrustGraph(topCase.journey_id).catch(() => null);
+        setGraphData(grp);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load risk telemetry');
     } finally {
@@ -382,24 +386,31 @@ export const RiskConsolePage: React.FC = () => {
             FinFlow AI evaluates shared identifiers (bank accounts, PAN hashes, phone numbers) across applications to identify high-risk synthetic clusters.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-2">
-              <span className="font-bold text-amber-900 block">Potential Linked-Case Risk Detected</span>
-              <p className="text-amber-800">
-                Shared bank account <strong>HDFC-***8821</strong> identified between <em>Apex Logistics (jrn_apex_003)</em> and <em>Vanguard Freight</em>.
-              </p>
-              <Button size="xs" variant="outline" onClick={() => navigate('/risk/cases/jrn_apex_003')}>
-                Review Linked Signal
-              </Button>
-            </div>
-            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl space-y-2">
-              <span className="font-bold text-emerald-900 block">Verified Independent Graph</span>
-              <p className="text-emerald-800">
-                <em>Sharma Textiles (jrn_sharma_001)</em> shows zero overlap with any flagged fraud nodes or shared identities across the registry.
-              </p>
-              <Button size="xs" variant="outline" onClick={() => navigate('/risk/cases/jrn_sharma_001')}>
-                Inspect Prime Case
-              </Button>
-            </div>
+            {queue.filter(q => !q.is_consistent || q.discrepancy_count > 0).slice(0, 1).map(item => (
+              <div key={item.journey_id} className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-2">
+                <span className="font-bold text-amber-900 block">Potential Linked-Case Risk Detected</span>
+                <p className="text-amber-800">
+                  Discrepancy signals detected in <em>{item.business_name} ({item.journey_id})</em>. Cross-reference evidence before proceeding.
+                </p>
+                <Button size="xs" variant="outline" onClick={() => navigate(`/risk/cases/${item.journey_id}`)}>
+                  Review Linked Signal
+                </Button>
+              </div>
+            ))}
+            {queue.filter(q => q.is_consistent && !q.discrepancy_count).slice(0, 1).map(item => (
+              <div key={item.journey_id} className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl space-y-2">
+                <span className="font-bold text-emerald-900 block">Verified Independent Graph</span>
+                <p className="text-emerald-800">
+                  <em>{item.business_name} ({item.journey_id})</em> shows zero overlap with flagged fraud nodes across the registry.
+                </p>
+                <Button size="xs" variant="outline" onClick={() => navigate(`/risk/cases/${item.journey_id}`)}>
+                  Inspect Prime Case
+                </Button>
+              </div>
+            ))}
+            {queue.length === 0 && (
+              <p className="text-xs text-[var(--text-muted)] col-span-2 py-4 text-center">No fraud network data available. Cases will appear here as they are processed.</p>
+            )}
           </div>
         </div>
       )}

@@ -37,14 +37,17 @@ export const SignInPage: React.FC = () => {
   const getRoleDestination = (role: UserRole) => {
     switch (role) {
       case 'RM':
-      case 'RM_SUPERVISOR':
         return '/rm';
+      case 'RM_SUPERVISOR':
+        return '/rm-supervisor';
       case 'RISK_OFFICER':
-      case 'RISK_MANAGER':
-      case 'CREDIT_APPROVER':
         return '/risk';
+      case 'RISK_MANAGER':
+        return '/risk-manager';
+      case 'CREDIT_APPROVER':
+        return '/credit-approval';
       case 'AUDIT_OFFICER':
-        return '/risk/replay';
+        return '/audit';
       case 'SYS_ADMIN':
       case 'ADMIN':
         return '/admin';
@@ -73,12 +76,21 @@ export const SignInPage: React.FC = () => {
         localStorage.removeItem('finflow_remember_email');
       }
 
-      // Determine role from email if demo mode, or route to target
+      // Determine authoritative role from session or email heuristic
       let targetRole: UserRole = 'CUSTOMER';
-      const norm = email.toLowerCase();
-      if (norm.includes('rm') || norm.includes('officer')) targetRole = 'RM';
-      else if (norm.includes('risk') || norm.includes('compliance')) targetRole = 'RISK_OFFICER';
-      else if (norm.includes('admin')) targetRole = 'ADMIN';
+      const stored = localStorage.getItem('finflow_role') as UserRole | null;
+      if (stored) {
+        targetRole = stored;
+      } else {
+        const norm = email.toLowerCase();
+        if (norm.includes('supervisor')) targetRole = 'RM_SUPERVISOR';
+        else if (norm.includes('rm')) targetRole = 'RM';
+        else if (norm.includes('risk_manager') || norm.includes('meera')) targetRole = 'RISK_MANAGER';
+        else if (norm.includes('risk') || norm.includes('compliance') || norm.includes('ananya')) targetRole = 'RISK_OFFICER';
+        else if (norm.includes('approver') || norm.includes('credit') || norm.includes('rajesh')) targetRole = 'CREDIT_APPROVER';
+        else if (norm.includes('audit') || norm.includes('sunita')) targetRole = 'AUDIT_OFFICER';
+        else if (norm.includes('admin') || norm.includes('amit')) targetRole = 'SYS_ADMIN';
+      }
 
       const destination = from || getRoleDestination(targetRole);
       navigate(destination, { replace: true });
@@ -179,10 +191,10 @@ export const SignInPage: React.FC = () => {
             <div className="relative z-10 p-3.5 rounded-2xl bg-white/5 border border-white/10 mt-8">
               <div className="flex items-center justify-between text-[11px] text-[#94A3B8] pb-1.5 border-b border-white/10">
                 <span>Active Journey</span>
-                <span className="text-[#22C98A] font-bold">Sharma Textiles</span>
+                <span className="text-[#22C98A] font-bold">Demo Application</span>
               </div>
               <p className="text-[11px] text-white font-medium mt-1.5">
-                "Sanction Ready · DSCR 1.68x · 8/10 Evidence Verified"
+                "AI-Powered · Full Pipeline · Evidence Verified"
               </p>
             </div>
           </div>

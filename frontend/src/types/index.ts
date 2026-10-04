@@ -45,6 +45,9 @@ export interface IntentPayload {
   pan?: string;
   gstin?: string;
   industry_sector?: string;
+  promoter_name?: string;
+  phone?: string;
+  email?: string;
 }
 
 export interface JourneyStep {
@@ -81,6 +84,8 @@ export interface JourneyRecord {
   application_id: string;
   created_at: string;
   updated_at: string;
+  customer_name?: string;
+  customer_email?: string;
 }
 
 export interface DocumentRecord {
@@ -631,6 +636,11 @@ export interface QueueItem {
   application_id: string;
   business_name: string;
   applicant_name?: string;
+  promoter_name?: string;
+  credit_score?: number;
+  gstin?: string;
+  vintage_months?: number;
+  industry_sector?: string;
   requested_amount: number;
   current_stage: string;
   status: string;

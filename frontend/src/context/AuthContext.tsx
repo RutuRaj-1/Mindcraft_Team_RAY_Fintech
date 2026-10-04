@@ -94,14 +94,14 @@ export interface PersonaProfile {
 export const PERSONAS: Record<UserRole, PersonaProfile> = {
   CUSTOMER: {
     role: 'CUSTOMER',
-    name: 'Priya Sharma',
-    title: 'Managing Director & Founder',
-    email: 'priya@sharmatextiles.in',
-    organization: 'Sharma Textiles Pvt. Ltd.',
-    avatarInitials: 'PS',
+    name: 'MSME Customer',
+    title: 'Authorized Signatory',
+    email: 'customer@example.com',
+    organization: 'My MSME Enterprise',
+    avatarInitials: 'CU',
     badgeColor: 'var(--fin-green)',
     defaultRoute: '/customer',
-    defaultJourneyId: 'jrn_priya_001',
+    defaultJourneyId: '',
   },
   RM: {
     role: 'RM',
@@ -430,7 +430,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: persona.email,
     name: persona.name,
     role,
-    business_id: role === 'CUSTOMER' ? (msmeProfile?.user_id || (firebaseUser ? undefined : 'app_priya_001')) : undefined,
+    business_id: role === 'CUSTOMER' ? (msmeProfile?.user_id || undefined) : undefined,
   }), [firebaseUser, role, persona, msmeProfile]);
 
   // ── Actions ────────────────────────────────────────────────────────────────

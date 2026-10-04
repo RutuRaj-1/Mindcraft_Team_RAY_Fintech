@@ -71,15 +71,15 @@ export const ApplyLoanPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'natural' | 'guided'>('natural');
 
   // Raw user inputs
-  const [naturalText, setNaturalText] = useState("I need 7 lakh for working capital to fulfil a bulk textile order.");
+  const [naturalText, setNaturalText] = useState("");
   const [answers, setAnswers] = useState<GuidedAnswers>({
-    need: "Working capital to fulfil a bulk textile order",
-    amount: "7 lakh",
-    business_type: "Textile & Garment Manufacturing",
-    vintage: "3 years",
-    revenue: "5 lakh / month",
-    obligations: "None",
-    business_name: "Sharma Textiles & Weaving Mill",
+    need: "",
+    amount: "",
+    business_type: "",
+    vintage: "",
+    revenue: "",
+    obligations: "",
+    business_name: "",
   });
 
   // Pre-fill from MSME Profile if available

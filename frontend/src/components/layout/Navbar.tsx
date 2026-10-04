@@ -46,7 +46,7 @@ export const ROLE_CONFIG: Record<string, {
     role: 'CUSTOMER',
     icon: <UserCheck className="w-3.5 h-3.5" />, 
     label: '1. Customer', 
-    officer: 'Priya Sharma (MSME Applicant)', 
+    officer: 'MSME Applicant (Customer Portal)', 
     category: 'Customer Boundary',
     color: '#059669',
     badgeBg: '#ECFDF5'

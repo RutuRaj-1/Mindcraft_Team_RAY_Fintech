@@ -103,7 +103,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   const { activeJourneyId, setActiveJourneyId, role, persona } = useAuth();
   const { unreadCount, openDrawer } = useNotifications();
 
-  const [cases, setCases] = React.useState<{ id: string; label: string; tier: string }[]>(BENCHMARK_CASES);
+  const [cases, setCases] = React.useState<{ id: string; label: string; tier: string }[]>([]);
   const [showPicker, setShowPicker] = React.useState(false);
   const pickerRef = React.useRef<HTMLDivElement>(null);
 
@@ -113,19 +113,28 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     let isMounted = true;
     journeysApi.listJourneys()
       .then((res: any[]) => {
-        if (!isMounted || !res || res.length === 0) return;
-        const mapped = res.map((j) => ({
-          id: j.journey_id,
-          label: j.intent?.business_name || j.business_name || j.journey_id,
-          tier: j.current_stage
-            ? j.current_stage.replace(/_/g, ' ')
-            : (j.status || 'ACTIVE'),
-        }));
-        setCases(mapped);
+        if (!isMounted) return;
+        if (res && res.length > 0) {
+          const mapped = res.map((j) => ({
+            id: j.journey_id,
+            label: j.intent?.business_name || j.business_name || j.journey_id,
+            tier: j.current_stage
+              ? j.current_stage.replace(/_/g, ' ')
+              : (j.status || 'ACTIVE'),
+          }));
+          setCases(mapped);
+        } else if (role !== 'CUSTOMER') {
+          // For internal/demo roles, fall back to benchmark cases when no real data
+          setCases(BENCHMARK_CASES);
+        } else {
+          setCases([]);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (role !== 'CUSTOMER') setCases(BENCHMARK_CASES);
+      });
     return () => { isMounted = false; };
-  }, []);
+  }, [role]);
 
   // Close picker on outside click
   React.useEffect(() => {
@@ -171,7 +180,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold text-[var(--text-muted)] leading-none mb-0.5">{ctx.label}</p>
               <p className="text-xs font-bold text-[var(--brand-950)] truncate leading-none">
-                {activeCase?.label || ctx.pickerLabel}
+                {activeCase?.label || (role === 'CUSTOMER' ? 'No active application' : ctx.pickerLabel)}
               </p>
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform duration-200 ${showPicker ? 'rotate-180' : ''}`} />
@@ -182,6 +191,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               <p className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] px-2 py-1.5">
                 {role === 'CUSTOMER' ? 'My Applications' : 'Available Cases'}
               </p>
+              {cases.length === 0 && role === 'CUSTOMER' && (
+                <p className="text-xs text-[var(--text-muted)] px-2 py-3 text-center">No applications yet. Start a new application to begin.</p>
+              )}
               {cases.map((c) => (
                 <button
                   key={c.id}

@@ -66,16 +66,19 @@ export const documentsApi = {
   listVaultDocuments: () =>
     http.get<import('../types').VaultDocument[]>('/documents/vault'),
 
-  uploadVaultDocument: (file: File, docType: string) => {
+  uploadVaultDocument: (file: File, docType: string, category?: string) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('doc_type', docType);
+    formData.append('category', category || docType);
     return http.post<import('../types').VaultDocument>('/documents/vault', formData);
   },
 
-  updateVaultDocument: (docId: string, file: File) => {
+  updateVaultDocument: (docId: string, file: File, docType?: string, category?: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (docType) formData.append('doc_type', docType);
+    if (category || docType) formData.append('category', category || docType || '');
     return http.put<import('../types').VaultDocument>(`/documents/vault/${docId}`, formData);
   },
 

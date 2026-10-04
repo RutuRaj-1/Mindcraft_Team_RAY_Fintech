@@ -67,18 +67,26 @@ service cloud.firestore {
       return isFirstLineOps() || isSecondLineRisk() || isSanctionAuthority() || isAuditOfficer();
     }
 
-    // Application ownership validation
+    // Application ownership validation (supports camelCase and snake_case properties)
     function isApplicationOwner(applicationId) {
-      return isAuthenticated() && (
+      return isAuthenticated() && applicationId != null && (
         exists(/databases/$(database)/documents/applications/$(applicationId)) &&
-        get(/databases/$(database)/documents/applications/$(applicationId)).data.userId == request.auth.uid
+        (
+          get(/databases/$(database)/documents/applications/$(applicationId)).data.get('userId', '') == request.auth.uid ||
+          get(/databases/$(database)/documents/applications/$(applicationId)).data.get('user_id', '') == request.auth.uid ||
+          get(/databases/$(database)/documents/applications/$(applicationId)).data.get('applicant_id', '') == request.auth.uid
+        )
       );
     }
 
     function isJourneyOwner(journeyId) {
-      return isAuthenticated() && (
+      return isAuthenticated() && journeyId != null && (
         exists(/databases/$(database)/documents/journeys/$(journeyId)) &&
-        get(/databases/$(database)/documents/journeys/$(journeyId)).data.applicant_id == request.auth.uid
+        (
+          get(/databases/$(database)/documents/journeys/$(journeyId)).data.get('applicant_id', '') == request.auth.uid ||
+          get(/databases/$(database)/documents/journeys/$(journeyId)).data.get('user_id', '') == request.auth.uid ||
+          get(/databases/$(database)/documents/journeys/$(journeyId)).data.get('userId', '') == request.auth.uid
+        )
       );
     }
 
@@ -107,15 +115,22 @@ service cloud.firestore {
     // =========================================================================
     match /applications/{applicationId} {
       allow read: if isApplicationOwner(applicationId) || isInstitutionalStaff();
-      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid) || isFirstLineOps();
-      allow update: if (isApplicationOwner(applicationId) && notChanging('applicationId') && notChanging('userId')) || isInstitutionalStaff();
+      allow create: if (isAuthenticated() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid
+      )) || isFirstLineOps();
+      allow update: if (isApplicationOwner(applicationId) && notChanging('applicationId') && notChanging('userId') && notChanging('user_id')) || isInstitutionalStaff();
       allow delete: if false; // Applications are legal artifacts; deletion is prohibited
     }
 
     match /journeys/{journeyId} {
       allow read: if isJourneyOwner(journeyId) || isInstitutionalStaff();
-      allow create: if isAuthenticated() && (request.resource.data.applicant_id == request.auth.uid || isFirstLineOps());
-      allow update: if isInstitutionalStaff() || (isAuthenticated() && resource.data.applicant_id == request.auth.uid && notChanging('journey_id'));
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('applicant_id', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isFirstLineOps()
+      );
+      allow update: if isInstitutionalStaff() || (isAuthenticated() && resource.data.get('applicant_id', '') == request.auth.uid && notChanging('journey_id'));
       allow delete: if false;
     }
 
@@ -123,15 +138,21 @@ service cloud.firestore {
     // 4. DOCUMENTS & EVIDENCE ITEMS — EVIDENCE LEDGER IMMUTABILITY
     // =========================================================================
     match /documents/{documentId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
-      allow create: if isApplicationOwner(request.resource.data.applicationId) || isFirstLineOps();
+      allow read: if isApplicationOwner(resource.data.get('applicationId', resource.data.get('application_id', ''))) ||
+                     resource.data.get('userId', '') == request.auth.uid ||
+                     resource.data.get('user_id', '') == request.auth.uid ||
+                     isInstitutionalStaff();
+      allow create: if isApplicationOwner(request.resource.data.get('applicationId', request.resource.data.get('application_id', ''))) ||
+                      request.resource.data.get('userId', '') == request.auth.uid ||
+                      request.resource.data.get('user_id', '') == request.auth.uid ||
+                      isFirstLineOps();
       // Documents cannot have their fileHash or storagePath modified after upload
       allow update: if isInstitutionalStaff() && notChanging('fileHash') && notChanging('storagePath');
       allow delete: if false;
     }
 
     match /evidence_items/{evidenceId} {
-      allow read: if isApplicationOwner(resource.data.applicationId) || isInstitutionalStaff();
+      allow read: if isApplicationOwner(resource.data.get('applicationId', resource.data.get('application_id', ''))) || isInstitutionalStaff();
       // Evidence items are created by OCR / backend extraction services
       allow create: if isInstitutionalStaff();
       // Extracted evidence items are immutable point-in-time facts
@@ -294,6 +315,79 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if false;
       allow delete: if false;
+    }
+
+    // =========================================================================
+    // 14. MSME REUSABLE DOCUMENT VAULT
+    // =========================================================================
+    match /document_vault/{docId} {
+      allow read: if isAuthenticated() && (
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isInstitutionalStaff()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        request.resource.data.get('userId', '') == request.auth.uid
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isInstitutionalStaff()
+      );
+    }
+
+    // =========================================================================
+    // 15. MSME BUSINESS PROFILES
+    // =========================================================================
+    match /msme_profiles/{userId} {
+      allow read: if isUser(userId) || isInstitutionalStaff() || isSysAdmin();
+      allow create, update: if isUser(userId) || isSysAdmin();
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 16. MULTI-DOCUMENT CONSISTENCY REPORTS
+    // =========================================================================
+    match /consistency_reports/{reportId} {
+      allow read: if isInstitutionalStaff() || (
+        isAuthenticated() && (
+          isApplicationOwner(resource.data.get('application_id', resource.data.get('applicationId', '')))
+        )
+      );
+      allow create, update: if isInstitutionalStaff();
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 17. TREESHAP FEATURE ATTRIBUTIONS
+    // =========================================================================
+    match /shap_attributions/{attrId} {
+      allow read: if isInstitutionalStaff() || (
+        isAuthenticated() && (
+          isApplicationOwner(resource.data.get('application_id', resource.data.get('applicationId', '')))
+        )
+      );
+      allow create: if isSecondLineRisk() || isSanctionAuthority();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 18. INSTITUTIONAL COMMITTEE OVERRIDES
+    // =========================================================================
+    match /overrides/{overrideId} {
+      allow read: if isInstitutionalStaff();
+      allow create: if isSanctionAuthority();
+      allow update: if false; // Overrides are immutable audit records
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 19. SYSTEM HEALTH PROBES (DIAGNOSTICS)
+    // =========================================================================
+    match /_system_probes/{probeId} {
+      allow read, write, delete: if isSysAdmin() || isAuthenticated();
     }
 
   }

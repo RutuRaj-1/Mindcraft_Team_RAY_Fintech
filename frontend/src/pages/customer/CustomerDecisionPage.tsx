@@ -471,7 +471,7 @@ export const CustomerDecisionPage: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--brand-950)] leading-relaxed space-y-2">
           <p className="text-sm font-semibold">
-            {decision.reasoning || 'Application for Sharma Textiles Private Limited is APPROVED. FinFlow Trust Score is 920/1000 with 0 inward cheque bounces, healthy DSCR of 1.85x, and verified GST filings totaling ₹1.45 Cr. Prime rate approved with zero manual intervention required.'}
+            {decision.reasoning || 'Decision explanation will appear here after the AI generates the grounded reasoning from verified evidence.'}
           </p>
         </div>
       </div>

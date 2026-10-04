@@ -81,8 +81,8 @@ const SUPPORTED_DOC_TYPES = [
 export const CustomerDocumentsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { activeJourneyId } = useAuth();
-  const journeyId = id || activeJourneyId || 'jrn_priya_001';
+  const { activeJourneyId, persona, journey: authJourney } = useAuth();
+  const journeyId = id || activeJourneyId || '';
 
   // Navigation tab: 'upload' | 'digilocker' | 'evidence' | 'consistency'
   const [activeTab, setActiveTab] = useState<'upload' | 'digilocker' | 'evidence' | 'consistency'>('upload');
@@ -247,20 +247,20 @@ export const CustomerDocumentsPage: React.FC = () => {
     let mockContent = "";
     let mockName = "";
     if (type === 'BANK_STATEMENT') {
-      mockName = "HDFC_Current_Account_Statement.pdf";
-      mockContent = "%PDF-1.4\nAccount Name: Sharma Textiles Private Limited\nStatement Period: 01/04/2024 to 31/03/2025\nTotal Credits: 14,200,000.00\nTotal Debits: 12,800,000.00\nOpening Balance: 150,000.00\nClosing Balance: 1,550,000.00\n%%EOF";
+      mockName = "Bank_Account_Statement.pdf";
+      mockContent = "%PDF-1.4\nAccount Name: Your Business Enterprise\nStatement Period: 01/04/2024 to 31/03/2025\nTotal Credits: 5,000,000.00\nTotal Debits: 4,200,000.00\nOpening Balance: 100,000.00\nClosing Balance: 900,000.00\n%%EOF";
     } else if (type === 'GST_RETURN') {
       mockName = "GSTR3B_FY202425_Tax_Return.pdf";
-      mockContent = "%PDF-1.4\nGSTIN: 27AAACS1234F1Z5\nLegal Name: Sharma Textiles Private Limited\nTotal Taxable Turnover: 14,500,000.00\nTax Period: FY 2024-25\n%%EOF";
+      mockContent = "%PDF-1.4\nGSTIN: 27XXXXX0000X1Z5\nLegal Name: Your Business Enterprise\nTotal Taxable Turnover: 5,000,000.00\nTax Period: FY 2024-25\n%%EOF";
     } else if (type === 'ITR') {
       mockName = "ITR_V_Acknowledgement_AY202526.pdf";
-      mockContent = "%PDF-1.4\nGross Total Income: 14,000,000.00\nBusiness Income: 1,850,000.00\nAssessment Year: 2025-26\n%%EOF";
+      mockContent = "%PDF-1.4\nGross Total Income: 4,800,000.00\nBusiness Income: 1,200,000.00\nAssessment Year: 2025-26\n%%EOF";
     } else if (type === 'BUSINESS_REGISTRATION') {
       mockName = "Udyam_Registration_Certificate.pdf";
-      mockContent = "%PDF-1.4\nName of Enterprise: Sharma Textiles Private Limited\nDate of Incorporation: 15/06/2020\nType of Enterprise: Small Enterprise (Manufacturing)\n%%EOF";
+      mockContent = "%PDF-1.4\nName of Enterprise: Your Business Enterprise\nDate of Incorporation: 01/01/2022\nType of Enterprise: Small Enterprise (Manufacturing)\n%%EOF";
     } else {
       mockName = "Permanent_Account_Number_Card.pdf";
-      mockContent = "%PDF-1.4\nPermanent Account Number: AAACS1234F\nName: Priya Sharma\nDate of Birth: 12/04/1982\n%%EOF";
+      mockContent = "%PDF-1.4\nPermanent Account Number: XXXXX0000X\nName: Authorized Signatory\nDate of Birth: 01/01/1985\n%%EOF";
     }
 
     const blob = new Blob([mockContent], { type: "application/pdf" });
@@ -680,7 +680,7 @@ export const CustomerDocumentsPage: React.FC = () => {
 
               <div className="bg-white/10 p-3 rounded-xl border border-white/20 shrink-0 text-center">
                 <span className="text-[10px] text-blue-200 uppercase font-bold block">Verified Entity</span>
-                <span className="text-xs font-bold text-white">Sharma Textiles Pvt Ltd</span>
+                <span className="text-xs font-bold text-white">{authJourney?.intent?.business_name || persona?.organization || 'Your Business'}</span>
                 <span className="text-[9px] text-emerald-300 block mt-0.5">● Cryptographically Signed</span>
               </div>
             </div>
