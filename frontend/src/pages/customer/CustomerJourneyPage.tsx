@@ -13,7 +13,7 @@ import { TrustGraphVisual } from '../../components/risk/TrustGraphVisual';
 
 export const CustomerJourneyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const journeyId = id || 'jrn_priya_001';
+  const journeyId = id || 'jrn_skillbridge_001';
 
   const [journey, setJourney] = useState<JourneyRecord | null>(null);
   const [friction, setFriction] = useState<JourneyFrictionMetrics | null>(null);

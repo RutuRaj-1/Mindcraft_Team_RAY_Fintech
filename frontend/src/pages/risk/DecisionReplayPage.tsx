@@ -11,16 +11,16 @@ import { RotateCcw, ArrowLeft, ShieldAlert, Sparkles, Compass, CheckCircle2 } fr
 export const DecisionReplayPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const currentId = id || 'jrn_priya_001';
+  const currentId = id || 'jrn_lifeline_002';
 
   const [replayData, setReplayData] = useState<DecisionReplayResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const benchmarkCases = [
-    { id: 'jrn_priya_001', name: 'Sharma Textiles', badge: 'Clean Approved Case (Priya)', color: 'var(--fin-green)' },
-    { id: 'jrn_kavita_002', name: 'Kavita Electronics', badge: 'Boundary Conditional Case (Rohan)', color: '#d97706' },
-    { id: 'jrn_apex_003', name: 'Apex Logistics', badge: 'Discrepancy & Override Case (Ananya)', color: 'var(--fin-coral)' },
+    { id: 'jrn_skillbridge_001', name: 'SkillBridge Enterprises', badge: 'Prime Tier (Ruturaj)', color: 'var(--fin-green)' },
+    { id: 'jrn_lifeline_002', name: 'Lifeline AI Healthcare', badge: 'Module 4 Explainable Decision (Rashi)', color: '#2563eb' },
+    { id: 'jrn_safeera_003', name: 'SafeEra Industrial', badge: 'Underwriting Review (Aaditya)', color: '#d97706' },
   ];
 
   const fetchReplay = async () => {

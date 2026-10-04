@@ -28,17 +28,17 @@ const DEMO_ROLES: {
 }[] = [
   {
     role: 'CUSTOMER',
-    name: 'MSME Borrower Portal',
+    name: 'SkillBridge MSME Portal',
     title: 'Self-Service Borrower Experience',
-    email: 'bhomeruturaj@gmail.com',
-    department: 'SkillBridge Enterprises (Borrower)',
+    email: 'bhomeruturaj17@gmail.com',
+    department: 'SkillBridge Enterprises (Ruturaj Bhome)',
     route: '/customer',
     badgeColor: '#10b981',
     accentBg: '#ecfdf5',
     icon: UserCheck,
     capabilities: [
-      'Self-Service Loan Application Intake',
-      'Immutable Reusable Document Vault',
+      'SkillBridge Enterprises Live MSME Desk',
+      '4 Verified Compliance Documents in Vault',
       'Real-Time Status & Transparent Sanction Tracking',
     ],
   },

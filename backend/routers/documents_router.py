@@ -257,11 +257,18 @@ class AttachVaultDocumentRequest(BaseModel):
 )
 def list_vault_documents(user: AuthenticatedUser = Depends(get_current_user)) -> List[Dict[str, Any]]:
     # Retrieve user's stored vault documents
+    user_email = (user.email or "").lower()
     items = db.list("document_vault", {"user_id": user.uid})
-    if not items and user.uid in ("usr_demo_customer", "demo-customer-1", "user-msme-priya"):
-        # Provide sample vault starter items for demo evaluation
-        items = db.list("document_vault", {"user_id": "usr_priya_001"})
-    return items or []
+    if items:
+        return items
+
+    if "rashi" in user_email or user.uid == "usr_lifeline_002":
+        return db.list("document_vault", {"user_id": "usr_lifeline_002"})
+    elif "aditya" in user_email or "wakchaure" in user_email or user.uid == "usr_safeera_003":
+        return db.list("document_vault", {"user_id": "usr_safeera_003"})
+    else:
+        # Default MSME customer is SkillBridge (Ruturaj Bhome)
+        return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
 
 
 @router.post(

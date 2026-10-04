@@ -6,7 +6,7 @@ import { Sparkles, ArrowLeft, ArrowRight, HelpCircle, ShieldCheck, CheckCircle2,
 
 export const CustomerWhatIfPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const journeyId = id || 'jrn_priya_001';
+  const journeyId = id || 'jrn_skillbridge_001';
 
   return (
     <div className="space-y-6">

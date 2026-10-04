@@ -68,16 +68,16 @@ def get_current_profile(user: AuthenticatedUser = Depends(get_current_user)):
 
 @router.get("/personas", response_model=List[PersonaInfo])
 def list_available_personas():
-    """Returns all 8 personas configured for FinFlow AI."""
+    """Returns all 8 personas configured for FinFlow AI with exactly 1 user profile per role."""
     personas = [
         PersonaInfo(
             role=UserRole.CUSTOMER,
-            name="Priya Sharma",
-            email="priya.sharma@sharmatextiles.in",
-            title="Managing Director & Founder, Sharma Textiles",
+            name="Ruturaj Bhome",
+            email="bhomeruturaj17@gmail.com",
+            title="Founder & Managing Director, SkillBridge Enterprises",
             delegated_limit_inr=0.0,
             token="demo-customer",
-            category="Customer"
+            category="Customer (SkillBridge)"
         ),
         PersonaInfo(
             role=UserRole.RM,
@@ -135,9 +135,9 @@ def list_available_personas():
         ),
         PersonaInfo(
             role=UserRole.SYS_ADMIN,
-            name="Amit Verma",
-            email="admin@finflow.ai",
-            title="Platform Infrastructure Lead",
+            name="Ruturaj Bhome",
+            email="bhomeruturaj@gmail.com",
+            title="Master System Administrator & Architecture Lead",
             delegated_limit_inr=0.0,
             token="demo-admin",
             category="Technical Custodian"
@@ -183,43 +183,79 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
     from backend.database.firestore_client import db
     from datetime import datetime, timezone
     profile = db.get("msme_profiles", user.uid)
-    email = user.email or ""
-    is_ruturaj = "bhomeruturaj" in email.lower() or "ruturaj" in (user.name or "").lower()
+    email = (user.email or "").lower()
 
-    if not profile or profile.get("business_name") in ("Rohan Mehta Enterprises", "borrower@enterprise.com Enterprises"):
-        derived_name = "Ruturaj Bhome" if is_ruturaj else (user.name or email.split("@")[0].replace(".", " ").title() if email else "")
-        biz_name = "SkillBridge Enterprises" if is_ruturaj else (f"{derived_name} Enterprises" if derived_name else "")
-        profile = {
-            "user_id": user.uid,
-            "email": email,
-            "promoter_name": derived_name,
-            "business_name": biz_name,
-            "legal_entity_type": "PRIVATE_LIMITED",
-            "phone": "8468812201" if is_ruturaj else "",
-            "pan": "SKLBR1234A" if is_ruturaj else "",
-            "gstin": "27SKLBR1234A1Z5" if is_ruturaj else "",
-            "industry_sector": "Information Technology & Software" if is_ruturaj else "Manufacturing & Services",
-            "vintage_months": 48 if is_ruturaj else 0,
-            "annual_turnover": 30000000.0 if is_ruturaj else 0.0,
-            "registered_address": "Plot 12, Tech Park, Andheri East, Mumbai, Maharashtra 400069" if is_ruturaj else "",
-            "city": "Mumbai",
-            "pincode": "400069",
-            "is_profile_complete": bool(is_ruturaj),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
+    is_lifeline = "rashi" in email or user.uid == "usr_lifeline_002"
+    is_safeera = "aditya" in email or "wakchaure" in email or user.uid == "usr_safeera_003"
+    is_skillbridge = not is_lifeline and not is_safeera
+
+    if not profile or profile.get("business_name") in ("Rohan Mehta Enterprises", "borrower@enterprise.com Enterprises", "Sharma Textiles Private Limited"):
+        if is_lifeline:
+            profile = {
+                "user_id": user.uid,
+                "email": "rashi88@gmail.com",
+                "promoter_name": "Rashi Kachwah",
+                "business_name": "Lifeline AI Healthcare Technologies Pvt. Ltd.",
+                "legal_entity_type": "PRIVATE_LIMITED",
+                "phone": "+91 98204 55678",
+                "pan": "SYNTH0000L",
+                "gstin": "27SYNTH0000L1Z9",
+                "industry_sector": "Healthcare AI & Clinical Workflow Systems",
+                "vintage_months": 12,
+                "annual_turnover": 11800000.0,
+                "registered_address": "Unit 4B, Meridian Innovation Hub, 42 Knowledge Park Road, Pune, Maharashtra 411045",
+                "city": "Pune",
+                "pincode": "411045",
+                "is_profile_complete": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        elif is_safeera:
+            profile = {
+                "user_id": user.uid,
+                "email": "wakchaureaditya@gmail.com",
+                "promoter_name": "Aaditya Wakchaure",
+                "business_name": "SafeEra Industrial Solutions Pvt. Ltd.",
+                "legal_entity_type": "PRIVATE_LIMITED",
+                "phone": "+91 97654 32109",
+                "pan": "NTHSE0048Z",
+                "gstin": "27NTHSE0048Z1Z3",
+                "industry_sector": "Industrial Safety Equipment & Smart Surveillance",
+                "vintage_months": 54,
+                "annual_turnover": 18200000.0,
+                "registered_address": "42, Meridian Industrial Estate, Demo Service Road, Andheri East, Mumbai, Maharashtra 400069",
+                "city": "Mumbai",
+                "pincode": "400069",
+                "is_profile_complete": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        else:
+            profile = {
+                "user_id": user.uid,
+                "email": "bhomeruturaj17@gmail.com",
+                "promoter_name": "Ruturaj Bhome",
+                "business_name": "SkillBridge Learning Solutions Pvt. Ltd.",
+                "legal_entity_type": "PRIVATE_LIMITED",
+                "phone": "+91 84688 12201",
+                "pan": "NTHSB0012Z",
+                "gstin": "27NTHSB0012Z1Z5",
+                "industry_sector": "EdTech & Professional Skill Training",
+                "vintage_months": 44,
+                "annual_turnover": 30000000.0,
+                "registered_address": "17, Knowledge Avenue, Blue Orbit Campus, Hinjewadi Phase Beta, Pune, Maharashtra 411057",
+                "city": "Pune",
+                "pincode": "411057",
+                "is_profile_complete": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
         db.set("msme_profiles", user.uid, profile)
     else:
-        # Guarantee registered account email is synchronized (never keep stale demo bank employee email)
+        # Guarantee registered account email is synchronized
         if user.email and (
             not profile.get("email")
             or profile.get("email").endswith("@finflowbank.com")
-            or profile.get("email") in ("customer@example.com", "borrower@enterprise.com")
+            or profile.get("email") in ("customer@example.com", "borrower@enterprise.com", "priya.sharma@sharmatextiles.in")
         ):
             profile["email"] = user.email
-            db.set("msme_profiles", user.uid, profile)
-        if is_ruturaj and (not profile.get("business_name") or profile.get("business_name") == "Rohan Mehta Enterprises"):
-            profile["business_name"] = "SkillBridge Enterprises"
-            profile["promoter_name"] = "Ruturaj Bhome"
             db.set("msme_profiles", user.uid, profile)
     return profile
 

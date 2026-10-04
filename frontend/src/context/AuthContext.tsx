@@ -97,14 +97,14 @@ export interface PersonaProfile {
 export const PERSONAS: Record<UserRole, PersonaProfile> = {
   CUSTOMER: {
     role: 'CUSTOMER',
-    name: 'MSME Customer',
-    title: 'Authorized Signatory',
-    email: 'customer@example.com',
-    organization: 'My MSME Enterprise',
-    avatarInitials: 'CU',
+    name: 'Ruturaj Bhome',
+    title: 'Founder & Managing Director',
+    email: 'bhomeruturaj17@gmail.com',
+    organization: 'SkillBridge Enterprises',
+    avatarInitials: 'RB',
     badgeColor: 'var(--fin-green)',
     defaultRoute: '/customer',
-    defaultJourneyId: '',
+    defaultJourneyId: 'jrn_skillbridge_001',
   },
   RM: {
     role: 'RM',
@@ -115,7 +115,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'RM',
     badgeColor: 'var(--fin-blue)',
     defaultRoute: '/rm',
-    defaultJourneyId: 'jrn_kavita_002',
+    defaultJourneyId: 'jrn_safeera_003',
   },
   RM_SUPERVISOR: {
     role: 'RM_SUPERVISOR',
@@ -126,7 +126,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'VM',
     badgeColor: 'var(--brand-700)',
     defaultRoute: '/operations',
-    defaultJourneyId: 'jrn_kavita_002',
+    defaultJourneyId: 'jrn_safeera_003',
   },
   RISK_OFFICER: {
     role: 'RISK_OFFICER',
@@ -137,7 +137,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'AI',
     badgeColor: 'var(--fin-amber)',
     defaultRoute: '/risk',
-    defaultJourneyId: 'jrn_apex_003',
+    defaultJourneyId: 'jrn_lifeline_002',
   },
   RISK_MANAGER: {
     role: 'RISK_MANAGER',
@@ -148,7 +148,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'MK',
     badgeColor: 'var(--fin-coral)',
     defaultRoute: '/risk-manager',
-    defaultJourneyId: 'jrn_apex_003',
+    defaultJourneyId: 'jrn_lifeline_002',
   },
   CREDIT_APPROVER: {
     role: 'CREDIT_APPROVER',
@@ -159,7 +159,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'RS',
     badgeColor: '#dc2626',
     defaultRoute: '/approvals',
-    defaultJourneyId: 'jrn_apex_003',
+    defaultJourneyId: 'jrn_safeera_003',
   },
   AUDIT_OFFICER: {
     role: 'AUDIT_OFFICER',
@@ -170,7 +170,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'SR',
     badgeColor: 'var(--fin-violet)',
     defaultRoute: '/audit',
-    defaultJourneyId: 'jrn_apex_003',
+    defaultJourneyId: 'jrn_lifeline_002',
   },
   SYS_ADMIN: {
     role: 'SYS_ADMIN',
@@ -181,7 +181,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'RB',
     badgeColor: '#0f172a',
     defaultRoute: '/admin',
-    defaultJourneyId: '',
+    defaultJourneyId: 'jrn_skillbridge_001',
   },
   ADMIN: {
     role: 'ADMIN',
@@ -192,7 +192,7 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
     avatarInitials: 'RB',
     badgeColor: '#0f172a',
     defaultRoute: '/admin',
-    defaultJourneyId: '',
+    defaultJourneyId: 'jrn_skillbridge_001',
   },
 };
 
@@ -265,10 +265,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [msmeProfile, setMsmeProfile] = useState<MSMEProfile | null>(null);
   const [activeJourneyId, setActiveJourneyId] = useState<string>(() => {
     // If real Firebase enabled, wait for user's own journey list
-    return FIREBASE_ENABLED ? '' : 'jrn_priya_001';
+    return FIREBASE_ENABLED ? '' : 'jrn_skillbridge_001';
   });
   const [selectedApplicationId, setSelectedApplicationIdState] = useState<string>(() => {
-    return FIREBASE_ENABLED ? '' : 'app_priya_001';
+    return FIREBASE_ENABLED ? '' : 'app_skillbridge_001';
   });
   const [selectedApplication, setSelectedApplication] = useState<ApplicationRecord | null>(null);
   const [journey, setJourney] = useState<JourneyRecord | null>(null);

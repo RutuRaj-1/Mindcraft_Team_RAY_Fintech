@@ -47,7 +47,7 @@ import confetti from 'canvas-confetti';
 export const CustomerDecisionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { activeJourneyId } = useAuth();
-  const journeyId = id || activeJourneyId || 'jrn_priya_001';
+  const journeyId = id || activeJourneyId || 'jrn_skillbridge_001';
 
   const [decision, setDecision] = useState<DecisionRecord | null>(null);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);

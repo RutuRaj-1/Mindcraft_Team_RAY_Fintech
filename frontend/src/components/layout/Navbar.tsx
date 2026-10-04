@@ -28,9 +28,9 @@ interface NavbarProps {
 }
 
 const CASES = [
-  { id: 'jrn_priya_001', label: 'Sharma Textiles', desc: 'High Trust', badge: 'green' },
-  { id: 'jrn_kavita_002', label: 'Kavita Electronics', desc: 'Conditional', badge: 'amber' },
-  { id: 'jrn_apex_003', label: 'Apex Trading', desc: '⚠ Fraud', badge: 'coral' },
+  { id: 'jrn_skillbridge_001', label: 'SkillBridge Enterprises', desc: 'Prime Tier', badge: 'green' },
+  { id: 'jrn_lifeline_002', label: 'Lifeline AI Healthcare', desc: 'Module 4 AI', badge: 'blue' },
+  { id: 'jrn_safeera_003', label: 'SafeEra Industrial', desc: 'Underwriting', badge: 'amber' },
 ];
 
 export const ROLE_CONFIG: Record<string, { 

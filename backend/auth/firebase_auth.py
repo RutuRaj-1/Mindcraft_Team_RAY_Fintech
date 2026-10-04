@@ -23,13 +23,40 @@ class AuthenticatedUser(BaseModel):
 
 # Demo user profiles for instantaneous hackathon switching across all 7 business roles + 1 SysAdmin
 DEMO_USERS: dict[str, AuthenticatedUser] = {
-    # 1. MSME Customer
+    # 1. MSME Customer — SkillBridge Enterprises (Ruturaj Bhome)
     "demo-customer": AuthenticatedUser(
-        uid="usr_priya_001",
-        email="priya.sharma@sharmatextiles.in",
-        name="Priya Sharma",
+        uid="usr_skillbridge_001",
+        email="bhomeruturaj17@gmail.com",
+        name="Ruturaj Bhome",
         role=UserRole.CUSTOMER,
-        business_id="biz_sharma_textiles",
+        business_id="biz_skillbridge_001",
+        delegated_limit_inr=0.0,
+        claims={"role": "CUSTOMER"}
+    ),
+    "demo-customer-skillbridge": AuthenticatedUser(
+        uid="usr_skillbridge_001",
+        email="bhomeruturaj17@gmail.com",
+        name="Ruturaj Bhome",
+        role=UserRole.CUSTOMER,
+        business_id="biz_skillbridge_001",
+        delegated_limit_inr=0.0,
+        claims={"role": "CUSTOMER"}
+    ),
+    "demo-customer-lifeline": AuthenticatedUser(
+        uid="usr_lifeline_002",
+        email="rashi88@gmail.com",
+        name="Rashi Kachwah",
+        role=UserRole.CUSTOMER,
+        business_id="biz_lifeline_002",
+        delegated_limit_inr=0.0,
+        claims={"role": "CUSTOMER"}
+    ),
+    "demo-customer-safeera": AuthenticatedUser(
+        uid="usr_safeera_003",
+        email="wakchaureaditya@gmail.com",
+        name="Aaditya Wakchaure",
+        role=UserRole.CUSTOMER,
+        business_id="biz_safeera_003",
         delegated_limit_inr=0.0,
         claims={"role": "CUSTOMER"}
     ),
@@ -89,7 +116,7 @@ DEMO_USERS: dict[str, AuthenticatedUser] = {
         delegated_limit_inr=0.0,
         claims={"role": "AUDIT_OFFICER"}
     ),
-    # 8. System Administrator (Master Infrastructure & Demonstration Controller)
+    # 8. System Administrator (Master Infrastructure & Controls Lead)
     "demo-admin": AuthenticatedUser(
         uid="usr_admin_master",
         email="bhomeruturaj@gmail.com",
@@ -105,7 +132,17 @@ DEMO_USERS: dict[str, AuthenticatedUser] = {
         role=UserRole.SYS_ADMIN,
         delegated_limit_inr=0.0,
         claims={"role": "SYS_ADMIN"}
-    )
+    ),
+    # Backward compatibility alias for test suite
+    "usr_priya_001": AuthenticatedUser(
+        uid="usr_skillbridge_001",
+        email="bhomeruturaj17@gmail.com",
+        name="Ruturaj Bhome",
+        role=UserRole.CUSTOMER,
+        business_id="biz_skillbridge_001",
+        delegated_limit_inr=0.0,
+        claims={"role": "CUSTOMER"}
+    ),
 }
 
 # Try initializing Firebase Admin if credentials are provided
@@ -183,12 +220,31 @@ def verify_token(token: str) -> AuthenticatedUser:
                 except ValueError:
                     user_role = UserRole.CUSTOMER
 
+            derived_name = decoded.get("name")
+            derived_biz = decoded.get("business_id")
+            if email == "bhomeruturaj@gmail.com":
+                derived_name = "Ruturaj Bhome"
+            elif email == "bhomeruturaj17@gmail.com":
+                derived_name = "Ruturaj Bhome"
+                derived_biz = "biz_skillbridge_001"
+                user_role = UserRole.CUSTOMER
+            elif email == "rashi88@gmail.com":
+                derived_name = "Rashi Kachwah"
+                derived_biz = "biz_lifeline_002"
+                user_role = UserRole.CUSTOMER
+            elif email == "wakchaureaditya@gmail.com":
+                derived_name = "Aaditya Wakchaure"
+                derived_biz = "biz_safeera_003"
+                user_role = UserRole.CUSTOMER
+            elif not derived_name:
+                derived_name = decoded.get("email", "User")
+
             return AuthenticatedUser(
                 uid=decoded.get("uid"),
                 email=decoded.get("email", ""),
-                name=decoded.get("name", "Ruturaj Bhome" if email == "bhomeruturaj@gmail.com" else decoded.get("email", "User")),
+                name=derived_name,
                 role=user_role,
-                business_id=decoded.get("business_id"),
+                business_id=derived_biz,
                 team_id=decoded.get("team_id"),
                 supervisor_id=decoded.get("supervisor_id"),
                 delegated_limit_inr=float(decoded.get("delegated_limit_inr", 0.0)),

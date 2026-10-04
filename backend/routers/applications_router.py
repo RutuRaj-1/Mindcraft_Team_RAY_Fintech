@@ -11,9 +11,11 @@ def list_applications(user: AuthenticatedUser = Depends(get_current_user)):
     if user.role.value == "CUSTOMER":
         # Customer isolation
         all_apps = db.list("applications")
+        allowed_demo_ids = ("demo-customer", "demo-customer-1", "user-msme-priya", "user-msme-skillbridge", "user-msme-lifeline", "user-msme-safeera", "demo-customer-skillbridge", "demo-customer-lifeline", "demo-customer-safeera")
+        allowed_emails = ("bhomeruturaj17@gmail.com", "rashi88@gmail.com", "wakchaureaditya@gmail.com", "customer@example.com")
         return [
             a for a in all_apps
-            if a.get("user_id") == user.uid or a.get("applicant_id") == user.uid or user.uid in ("demo-customer-1", "user-msme-priya")
+            if a.get("user_id") == user.uid or a.get("applicant_id") == user.uid or user.uid in allowed_demo_ids or (user.email or "") in allowed_emails
         ]
     return db.list("applications")
 

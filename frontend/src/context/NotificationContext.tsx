@@ -148,7 +148,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const getRole = (): UserRole =>
     (localStorage.getItem('finflow_role') as UserRole) || 'CUSTOMER';
   const getJourneyId = (): string =>
-    localStorage.getItem('finflow_journey') || 'jrn_priya_001';
+    localStorage.getItem('finflow_journey') || 'jrn_skillbridge_001';
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

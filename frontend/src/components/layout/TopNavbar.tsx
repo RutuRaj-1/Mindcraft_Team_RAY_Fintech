@@ -13,9 +13,9 @@ import { journeysApi } from '../../api/journeys';
 import { UserRole } from '../../types';
 
 export const BENCHMARK_CASES = [
-  { id: 'jrn_priya_001', label: 'Sharma Textiles', tier: 'Prime Tier (Approved)', badgeColor: 'var(--fin-green)' },
-  { id: 'jrn_kavita_002', label: 'Kavita Electronics', tier: 'Borderline (Conditional)', badgeColor: 'var(--fin-amber)' },
-  { id: 'jrn_apex_003', label: 'Apex Logistics', tier: 'Adverse Fraud (Review)', badgeColor: 'var(--fin-coral)' },
+  { id: 'jrn_skillbridge_001', label: 'SkillBridge Enterprises', tier: 'Prime Tier (Sanctioned)', badgeColor: 'var(--fin-green)' },
+  { id: 'jrn_lifeline_002', label: 'Lifeline AI Healthcare', tier: 'Module 4 (Explainable Decision)', badgeColor: 'var(--fin-blue)' },
+  { id: 'jrn_safeera_003', label: 'SafeEra Industrial', tier: 'Underwriting Review (Borderline)', badgeColor: 'var(--fin-amber)' },
 ];
 
 interface TopNavbarProps {

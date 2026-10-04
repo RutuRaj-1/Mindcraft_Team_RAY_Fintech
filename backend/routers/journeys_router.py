@@ -102,7 +102,9 @@ def get_journey_by_id(
     # Part 26: Application-Level Isolation
     if user.role.value == "CUSTOMER":
         applicant_id = journey.get("applicant_id") or journey.get("customer_id")
-        if applicant_id and applicant_id != user.uid and user.uid not in ("demo-customer-1", "user-msme-priya"):
+        allowed_demo_ids = ("demo-customer", "demo-customer-1", "user-msme-priya", "user-msme-skillbridge", "user-msme-lifeline", "user-msme-safeera", "demo-customer-skillbridge", "demo-customer-lifeline", "demo-customer-safeera")
+        allowed_emails = ("bhomeruturaj17@gmail.com", "rashi88@gmail.com", "wakchaureaditya@gmail.com", "customer@example.com")
+        if applicant_id and applicant_id != user.uid and user.uid not in allowed_demo_ids and (user.email or "") not in allowed_emails:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Customers are restricted to their own applications."
@@ -147,7 +149,9 @@ def get_journey_timeline(
     journey = JourneyOrchestrator.get_journey(journey_id)
     if user.role.value == "CUSTOMER":
         applicant_id = journey.get("applicant_id") or journey.get("customer_id")
-        if applicant_id and applicant_id != user.uid and user.uid not in ("demo-customer-1", "user-msme-priya"):
+        allowed_demo_ids = ("demo-customer", "demo-customer-1", "user-msme-priya", "user-msme-skillbridge", "user-msme-lifeline", "user-msme-safeera", "demo-customer-skillbridge", "demo-customer-lifeline", "demo-customer-safeera")
+        allowed_emails = ("bhomeruturaj17@gmail.com", "rashi88@gmail.com", "wakchaureaditya@gmail.com", "customer@example.com")
+        if applicant_id and applicant_id != user.uid and user.uid not in allowed_demo_ids and (user.email or "") not in allowed_emails:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Customers are restricted to their own applications."
