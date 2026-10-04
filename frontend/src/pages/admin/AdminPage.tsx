@@ -144,7 +144,6 @@ export const AdminPage: React.FC = () => {
   const { persona, emulateRoleAsAdmin, adminEmulatedRole, exitAdminEmulation } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'users';
 
   const [metrics, setMetrics] = useState<Record<string, any>>({});
   const [personas, setPersonas] = useState<any[]>([]);
@@ -208,7 +207,10 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const activeTab = searchParams.get('tab') || 'emulation';
+
   const tabs = [
+    { key: 'emulation', label: '7-Role Emulation Deck', icon: Sparkles },
     { key: 'users', label: 'User Management', icon: Users },
     { key: 'roles', label: 'Role Management', icon: Shield },
     { key: 'system_health', label: 'System Health', icon: Activity },
@@ -253,7 +255,15 @@ export const AdminPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={activeTab === 'emulation' ? 'brutal' : 'outline'}
+            size="sm"
+            onClick={() => handleTabChange('emulation')}
+            leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+          >
+            7-Role Emulation Hub
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -298,124 +308,6 @@ export const AdminPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Master Presentation & 7-Role Emulation Hub */}
-      <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-200 border border-indigo-700/50 flex items-center gap-1.5 shadow-xs">
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                Master Defense & Presentation Hub
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                End-to-End Module Explainer
-              </span>
-            </div>
-            <h2 className="text-xl font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Institutional 7-Role Emulation Deck
-            </h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Launch directly into any of the 7 business, risk, and audit roles from this master admin console. 
-              Explain each module end-to-end and use the top banner anytime to return here.
-            </p>
-          </div>
-
-          {adminEmulatedRole && (
-            <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-2xl border-2 border-amber-400">
-              <span className="text-xs font-bold text-amber-950">
-                Active Session: <strong className="underline">{adminEmulatedRole}</strong>
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exitAdminEmulation}
-              >
-                Exit to Master Admin
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {DEMO_ROLES.map((roleCard) => {
-            const isCurrentlyActive = adminEmulatedRole === roleCard.role;
-            const Icon = roleCard.icon;
-            return (
-              <div
-                key={roleCard.role}
-                className={`flex flex-col justify-between p-4 rounded-2xl border-2 transition-all ${
-                  isCurrentlyActive
-                    ? 'border-indigo-600 bg-indigo-50/50 shadow-[4px_4px_0px_#4338ca]'
-                    : 'border-[var(--brand-950)] bg-white hover:bg-[var(--surface-subtle)] shadow-[2px_2px_0px_#0A1F20]'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-xs shrink-0"
-                      style={{ backgroundColor: roleCard.badgeColor }}
-                    >
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <span
-                      className="text-[9px] font-black uppercase px-2 py-0.5 rounded border"
-                      style={{
-                        backgroundColor: roleCard.accentBg,
-                        color: roleCard.badgeColor,
-                        borderColor: roleCard.badgeColor + '50',
-                      }}
-                    >
-                      {roleCard.role}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-black text-[var(--brand-950)] leading-snug">
-                      {roleCard.name}
-                    </h3>
-                    <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
-                      {roleCard.title}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-muted)] font-medium">
-                      {roleCard.department}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
-                      Demonstrable Workflows
-                    </p>
-                    <ul className="space-y-1">
-                      {roleCard.capabilities.map((cap, idx) => (
-                        <li key={idx} className="text-[10px] text-[var(--brand-950)] flex items-start gap-1.5">
-                          <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
-                          <span className="leading-tight">{cap}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="pt-4 mt-3 border-t border-[var(--border)]">
-                  <Button
-                    variant={isCurrentlyActive ? 'outline' : 'brutal'}
-                    size="sm"
-                    className="w-full justify-between"
-                    onClick={() => {
-                      emulateRoleAsAdmin(roleCard.role);
-                      navigate(roleCard.route);
-                    }}
-                    rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                  >
-                    <span>{isCurrentlyActive ? 'Viewing (Open Desk)' : `Launch ${roleCard.role}`}</span>
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -448,13 +340,13 @@ export const AdminPage: React.FC = () => {
         />
       </div>
 
-      {/* 9 Navigation Workspace Tabs (Part 23) */}
+      {/* 10 Navigation Workspace Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[var(--border)]">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => handleTabChange(key)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === key
                 ? 'bg-[var(--brand-950)] text-white shadow-[2px_2px_0px_#0A1F20]'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-950)]'
@@ -466,7 +358,125 @@ export const AdminPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Tab Contents */}
+      {/* Tab Contents: 7-Role Emulation Hub */}
+      {activeTab === 'emulation' && (
+        <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-5 animate-fadeInUp">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-200 border border-indigo-700/50 flex items-center gap-1.5 shadow-xs">
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  Master Defense & Presentation Hub
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  End-to-End Module Explainer
+                </span>
+              </div>
+              <h2 className="text-xl font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Institutional 7-Role Emulation Deck
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Launch directly into any of the 7 business, risk, and audit roles from this master admin console. 
+                Explain each module end-to-end and use the top banner anytime to return here.
+              </p>
+            </div>
+
+            {adminEmulatedRole && (
+              <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-2xl border-2 border-amber-400">
+                <span className="text-xs font-bold text-amber-950">
+                  Active Session: <strong className="underline">{adminEmulatedRole}</strong>
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exitAdminEmulation}
+                >
+                  Exit to Master Admin
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {DEMO_ROLES.map((roleCard) => {
+              const isCurrentlyActive = adminEmulatedRole === roleCard.role;
+              const Icon = roleCard.icon;
+              return (
+                <div
+                  key={roleCard.role}
+                  className={`flex flex-col justify-between p-4 rounded-2xl border-2 transition-all ${
+                    isCurrentlyActive
+                      ? 'border-indigo-600 bg-indigo-50/50 shadow-[4px_4px_0px_#4338ca]'
+                      : 'border-[var(--brand-950)] bg-white hover:bg-[var(--surface-subtle)] shadow-[2px_2px_0px_#0A1F20]'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-xs shrink-0"
+                        style={{ backgroundColor: roleCard.badgeColor }}
+                      >
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <span
+                        className="text-[9px] font-black uppercase px-2 py-0.5 rounded border"
+                        style={{
+                          backgroundColor: roleCard.accentBg,
+                          color: roleCard.badgeColor,
+                          borderColor: roleCard.badgeColor + '50',
+                        }}
+                      >
+                        {roleCard.role}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-black text-[var(--brand-950)] leading-snug">
+                        {roleCard.name}
+                      </h3>
+                      <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
+                        {roleCard.title}
+                      </p>
+                      <p className="text-[10px] text-[var(--text-muted)] font-medium">
+                        {roleCard.department}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                      <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+                        Demonstrable Workflows
+                      </p>
+                      <ul className="space-y-1">
+                        {roleCard.capabilities.map((cap, idx) => (
+                          <li key={idx} className="text-[10px] text-[var(--brand-950)] flex items-start gap-1.5">
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                            <span className="leading-tight">{cap}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-3 border-t border-[var(--border)]">
+                    <Button
+                      variant={isCurrentlyActive ? 'outline' : 'brutal'}
+                      size="sm"
+                      className="w-full justify-between"
+                      onClick={() => {
+                        emulateRoleAsAdmin(roleCard.role);
+                        navigate(roleCard.route);
+                      }}
+                      rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                    >
+                      <span>{isCurrentlyActive ? 'Viewing (Open Desk)' : `Launch ${roleCard.role}`}</span>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {activeTab === 'users' && (
         <div className="p-6 bg-white border-2 border-[var(--brand-950)] rounded-3xl shadow-[4px_4px_0px_#0A1F20] space-y-4">
           <div className="flex items-center justify-between">

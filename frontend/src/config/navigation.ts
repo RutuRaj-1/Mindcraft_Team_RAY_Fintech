@@ -290,6 +290,7 @@ export const getRoleNavigation = (
         {
           title: 'Technical Infrastructure Custodian',
           items: [
+            { label: '7-Role Emulation Deck', path: '/admin?tab=emulation', iconName: 'Sparkles', requiredPermission: 'manage:roles' },
             { label: 'User Management', path: '/admin?tab=users', iconName: 'Users', requiredPermission: 'manage:users' },
             { label: 'Role Management', path: '/admin?tab=roles', iconName: 'Shield', requiredPermission: 'manage:roles' },
             { label: 'System Health', path: '/admin?tab=system_health', iconName: 'Activity', requiredPermission: 'view:system_health' },

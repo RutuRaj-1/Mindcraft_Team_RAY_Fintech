@@ -26,6 +26,8 @@ AUDIT_READ_ROLES = [
     UserRole.AUDIT_OFFICER,
     UserRole.RISK_MANAGER,
     UserRole.CREDIT_APPROVER,
+    UserRole.SYS_ADMIN,
+    UserRole.ADMIN,
 ]
 
 class CreateFindingRequest(BaseModel):

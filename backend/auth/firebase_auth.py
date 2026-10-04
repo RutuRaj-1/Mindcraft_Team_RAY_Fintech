@@ -246,15 +246,15 @@ def require_role(allowed_roles: List[UserRole]) -> Callable:
         if user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required role in {[r.value for r in allowed_roles]}, but user has role {user.role.value}"
+                detail=f"Access denied: role '{user.role.value}' not in allowed roles {[r.value for r in allowed_roles]}"
             )
         return user
     return role_checker
 
 # Explicit role dependencies enforcing strict Separation of Duties
 def require_customer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces CUSTOMER role access (Audit Officer can view in read-only mode)."""
-    if user.role not in [UserRole.CUSTOMER, UserRole.AUDIT_OFFICER]:
+    """Enforces CUSTOMER role access (SysAdmin and Audit Officer can view in inspection mode)."""
+    if user.role not in [UserRole.CUSTOMER, UserRole.AUDIT_OFFICER, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Customer privileges required, but current role is {user.role.value}"
@@ -262,8 +262,8 @@ def require_customer(user: AuthenticatedUser = Depends(get_current_user)) -> Aut
     return user
 
 def require_rm(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Relationship Manager (RM) or RM Supervisor access."""
-    if user.role not in [UserRole.RM, UserRole.RM_SUPERVISOR]:
+    """Enforces Relationship Manager (RM), RM Supervisor, or SysAdmin inspection access."""
+    if user.role not in [UserRole.RM, UserRole.RM_SUPERVISOR, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Relationship Manager privileges required, but current role is {user.role.value}"
@@ -271,8 +271,8 @@ def require_rm(user: AuthenticatedUser = Depends(get_current_user)) -> Authentic
     return user
 
 def require_rm_supervisor(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces RM Supervisor privileges for team reassignments and ops exceptions."""
-    if user.role != UserRole.RM_SUPERVISOR:
+    """Enforces RM Supervisor or SysAdmin inspection privileges."""
+    if user.role not in [UserRole.RM_SUPERVISOR, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. RM Supervisor privileges required, but current role is {user.role.value}"
@@ -280,8 +280,8 @@ def require_rm_supervisor(user: AuthenticatedUser = Depends(get_current_user)) -
     return user
 
 def require_risk_officer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Risk & Compliance Officer or Senior Risk Manager access."""
-    if user.role not in [UserRole.RISK_OFFICER, UserRole.RISK_MANAGER, UserRole.AUDIT_OFFICER]:
+    """Enforces Risk & Compliance Officer, Senior Risk Manager, or SysAdmin inspection access."""
+    if user.role not in [UserRole.RISK_OFFICER, UserRole.RISK_MANAGER, UserRole.AUDIT_OFFICER, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Risk Officer privileges required, but current role is {user.role.value}"
@@ -289,8 +289,8 @@ def require_risk_officer(user: AuthenticatedUser = Depends(get_current_user)) ->
     return user
 
 def require_risk_manager(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Senior Risk Manager or Credit Approver access."""
-    if user.role not in [UserRole.RISK_MANAGER, UserRole.CREDIT_APPROVER]:
+    """Enforces Senior Risk Manager, Credit Approver, or SysAdmin inspection access."""
+    if user.role not in [UserRole.RISK_MANAGER, UserRole.CREDIT_APPROVER, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Risk Manager privileges required, but current role is {user.role.value}"
@@ -298,8 +298,8 @@ def require_risk_manager(user: AuthenticatedUser = Depends(get_current_user)) ->
     return user
 
 def require_credit_approver(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces final Credit Approver / Committee authority."""
-    if user.role != UserRole.CREDIT_APPROVER:
+    """Enforces Credit Approver / Committee authority or SysAdmin presentation access."""
+    if user.role not in [UserRole.CREDIT_APPROVER, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Credit Approver privileges required, but current role is {user.role.value}"
@@ -307,8 +307,8 @@ def require_credit_approver(user: AuthenticatedUser = Depends(get_current_user))
     return user
 
 def require_audit_officer(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    """Enforces Independent Audit & Governance Officer access."""
-    if user.role != UserRole.AUDIT_OFFICER:
+    """Enforces Independent Audit & Governance Officer or SysAdmin inspection access."""
+    if user.role not in [UserRole.AUDIT_OFFICER, UserRole.SYS_ADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. Independent Audit privileges required, but current role is {user.role.value}"

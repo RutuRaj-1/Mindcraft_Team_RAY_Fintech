@@ -20,6 +20,8 @@ INSTITUTIONAL_STAFF_ROLES = [
     UserRole.RISK_MANAGER,
     UserRole.CREDIT_APPROVER,
     UserRole.AUDIT_OFFICER,
+    UserRole.SYS_ADMIN,
+    UserRole.ADMIN,
 ]
 
 OVERRIDE_ROLES = [

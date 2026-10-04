@@ -37,6 +37,8 @@ INSTITUTIONAL_READ_ROLES = [
     UserRole.RISK_MANAGER,
     UserRole.CREDIT_APPROVER,
     UserRole.AUDIT_OFFICER,
+    UserRole.SYS_ADMIN,
+    UserRole.ADMIN,
 ]
 
 REVIEW_ACTION_ROLES = [
