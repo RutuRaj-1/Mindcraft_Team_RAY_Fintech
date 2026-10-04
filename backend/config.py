@@ -14,12 +14,12 @@ class Settings(BaseSettings):
     DEMO_MODE: bool = True
 
     # Firebase Settings
-    FIREBASE_PROJECT_ID: str = "finflow-ai-demo"
+    FIREBASE_PROJECT_ID: str = "finflow-ray"
     FIREBASE_PRIVATE_KEY_ID: str = ""
     FIREBASE_PRIVATE_KEY: str = ""
     FIREBASE_CLIENT_EMAIL: str = ""
     FIREBASE_CLIENT_ID: str = ""
-    FIREBASE_STORAGE_BUCKET: str = "finflow-ai-demo.appspot.com"
+    FIREBASE_STORAGE_BUCKET: str = "finflow-ray.firebasestorage.app"
     FIREBASE_CREDENTIALS_PATH: str = ""
     FIRESTORE_EMULATOR_HOST: Optional[str] = None
 

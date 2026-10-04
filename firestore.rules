@@ -110,6 +110,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /msme_profiles/{userId} {
+      allow read: if isUser(userId) || isInstitutionalStaff() || isSysAdmin();
+      allow create, update: if isUser(userId) || isSysAdmin();
+      allow delete: if false;
+    }
+
+    match /document_vault/{docId} {
+      allow read: if (isAuthenticated() && (
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid
+      )) || isInstitutionalStaff() || isSysAdmin();
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        request.resource.data.get('userId', '') == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid
+      );
+      allow delete: if (isAuthenticated() && (
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid
+      )) || isSysAdmin();
+    }
+
     // =========================================================================
     // 3. APPLICATIONS & JOURNEYS
     // =========================================================================

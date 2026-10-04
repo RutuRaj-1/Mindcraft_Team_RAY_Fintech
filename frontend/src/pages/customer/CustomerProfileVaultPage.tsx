@@ -3,6 +3,16 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api';
 import { MSMEProfile, VaultDocument } from '../../types';
+import {
+  firestoreDb,
+  doc,
+  setDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  deleteDoc,
+} from '../../api/firebase';
 import { Button } from '../../components/ui/Button';
 import {
   Building2,
@@ -164,12 +174,32 @@ export const CustomerProfileVaultPage: React.FC = () => {
     }
   }, [msmeProfile, firebaseUser, user]);
 
-  // Load vault documents
+  // Load vault documents with Cloud Firestore fallback
   const loadVault = async () => {
     setIsLoadingVault(true);
     setVaultError(null);
     try {
-      const docs = await api.listVaultDocuments();
+      let docs: VaultDocument[] = [];
+      try {
+        docs = await api.listVaultDocuments();
+      } catch (e) {
+        console.warn('Backend listVaultDocuments error, trying direct Firestore:', e);
+      }
+
+      if ((!docs || docs.length === 0) && firebaseUser) {
+        try {
+          const q = query(
+            collection(firestoreDb, 'document_vault'),
+            where('user_id', '==', firebaseUser.uid)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            docs = snap.docs.map((d) => d.data() as VaultDocument);
+          }
+        } catch (fbErr) {
+          console.warn('Firestore load vault fallback error:', fbErr);
+        }
+      }
       setVaultDocs(docs || []);
     } catch (err: any) {
       console.warn('Failed to load vault documents:', err);
@@ -211,7 +241,22 @@ export const CustomerProfileVaultPage: React.FC = () => {
     setIsUploading(true);
     setVaultError(null);
     try {
-      await api.uploadVaultDocument(selectedFile, uploadDocType);
+      const docRecord = await api.uploadVaultDocument(selectedFile, uploadDocType);
+      if (firebaseUser && docRecord) {
+        try {
+          await setDoc(
+            doc(firestoreDb, 'document_vault', docRecord.doc_id),
+            {
+              ...docRecord,
+              user_id: firebaseUser.uid,
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (fbErr) {
+          console.warn('Firestore vault sync error:', fbErr);
+        }
+      }
       setIsUploadModalOpen(false);
       setSelectedFile(null);
       await loadVault();
@@ -236,7 +281,22 @@ export const CustomerProfileVaultPage: React.FC = () => {
 
     setIsLoadingVault(true);
     try {
-      await api.updateVaultDocument(replacingDocId, file);
+      const updated = await api.updateVaultDocument(replacingDocId, file);
+      if (firebaseUser && updated) {
+        try {
+          await setDoc(
+            doc(firestoreDb, 'document_vault', replacingDocId),
+            {
+              ...updated,
+              user_id: firebaseUser.uid,
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (fbErr) {
+          console.warn('Firestore vault update error:', fbErr);
+        }
+      }
       await loadVault();
     } catch (err: any) {
       setVaultError(err?.message || 'Failed to update document with new version.');
@@ -253,6 +313,13 @@ export const CustomerProfileVaultPage: React.FC = () => {
     setIsLoadingVault(true);
     try {
       await api.deleteVaultDocument(docId);
+      if (firebaseUser) {
+        try {
+          await deleteDoc(doc(firestoreDb, 'document_vault', docId));
+        } catch (fbErr) {
+          console.warn('Firestore vault delete error:', fbErr);
+        }
+      }
       await loadVault();
     } catch (err: any) {
       setVaultError(err?.message || 'Failed to delete vault document.');

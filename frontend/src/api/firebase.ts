@@ -21,7 +21,18 @@ import {
   browserLocalPersistence,
   connectAuthEmulator,
 } from 'firebase/auth';
-import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import {
+  getFirestore,
+  Firestore,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  deleteDoc,
+} from 'firebase/firestore';
 
 // ── Firebase Configuration ──────────────────────────────────────────────────
 export const firebaseConfig = {
@@ -73,6 +84,11 @@ export {
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  deleteDoc,
   getAnalytics,
 };
 

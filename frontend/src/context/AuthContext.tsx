@@ -73,6 +73,7 @@ import {
   sendPasswordResetEmail,
   doc,
   setDoc,
+  getDoc,
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser,
@@ -320,19 +321,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadMsmeProfile = useCallback(async () => {
     try {
       const profile = await api.getMSMEProfile();
-      if (profile) {
+      if (profile && (profile.business_name || profile.promoter_name)) {
         setMsmeProfile(profile);
+        return;
       }
     } catch {
       // not yet created or non-customer
     }
-  }, []);
+
+    if (firebaseUser) {
+      try {
+        const snap = await getDoc(doc(firestoreDb, 'msme_profiles', firebaseUser.uid));
+        if (snap.exists()) {
+          setMsmeProfile(snap.data() as MSMEProfile);
+        }
+      } catch (err) {
+        console.warn('Direct Firestore profile fetch error:', err);
+      }
+    }
+  }, [firebaseUser]);
 
   const updateMsmeProfileState = useCallback(async (data: Partial<MSMEProfile>) => {
-    const updated = await api.updateMSMEProfile(data);
-    setMsmeProfile(updated);
-    return updated;
-  }, []);
+    let updated: MSMEProfile | null = null;
+    try {
+      updated = await api.updateMSMEProfile(data);
+    } catch (apiErr) {
+      console.warn('API updateMSMEProfile failed, falling back to direct Cloud Firestore:', apiErr);
+    }
+
+    if (firebaseUser) {
+      try {
+        const cleanPayload = {
+          ...data,
+          user_id: firebaseUser.uid,
+          email: firebaseUser.email || data.email,
+          updated_at: new Date().toISOString(),
+        };
+        await setDoc(doc(firestoreDb, 'msme_profiles', firebaseUser.uid), cleanPayload, { merge: true });
+        await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), {
+          business_name: data.business_name,
+          promoter_name: data.promoter_name,
+          phone: data.phone,
+          pan: data.pan,
+          gstin: data.gstin,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (fbErr) {
+        console.warn('Direct Cloud Firestore setDoc error:', fbErr);
+      }
+    }
+
+    const finalProfile = updated || (data as MSMEProfile);
+    setMsmeProfile(finalProfile);
+    return finalProfile;
+  }, [firebaseUser]);
 
   // ── Firebase Auth listener ─────────────────────────────────────────────────
   useEffect(() => {
