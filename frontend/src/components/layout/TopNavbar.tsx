@@ -100,7 +100,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   onToggleMobileNav,
 }) => {
-  const { activeJourneyId, setActiveJourneyId, role, persona } = useAuth();
+  const { activeJourneyId, setActiveJourneyId, role, persona, msmeProfile } = useAuth();
   const { unreadCount, openDrawer } = useNotifications();
 
   const [cases, setCases] = React.useState<{ id: string; label: string; tier: string }[]>([]);
@@ -108,6 +108,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   const pickerRef = React.useRef<HTMLDivElement>(null);
 
   const ctx = ROLE_CONTEXT_CONFIG[role] || ROLE_CONTEXT_CONFIG.CUSTOMER;
+  const customerEnterprise = msmeProfile?.business_name || (role === 'CUSTOMER' ? persona?.organization : '') || 'SkillBridge Enterprises';
 
   React.useEffect(() => {
     let isMounted = true;
@@ -115,13 +116,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       .then((res: any[]) => {
         if (!isMounted) return;
         if (res && res.length > 0) {
-          const mapped = res.map((j) => ({
-            id: j.journey_id,
-            label: j.intent?.business_name || j.business_name || j.journey_id,
-            tier: j.current_stage
-              ? j.current_stage.replace(/_/g, ' ')
-              : (j.status || 'ACTIVE'),
-          }));
+          const mapped = res.map((j) => {
+            const rawLabel = j.intent?.business_name || j.business_name || j.journey_id;
+            const isTestName = rawLabel.includes('GreenTech') || rawLabel.toLowerCase().includes('sample');
+            const label = (role === 'CUSTOMER' && (isTestName || customerEnterprise))
+              ? (!isTestName && rawLabel ? rawLabel : customerEnterprise)
+              : rawLabel;
+            return {
+              id: j.journey_id,
+              label,
+              tier: j.current_stage
+                ? j.current_stage.replace(/_/g, ' ')
+                : (j.status || 'ACTIVE'),
+            };
+          });
           setCases(mapped);
         } else if (role !== 'CUSTOMER') {
           // For internal/demo roles, fall back to benchmark cases when no real data
@@ -134,7 +142,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         if (role !== 'CUSTOMER') setCases(BENCHMARK_CASES);
       });
     return () => { isMounted = false; };
-  }, [role]);
+  }, [role, customerEnterprise]);
 
   // Close picker on outside click
   React.useEffect(() => {
@@ -147,7 +155,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const activeCase = cases.find((c) => c.id === activeJourneyId) || cases[0];
+  const activeCase = React.useMemo(() => {
+    if (role === 'CUSTOMER') {
+      const match = cases.find((c) => c.id === activeJourneyId) || cases[0];
+      if (match) {
+        const isTestName = match.label.includes('GreenTech') || match.label.toLowerCase().includes('sample');
+        return {
+          ...match,
+          label: isTestName ? customerEnterprise : match.label || customerEnterprise,
+        };
+      }
+      return { id: activeJourneyId || 'active_case', label: customerEnterprise, tier: 'Active Application' };
+    }
+    return cases.find((c) => c.id === activeJourneyId) || cases[0];
+  }, [cases, activeJourneyId, role, customerEnterprise]);
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b-2 border-[var(--brand-950)] px-4 sm:px-6 h-14 flex items-center justify-between gap-4 shadow-sm">
@@ -194,23 +215,28 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               {cases.length === 0 && role === 'CUSTOMER' && (
                 <p className="text-xs text-[var(--text-muted)] px-2 py-3 text-center">No applications yet. Start a new application to begin.</p>
               )}
-              {cases.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveJourneyId(c.id);
-                    setShowPicker(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    c.id === activeJourneyId
-                      ? 'bg-[var(--brand-50)] text-[var(--brand-900)] border border-[var(--brand-200)]'
-                      : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-transparent'
-                  }`}
-                >
-                  <span className="font-bold">{c.label}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[100px]">{c.tier}</span>
-                </button>
-              ))}
+              {cases.map((c) => {
+                const displayLabel = role === 'CUSTOMER' && (c.label.includes('GreenTech') || !c.label)
+                  ? customerEnterprise
+                  : c.label;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setActiveJourneyId(c.id);
+                      setShowPicker(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      c.id === activeJourneyId
+                        ? 'bg-[var(--brand-50)] text-[var(--brand-900)] border border-[var(--brand-200)]'
+                        : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-transparent'
+                    }`}
+                  >
+                    <span className="font-bold">{displayLabel}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[100px]">{c.tier}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

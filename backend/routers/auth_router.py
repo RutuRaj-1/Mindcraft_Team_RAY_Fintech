@@ -185,39 +185,78 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
     profile = db.get("msme_profiles", user.uid)
     if not profile:
         email = user.email or "borrower@enterprise.com"
-        derived_name = user.name or email.split("@")[0].replace(".", " ").title()
+        is_ruturaj = "bhomeruturaj" in email.lower() or "ruturaj" in (user.name or "").lower()
+        derived_name = user.name or ("Ruturaj Bhome" if is_ruturaj else email.split("@")[0].replace(".", " ").title())
+        biz_name = "SkillBridge Enterprises" if is_ruturaj else f"{derived_name} Enterprises"
         profile = {
             "user_id": user.uid,
             "email": email,
             "promoter_name": derived_name,
-            "business_name": f"{derived_name} Enterprises",
+            "business_name": biz_name,
             "legal_entity_type": "PRIVATE_LIMITED",
-            "phone": "+91 98765 43210",
-            "pan": "",
-            "gstin": "",
-            "industry_sector": "Manufacturing & Services",
-            "vintage_months": 24,
-            "annual_turnover": 5000000.0,
+            "phone": "8468812201" if is_ruturaj else "+91 98765 43210",
+            "pan": "SKLBR1234A" if is_ruturaj else "",
+            "gstin": "27SKLBR1234A1Z5" if is_ruturaj else "",
+            "industry_sector": "Information Technology & Software" if is_ruturaj else "Manufacturing & Services",
+            "vintage_months": 48 if is_ruturaj else 24,
+            "annual_turnover": 30000000.0 if is_ruturaj else 5000000.0,
             "registered_address": "",
-            "city": "",
-            "pincode": "",
-            "is_profile_complete": False,
+            "city": "Mumbai",
+            "pincode": "400001",
+            "is_profile_complete": bool(is_ruturaj),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         db.set("msme_profiles", user.uid, profile)
+    else:
+        # Guarantee registered account email is synchronized (never keep stale demo bank employee email)
+        if user.email and (
+            not profile.get("email")
+            or profile.get("email").endswith("@finflowbank.com")
+            or profile.get("email") in ("customer@example.com", "borrower@enterprise.com")
+        ):
+            profile["email"] = user.email
+            db.set("msme_profiles", user.uid, profile)
+        if "bhomeruturaj" in (user.email or "").lower() and not profile.get("business_name"):
+            profile["business_name"] = "SkillBridge Enterprises"
+            profile["promoter_name"] = "Ruturaj Bhome"
+            db.set("msme_profiles", user.uid, profile)
     return profile
 
 @router.put("/profile")
 def update_user_msme_profile(data: MSMEProfileUpdateRequest, user: AuthenticatedUser = Depends(get_current_user)):
-    """Updates the MSME business profile for the authenticated user."""
+    """Updates the MSME business profile for the authenticated user and syncs related applications."""
     from backend.database.firestore_client import db
     from datetime import datetime, timezone
     existing = db.get("msme_profiles", user.uid) or {}
     updated = {**existing, **{k: v for k, v in data.model_dump().items() if v is not None}}
     updated["user_id"] = user.uid
-    updated["email"] = data.email or user.email or existing.get("email", "")
+
+    # Validate email to ensure it does not revert to bank staff
+    clean_email = data.email
+    if clean_email and clean_email.endswith("@finflowbank.com"):
+        clean_email = user.email
+    updated["email"] = clean_email or user.email or existing.get("email", "")
     updated["is_profile_complete"] = bool(updated.get("business_name") and updated.get("promoter_name"))
     updated["updated_at"] = datetime.now(timezone.utc).isoformat()
     db.set("msme_profiles", user.uid, updated)
+
+    # Cascade business name updates to all user journeys and applications
+    new_biz = updated.get("business_name")
+    if new_biz:
+        try:
+            user_journeys = db.list("journeys", filters={"applicant_id": user.uid})
+            for j in user_journeys:
+                if "intent" in j and isinstance(j["intent"], dict):
+                    j["intent"]["business_name"] = new_biz
+                j["business_name"] = new_biz
+                db.set("journeys", j["journey_id"], j)
+
+            user_apps = db.list("applications", filters={"user_id": user.uid})
+            for a in user_apps:
+                a["business_name"] = new_biz
+                db.set("applications", a["application_id"], a)
+        except Exception:
+            pass
+
     return updated
 

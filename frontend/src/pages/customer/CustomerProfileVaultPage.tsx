@@ -112,16 +112,31 @@ export const CustomerProfileVaultPage: React.FC = () => {
 
   // Sync profileForm from msmeProfile or defaults
   useEffect(() => {
+    const registeredAccountEmail =
+      firebaseUser?.email ||
+      (user?.email && !user.email.endsWith('@finflowbank.com') ? user.email : '') ||
+      '';
+
+    const cleanMsmeEmail =
+      msmeProfile?.email &&
+      !msmeProfile.email.endsWith('@finflowbank.com') &&
+      msmeProfile.email !== 'customer@example.com' &&
+      msmeProfile.email !== 'borrower@enterprise.com'
+        ? msmeProfile.email
+        : '';
+
+    const effectiveEmail = registeredAccountEmail || cleanMsmeEmail || '';
+
     if (msmeProfile) {
       setProfileForm({
         business_name: msmeProfile.business_name || '',
         entity_type: msmeProfile.entity_type || 'Private Limited Company (Pvt. Ltd.)',
-        promoter_name: msmeProfile.promoter_name || user.name || '',
+        promoter_name: msmeProfile.promoter_name || user.name || firebaseUser?.displayName || '',
         phone: msmeProfile.phone || '',
-        email: msmeProfile.email || firebaseUser?.email || user.email || '',
+        email: effectiveEmail,
         pan: msmeProfile.pan || '',
         gstin: msmeProfile.gstin || '',
-        industry_sector: msmeProfile.industry_sector || 'Textiles & Apparel',
+        industry_sector: msmeProfile.industry_sector || 'Information Technology & Software',
         annual_turnover: msmeProfile.annual_turnover || 0,
         vintage_months: msmeProfile.vintage_months || 36,
         registered_address: msmeProfile.registered_address || '',
@@ -131,7 +146,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
     } else if (firebaseUser || user) {
       setProfileForm((prev) => ({
         ...prev,
-        email: firebaseUser?.email || user.email || prev.email,
+        email: effectiveEmail || prev.email,
         promoter_name: user.name || firebaseUser?.displayName || prev.promoter_name,
       }));
     }

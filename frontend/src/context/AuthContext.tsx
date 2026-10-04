@@ -361,8 +361,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (journeysList && journeysList.length > 0) {
-            setActiveJourneyId(journeysList[0].journey_id);
-            setSelectedApplicationIdState(journeysList[0].application_id || journeysList[0].journey_id);
+            const biz = (profileRes?.business_name || '').toLowerCase();
+            const matchingJourney = biz
+              ? journeysList.find((j: any) =>
+                  (j.intent?.business_name || j.business_name || '').toLowerCase().includes(biz) ||
+                  biz.includes((j.intent?.business_name || j.business_name || '').toLowerCase())
+                )
+              : null;
+            const target = matchingJourney || journeysList[0];
+            setActiveJourneyId(target.journey_id);
+            setSelectedApplicationIdState(target.application_id || target.journey_id);
           } else {
             setActiveJourneyId('');
             setSelectedApplicationIdState('');
@@ -390,7 +398,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const persona: PersonaProfile = React.useMemo(() => {
     if (role === 'CUSTOMER' && (firebaseUser || customDemoUser || msmeProfile)) {
-      const email = firebaseUser?.email || customDemoUser?.email || defaultPersona.email;
+      const email =
+        firebaseUser?.email ||
+        (customDemoUser?.email && !customDemoUser.email.endsWith('@finflowbank.com') ? customDemoUser.email : '') ||
+        (msmeProfile?.email && !msmeProfile.email.endsWith('@finflowbank.com') ? msmeProfile.email : '') ||
+        defaultPersona.email;
       const emailPrefix = email ? email.split('@')[0].replace(/[._]/g, ' ') : '';
       const name =
         msmeProfile?.promoter_name ||
@@ -400,7 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const organization =
         msmeProfile?.business_name ||
-        (msmeProfile?.entity_type ? `${msmeProfile.entity_type} Enterprise` : 'My MSME Enterprise');
+        (msmeProfile?.entity_type ? `${msmeProfile.entity_type} Enterprise` : 'SkillBridge Enterprises');
 
       const initials = name
         .split(' ')
