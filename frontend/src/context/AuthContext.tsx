@@ -240,7 +240,7 @@ export interface AuthContextType {
   permissions: Record<string, boolean>;
   setSelectedApplicationId: (id: string) => void;
   refreshAppState: () => Promise<void>;
-  loadMsmeProfile: () => Promise<void>;
+  loadMsmeProfile: (targetJourneyId?: string) => Promise<void>;
   updateMsmeProfileState: (data: Partial<MSMEProfile>) => Promise<MSMEProfile>;
 
   /** Sign in with email/password (Firebase mode or demo fallback) */
@@ -322,9 +322,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const tokenRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadMsmeProfile = useCallback(async () => {
+  const loadMsmeProfile = useCallback(async (targetJourneyId?: string) => {
+    const jrnId = targetJourneyId || activeJourneyId;
     try {
-      const profile = await api.getMSMEProfile();
+      const profile = await api.getMSMEProfile(jrnId);
       if (profile && (profile.business_name || profile.promoter_name)) {
         setMsmeProfile(profile);
         return;
@@ -343,7 +344,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Direct Firestore profile fetch error:', err);
       }
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, activeJourneyId]);
+
+  useEffect(() => {
+    if (activeJourneyId) {
+      loadMsmeProfile(activeJourneyId);
+    }
+  }, [activeJourneyId, loadMsmeProfile]);
 
   const updateMsmeProfileState = useCallback(async (data: Partial<MSMEProfile>) => {
     let updated: MSMEProfile | null = null;
@@ -485,22 +492,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = FIREBASE_ENABLED ? Boolean(firebaseUser) : demoAuthenticated;
 
   const persona: PersonaProfile = React.useMemo(() => {
-    if (role === 'CUSTOMER' && (firebaseUser || customDemoUser || msmeProfile)) {
-      const email =
-        firebaseUser?.email ||
-        (customDemoUser?.email && !customDemoUser.email.endsWith('@finflowbank.com') ? customDemoUser.email : '') ||
-        (msmeProfile?.email && !msmeProfile.email.endsWith('@finflowbank.com') ? msmeProfile.email : '') ||
-        defaultPersona.email;
-      const emailPrefix = email ? email.split('@')[0].replace(/[._]/g, ' ') : '';
-      const name =
-        msmeProfile?.promoter_name ||
-        firebaseUser?.displayName ||
-        customDemoUser?.name ||
-        (emailPrefix ? emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1) : defaultPersona.name);
+    if (role === 'CUSTOMER') {
+      const activeJrn = (activeJourneyId || '').toLowerCase();
+      const isLifeline = activeJrn.includes('lifeline');
+      const isSafeera = activeJrn.includes('safeera');
 
-      const organization =
-        msmeProfile?.business_name ||
-        (msmeProfile?.entity_type ? `${msmeProfile.entity_type} Enterprise` : 'SkillBridge Enterprises');
+      const defaultBiz = isLifeline
+        ? 'Lifeline AI Healthcare Technologies Pvt. Ltd.'
+        : isSafeera
+        ? 'SafeEra Industrial Solutions Pvt. Ltd.'
+        : 'SkillBridge Learning Solutions Pvt. Ltd.';
+
+      const defaultPromoter = isLifeline
+        ? 'Rashi Kachwah'
+        : isSafeera
+        ? 'Aaditya Wakchaure'
+        : 'Ruturaj Bhome';
+
+      const defaultEmail = isLifeline
+        ? 'rashi88@gmail.com'
+        : isSafeera
+        ? 'wakchaureaditya@gmail.com'
+        : 'bhomeruturaj17@gmail.com';
+
+      const defaultInitials = isLifeline ? 'RK' : isSafeera ? 'AW' : 'RB';
+      const defaultBadge = isLifeline ? 'var(--fin-blue)' : isSafeera ? 'var(--fin-amber)' : 'var(--fin-green)';
+
+      const profileMatches = msmeProfile && (
+        (isLifeline && (msmeProfile.business_name?.toLowerCase().includes('lifeline') || msmeProfile.email?.includes('rashi'))) ||
+        (isSafeera && (msmeProfile.business_name?.toLowerCase().includes('safeera') || msmeProfile.email?.includes('aditya') || msmeProfile.email?.includes('wakchaure'))) ||
+        (!isLifeline && !isSafeera && (msmeProfile.business_name?.toLowerCase().includes('skillbridge') || msmeProfile.email?.includes('bhomeruturaj')))
+      );
+
+      const email = profileMatches && msmeProfile?.email ? msmeProfile.email : defaultEmail;
+      const name = profileMatches && msmeProfile?.promoter_name ? msmeProfile.promoter_name : defaultPromoter;
+      const organization = profileMatches && msmeProfile?.business_name ? msmeProfile.business_name : defaultBiz;
 
       const initials = name
         .split(' ')
@@ -508,18 +534,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .map((p) => p[0])
         .join('')
         .slice(0, 2)
-        .toUpperCase() || 'CU';
+        .toUpperCase() || defaultInitials;
 
       return {
         role: 'CUSTOMER',
         name,
-        title: msmeProfile?.entity_type ? `${msmeProfile.entity_type} Owner` : 'Authorized Signatory',
+        title: msmeProfile?.entity_type ? `${msmeProfile.entity_type} Signatory` : 'Authorized Signatory',
         email,
         organization,
         avatarInitials: initials,
-        badgeColor: 'var(--fin-green)',
+        badgeColor: defaultBadge,
         defaultRoute: '/customer',
-        defaultJourneyId: activeJourneyId || '',
+        defaultJourneyId: activeJourneyId || 'jrn_skillbridge_001',
       };
     }
     return defaultPersona;

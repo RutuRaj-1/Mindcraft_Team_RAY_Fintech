@@ -63,8 +63,8 @@ export const documentsApi = {
     ),
 
   // -- MSME Reusable Document Vault --
-  listVaultDocuments: () =>
-    http.get<import('../types').VaultDocument[]>('/documents/vault'),
+  listVaultDocuments: (journeyId?: string) =>
+    http.get<import('../types').VaultDocument[]>(`/documents/vault${journeyId ? `?journey_id=${encodeURIComponent(journeyId)}` : ''}`),
 
   uploadVaultDocument: (file: File, docType: string, category?: string) => {
     const formData = new FormData();

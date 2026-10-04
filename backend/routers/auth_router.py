@@ -178,21 +178,26 @@ class MSMEProfileUpdateRequest(BaseModel):
     pincode: Optional[str] = None
 
 @router.get("/profile")
-def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
-    """Returns the MSME profile for the authenticated user, or a clean editable profile."""
+def get_user_msme_profile(journey_id: Optional[str] = None, user: AuthenticatedUser = Depends(get_current_user)):
+    """Returns the MSME profile for the authenticated user, or for the active journey context."""
     from backend.database.firestore_client import db
     from datetime import datetime, timezone
-    profile = db.get("msme_profiles", user.uid)
+    
     email = (user.email or "").lower()
+    jrn = (journey_id or "").lower()
 
-    is_lifeline = "rashi" in email or user.uid == "usr_lifeline_002"
-    is_safeera = "aditya" in email or "wakchaure" in email or user.uid == "usr_safeera_003"
+    is_lifeline = "lifeline" in jrn or "rashi" in email or user.uid == "usr_lifeline_002"
+    is_safeera = "safeera" in jrn or "aditya" in email or "wakchaure" in email or user.uid == "usr_safeera_003"
     is_skillbridge = not is_lifeline and not is_safeera
+
+    # Check if a seeded profile already exists for this entity
+    target_key = "usr_lifeline_002" if is_lifeline else ("usr_safeera_003" if is_safeera else "usr_skillbridge_001")
+    profile = db.get("msme_profiles", target_key) or db.get("msme_profiles", user.uid)
 
     if not profile or profile.get("business_name") in ("Rohan Mehta Enterprises", "borrower@enterprise.com Enterprises", "Sharma Textiles Private Limited"):
         if is_lifeline:
             profile = {
-                "user_id": user.uid,
+                "user_id": "usr_lifeline_002",
                 "email": "rashi88@gmail.com",
                 "promoter_name": "Rashi Kachwah",
                 "business_name": "Lifeline AI Healthcare Technologies Pvt. Ltd.",
@@ -211,7 +216,7 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
             }
         elif is_safeera:
             profile = {
-                "user_id": user.uid,
+                "user_id": "usr_safeera_003",
                 "email": "wakchaureaditya@gmail.com",
                 "promoter_name": "Aaditya Wakchaure",
                 "business_name": "SafeEra Industrial Solutions Pvt. Ltd.",
@@ -230,7 +235,7 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
             }
         else:
             profile = {
-                "user_id": user.uid,
+                "user_id": "usr_skillbridge_001",
                 "email": "bhomeruturaj17@gmail.com",
                 "promoter_name": "Ruturaj Bhome",
                 "business_name": "SkillBridge Learning Solutions Pvt. Ltd.",
@@ -247,15 +252,8 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
                 "is_profile_complete": True,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
-        db.set("msme_profiles", user.uid, profile)
-    else:
-        # Guarantee registered account email is synchronized
-        if user.email and (
-            not profile.get("email")
-            or profile.get("email").endswith("@finflowbank.com")
-            or profile.get("email") in ("customer@example.com", "borrower@enterprise.com", "priya.sharma@sharmatextiles.in")
-        ):
-            profile["email"] = user.email
+        db.set("msme_profiles", target_key, profile)
+        if not journey_id:
             db.set("msme_profiles", user.uid, profile)
     return profile
 

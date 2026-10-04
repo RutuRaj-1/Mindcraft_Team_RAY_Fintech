@@ -77,7 +77,7 @@ const ENTITY_TYPES = [
 ];
 
 export const CustomerProfileVaultPage: React.FC = () => {
-  const { user, firebaseUser, msmeProfile, updateMsmeProfileState, loadMsmeProfile } = useAuth();
+  const { user, persona, firebaseUser, msmeProfile, updateMsmeProfileState, loadMsmeProfile, activeJourneyId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'vault' ? 'vault' : 'profile';
 
@@ -120,68 +120,94 @@ export const CustomerProfileVaultPage: React.FC = () => {
   // Hash copy state
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
 
-  // Sync profileForm from msmeProfile or defaults
+  // Sync profileForm from msmeProfile or active journey defaults
   useEffect(() => {
-    const registeredAccountEmail =
-      firebaseUser?.email ||
-      (user?.email && !user.email.endsWith('@finflowbank.com') ? user.email : '') ||
-      '';
+    const isLifeline = (activeJourneyId || '').toLowerCase().includes('lifeline');
+    const isSafeera = (activeJourneyId || '').toLowerCase().includes('safeera');
 
-    const cleanMsmeEmail =
-      msmeProfile?.email &&
-      !msmeProfile.email.endsWith('@finflowbank.com') &&
-      msmeProfile.email !== 'customer@example.com' &&
-      msmeProfile.email !== 'borrower@enterprise.com'
-        ? msmeProfile.email
-        : '';
+    const defaultData: Partial<MSMEProfile> = isLifeline
+      ? {
+          business_name: 'Lifeline AI Healthcare Technologies Pvt. Ltd.',
+          entity_type: 'Private Limited Company (Pvt. Ltd.)',
+          promoter_name: 'Rashi Kachwah',
+          phone: '+91 98204 55678',
+          email: 'rashi88@gmail.com',
+          pan: 'SYNTH0000L',
+          gstin: '27SYNTH0000L1Z9',
+          industry_sector: 'Healthcare & Life Sciences',
+          annual_turnover: 11800000,
+          vintage_months: 12,
+          registered_address: 'Unit 4B, Meridian Innovation Hub, 42 Knowledge Park Road, Pune, Maharashtra 411045',
+          bank_account_no: '000000000124',
+          ifsc_code: 'HDFC0001244',
+        }
+      : isSafeera
+      ? {
+          business_name: 'SafeEra Industrial Solutions Pvt. Ltd.',
+          entity_type: 'Private Limited Company (Pvt. Ltd.)',
+          promoter_name: 'Aaditya Wakchaure',
+          phone: '+91 97654 32109',
+          email: 'wakchaureaditya@gmail.com',
+          pan: 'NTHSE0048Z',
+          gstin: '27NTHSE0048Z1Z3',
+          industry_sector: 'Other Manufacturing',
+          annual_turnover: 18200000,
+          vintage_months: 54,
+          registered_address: '42, Meridian Industrial Estate, Demo Service Road, Andheri East, Mumbai, Maharashtra 400069',
+          bank_account_no: '000000000567',
+          ifsc_code: 'ICIC0005678',
+        }
+      : {
+          business_name: 'SkillBridge Learning Solutions Pvt. Ltd.',
+          entity_type: 'Private Limited Company (Pvt. Ltd.)',
+          promoter_name: 'Ruturaj Bhome',
+          phone: '+91 84688 12201',
+          email: 'bhomeruturaj17@gmail.com',
+          pan: 'NTHSB0012Z',
+          gstin: '27NTHSB0012Z1Z5',
+          industry_sector: 'Information Technology & Software',
+          annual_turnover: 30000000,
+          vintage_months: 44,
+          registered_address: '17, Knowledge Avenue, Blue Orbit Campus, Hinjewadi Phase Beta, Pune, Maharashtra 411057',
+          bank_account_no: '000000000987',
+          ifsc_code: 'SBIN0009876',
+        };
 
-    const effectiveEmail = registeredAccountEmail || cleanMsmeEmail || '';
+    const profileMatchesJourney = msmeProfile && (
+      (isLifeline && (msmeProfile.business_name?.toLowerCase().includes('lifeline') || msmeProfile.email?.includes('rashi'))) ||
+      (isSafeera && (msmeProfile.business_name?.toLowerCase().includes('safeera') || msmeProfile.email?.includes('aditya') || msmeProfile.email?.includes('wakchaure'))) ||
+      (!isLifeline && !isSafeera && (msmeProfile.business_name?.toLowerCase().includes('skillbridge') || msmeProfile.email?.includes('bhomeruturaj')))
+    );
 
-    const isRuturaj = (firebaseUser?.email || user?.email || '').toLowerCase().includes('bhomeruturaj');
-
-    const cleanBizName =
-      msmeProfile?.business_name && msmeProfile.business_name !== 'Rohan Mehta Enterprises'
-        ? msmeProfile.business_name
-        : (isRuturaj ? 'SkillBridge Enterprises' : '');
-
-    const cleanPromoterName =
-      msmeProfile?.promoter_name && msmeProfile.promoter_name !== 'Rohan Mehta'
-        ? msmeProfile.promoter_name
-        : (isRuturaj ? 'Ruturaj Bhome' : user.name || firebaseUser?.displayName || '');
-
-    if (msmeProfile) {
+    if (profileMatchesJourney && msmeProfile) {
       setProfileForm({
-        business_name: cleanBizName,
-        entity_type: msmeProfile.entity_type || 'Private Limited Company (Pvt. Ltd.)',
-        promoter_name: cleanPromoterName,
-        phone: msmeProfile.phone || (isRuturaj ? '8468812201' : ''),
-        email: effectiveEmail,
-        pan: msmeProfile.pan || (isRuturaj ? 'SKLBR1234A' : ''),
-        gstin: msmeProfile.gstin || (isRuturaj ? '27SKLBR1234A1Z5' : ''),
-        industry_sector: msmeProfile.industry_sector || 'Information Technology & Software',
-        annual_turnover: msmeProfile.annual_turnover ?? (isRuturaj ? 30000000 : 0),
-        vintage_months: msmeProfile.vintage_months ?? (isRuturaj ? 48 : 0),
-        registered_address: msmeProfile.registered_address || (isRuturaj ? 'Plot 12, Tech Park, Andheri East, Mumbai, Maharashtra 400069' : ''),
-        bank_account_no: msmeProfile.bank_account_no || '',
-        ifsc_code: msmeProfile.ifsc_code || '',
+        business_name: msmeProfile.business_name || defaultData.business_name,
+        entity_type: msmeProfile.entity_type || defaultData.entity_type,
+        promoter_name: msmeProfile.promoter_name || defaultData.promoter_name,
+        phone: msmeProfile.phone || defaultData.phone,
+        email: msmeProfile.email || defaultData.email,
+        pan: msmeProfile.pan || defaultData.pan,
+        gstin: msmeProfile.gstin || defaultData.gstin,
+        industry_sector: msmeProfile.industry_sector || defaultData.industry_sector,
+        annual_turnover: msmeProfile.annual_turnover ?? defaultData.annual_turnover,
+        vintage_months: msmeProfile.vintage_months ?? defaultData.vintage_months,
+        registered_address: msmeProfile.registered_address || defaultData.registered_address,
+        bank_account_no: msmeProfile.bank_account_no || defaultData.bank_account_no,
+        ifsc_code: msmeProfile.ifsc_code || defaultData.ifsc_code,
       });
-    } else if (firebaseUser || user) {
-      setProfileForm((prev) => ({
-        ...prev,
-        email: effectiveEmail || prev.email,
-        promoter_name: user.name || firebaseUser?.displayName || prev.promoter_name,
-      }));
+    } else {
+      setProfileForm(defaultData);
     }
-  }, [msmeProfile, firebaseUser, user]);
+  }, [msmeProfile, activeJourneyId]);
 
   // Load vault documents with Cloud Firestore fallback
-  const loadVault = async () => {
+  const loadVault = async (jrnId?: string) => {
     setIsLoadingVault(true);
     setVaultError(null);
     try {
       let docs: VaultDocument[] = [];
       try {
-        docs = await api.listVaultDocuments();
+        docs = await api.listVaultDocuments(jrnId || activeJourneyId);
       } catch (e) {
         console.warn('Backend listVaultDocuments error, trying direct Firestore:', e);
       }
@@ -210,9 +236,9 @@ export const CustomerProfileVaultPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadVault();
-    loadMsmeProfile();
-  }, []);
+    loadVault(activeJourneyId);
+    loadMsmeProfile(activeJourneyId);
+  }, [activeJourneyId]);
 
   const handleTabChange = (tab: 'profile' | 'vault') => {
     setSearchParams({ tab });
@@ -368,7 +394,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
               Enterprise MSME Workspace
             </span>
             <span className="text-xs text-[var(--text-muted)] font-mono">
-              Account: {firebaseUser?.email || user.email}
+              Account: {profileForm.email || persona.email}
             </span>
           </div>
           <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
@@ -767,7 +793,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadVault}
+                onClick={() => loadVault()}
                 isLoading={isLoadingVault}
                 leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoadingVault ? 'animate-spin' : ''}`} />}
               >

@@ -255,20 +255,25 @@ class AttachVaultDocumentRequest(BaseModel):
     summary="List Stored MSME Vault Documents",
     description="Retrieves all reusable documents stored in the user's permanent MSME Document Locker."
 )
-def list_vault_documents(user: AuthenticatedUser = Depends(get_current_user)) -> List[Dict[str, Any]]:
-    # Retrieve user's stored vault documents
+def list_vault_documents(
+    journey_id: Optional[str] = None,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    jrn = (journey_id or "").lower()
     user_email = (user.email or "").lower()
+
+    if "lifeline" in jrn or "rashi" in user_email or user.uid == "usr_lifeline_002":
+        return db.list("document_vault", {"user_id": "usr_lifeline_002"})
+    elif "safeera" in jrn or "aditya" in user_email or "wakchaure" in user_email or user.uid == "usr_safeera_003":
+        return db.list("document_vault", {"user_id": "usr_safeera_003"})
+    elif "skillbridge" in jrn or "bhomeruturaj17" in user_email or user.uid in ("usr_skillbridge_001", "usr_demo_customer", "demo-customer"):
+        return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
+
     items = db.list("document_vault", {"user_id": user.uid})
     if items:
         return items
 
-    if "rashi" in user_email or user.uid == "usr_lifeline_002":
-        return db.list("document_vault", {"user_id": "usr_lifeline_002"})
-    elif "aditya" in user_email or "wakchaure" in user_email or user.uid == "usr_safeera_003":
-        return db.list("document_vault", {"user_id": "usr_safeera_003"})
-    else:
-        # Default MSME customer is SkillBridge (Ruturaj Bhome)
-        return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
+    return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
 
 
 @router.post(

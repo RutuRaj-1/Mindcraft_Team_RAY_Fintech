@@ -8,8 +8,8 @@ export const authApi = {
   getProfile: () =>
     http.get<AuthenticatedUser>('/auth/me'),
 
-  getMSMEProfile: () =>
-    http.get<MSMEProfile>('/auth/profile'),
+  getMSMEProfile: (journeyId?: string) =>
+    http.get<MSMEProfile>(`/auth/profile${journeyId ? `?journey_id=${encodeURIComponent(journeyId)}` : ''}`),
 
   updateMSMEProfile: (profile: Partial<MSMEProfile>) =>
     http.put<MSMEProfile>('/auth/profile', profile),
