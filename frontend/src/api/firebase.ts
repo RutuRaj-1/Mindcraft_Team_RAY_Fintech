@@ -20,6 +20,8 @@ import {
   setPersistence,
   browserLocalPersistence,
   connectAuthEmulator,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -52,6 +54,9 @@ export const app: FirebaseApp = getApps().length
 
 export const firebaseAuth: Auth = getAuth(app);
 export const firestoreDb: Firestore = getFirestore(app);
+
+export const googleAuthProvider = new GoogleAuthProvider();
+googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Safe Analytics initialization (only in browser environment if supported)
 export let analytics: Analytics | null = null;
@@ -89,6 +94,8 @@ export {
   query,
   where,
   deleteDoc,
+  GoogleAuthProvider,
+  signInWithPopup,
   getAnalytics,
 };
 

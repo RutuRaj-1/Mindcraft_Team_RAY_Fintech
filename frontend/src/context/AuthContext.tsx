@@ -77,6 +77,8 @@ import {
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from '../api/firebase';
 
 // ── Persona catalogue ─────────────────────────────────────────────────────────
@@ -243,6 +245,8 @@ export interface AuthContextType {
 
   /** Sign in with email/password (Firebase mode or demo fallback) */
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  /** Sign in with Google (Firebase popup or demo fallback) */
+  signInWithGoogle: () => Promise<void>;
   /** Register new account with email/password */
   signUpWithEmail: (email: string, password: string, name: string, role?: UserRole) => Promise<void>;
   /** Send password reset email */
@@ -554,6 +558,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveJourneyId(PERSONAS[detectedRole].defaultJourneyId);
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (FIREBASE_ENABLED) {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const cred = await signInWithPopup(firebaseAuth, provider);
+      if (cred.user) {
+        const user = cred.user;
+        const userEmail = (user.email || '').toLowerCase().trim();
+        const isMaster = userEmail === 'bhomeruturaj@gmail.com';
+        const userDocRef = doc(firestoreDb, 'users', user.uid);
+        try {
+          const snap = await getDoc(userDocRef);
+          const resolvedRole: UserRole = isMaster
+            ? 'SYS_ADMIN'
+            : (snap.exists() ? (snap.data().role as UserRole) || 'CUSTOMER' : 'CUSTOMER');
+
+          if (!snap.exists()) {
+            await setDoc(
+              userDocRef,
+              {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email?.split('@')[0] || 'User',
+                photoURL: user.photoURL || null,
+                role: resolvedRole,
+                createdAt: new Date().toISOString(),
+                lastLoginAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+          } else {
+            await setDoc(
+              userDocRef,
+              {
+                lastLoginAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+          }
+        } catch (e) {
+          console.warn('Firestore user profile sync error:', e);
+        }
+      }
+      return;
+    }
+
+    // Demo Mode fallback for Google Sign-in
+    await new Promise((r) => setTimeout(r, 450));
+    const targetRole: UserRole = 'SYS_ADMIN';
+    setRoleState(targetRole);
+    setActiveRole(targetRole);
+    setStoredToken(ROLE_DEMO_TOKEN[targetRole]);
+    setCustomDemoUser({ name: 'Ruturaj Bhome', email: 'bhomeruturaj@gmail.com' });
+    setDemoAuthenticated(true);
+    localStorage.setItem('finflow_auth_status', 'authenticated');
+    localStorage.setItem('finflow_demo_user', JSON.stringify({ name: 'Ruturaj Bhome', email: 'bhomeruturaj@gmail.com' }));
+    setActiveJourneyId(PERSONAS[targetRole].defaultJourneyId);
+  }, []);
+
   const signUpWithEmail = useCallback(async (
     email: string,
     password: string,
@@ -683,6 +746,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadMsmeProfile,
         updateMsmeProfileState,
         signInWithEmail,
+        signInWithGoogle,
         signUpWithEmail,
         resetPassword,
         logout,
