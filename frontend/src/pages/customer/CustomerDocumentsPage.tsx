@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { DocumentRecord, EvidenceItem, ConsistencyReport, DigiLockerCredential } from '../../types';
 import { Card } from '../../components/ui/Card';
@@ -33,7 +34,8 @@ import {
   Info,
   Search,
   Check,
-  Scale
+  Scale,
+  FolderArchive
 } from 'lucide-react';
 import { ProvenanceDrawer } from '../../components/fintech/ProvenanceDrawer';
 
@@ -79,7 +81,8 @@ const SUPPORTED_DOC_TYPES = [
 export const CustomerDocumentsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const journeyId = id || 'jrn_priya_001';
+  const { activeJourneyId } = useAuth();
+  const journeyId = id || activeJourneyId || 'jrn_priya_001';
 
   // Navigation tab: 'upload' | 'digilocker' | 'evidence' | 'consistency'
   const [activeTab, setActiveTab] = useState<'upload' | 'digilocker' | 'evidence' | 'consistency'>('upload');
@@ -108,6 +111,10 @@ export const CustomerDocumentsPage: React.FC = () => {
   const [selectedProvenanceId, setSelectedProvenanceId] = useState<string | null>(null);
 
   const loadData = async () => {
+    if (!journeyId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -378,6 +385,14 @@ export const CustomerDocumentsPage: React.FC = () => {
           <ShieldCheck className="w-4 h-4" />
           Cross-Document Consistency
         </button>
+
+        <Link
+          to="/customer/profile?tab=vault"
+          className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[var(--brand-950)] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 ml-auto cursor-pointer"
+        >
+          <FolderArchive className="w-3.5 h-3.5 text-emerald-700" />
+          <span>Reusable Vault Locker</span>
+        </Link>
       </div>
 
       {/* ========================================================================= */}

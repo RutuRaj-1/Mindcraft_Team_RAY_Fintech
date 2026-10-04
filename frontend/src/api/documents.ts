@@ -61,4 +61,30 @@ export const documentsApi = {
       `/journeys/${journeyId}/digilocker/fetch`,
       { doc_type: docType }
     ),
+
+  // -- MSME Reusable Document Vault --
+  listVaultDocuments: () =>
+    http.get<import('../types').VaultDocument[]>('/documents/vault'),
+
+  uploadVaultDocument: (file: File, docType: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', docType);
+    return http.post<import('../types').VaultDocument>('/documents/vault', formData);
+  },
+
+  updateVaultDocument: (docId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return http.put<import('../types').VaultDocument>(`/documents/vault/${docId}`, formData);
+  },
+
+  deleteVaultDocument: (docId: string) =>
+    http.delete<{ status: string; message: string }>(`/documents/vault/${docId}`),
+
+  attachVaultDocument: (journeyId: string, docId: string, docType?: string) =>
+    http.post<DocumentRecord>(`/journeys/${journeyId}/documents/attach-vault`, {
+      doc_id: docId,
+      doc_type: docType,
+    }),
 };

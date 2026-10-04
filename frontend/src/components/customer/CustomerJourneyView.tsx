@@ -46,6 +46,10 @@ export const CustomerJourneyView: React.FC<CustomerViewProps> = ({ journeyId }) 
   const [isEvaluating,   setIsEvaluating]   = useState<boolean>(false);
 
   const fetchJourneyData = async () => {
+    if (!journeyId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const [jrn, docs, evi, cf, act, frict] = await Promise.all([

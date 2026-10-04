@@ -161,3 +161,63 @@ def assign_role_claims(
         "status": "success",
         "message": f"Successfully assigned role {req.role.value} with limit ₹{req.delegated_limit_inr:,.2f} to UID {req.uid}."
     }
+
+class MSMEProfileUpdateRequest(BaseModel):
+    business_name: Optional[str] = None
+    promoter_name: Optional[str] = None
+    legal_entity_type: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    pan: Optional[str] = None
+    gstin: Optional[str] = None
+    industry_sector: Optional[str] = None
+    vintage_months: Optional[int] = None
+    annual_turnover: Optional[float] = None
+    registered_address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+
+@router.get("/profile")
+def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
+    """Returns the MSME profile for the authenticated user, or a personalized default."""
+    from backend.database.firestore_client import db
+    from datetime import datetime, timezone
+    profile = db.get("msme_profiles", user.uid)
+    if not profile:
+        email = user.email or "borrower@enterprise.com"
+        derived_name = user.name or email.split("@")[0].replace(".", " ").title()
+        profile = {
+            "user_id": user.uid,
+            "email": email,
+            "promoter_name": derived_name,
+            "business_name": f"{derived_name} Enterprises",
+            "legal_entity_type": "PRIVATE_LIMITED",
+            "phone": "+91 98765 43210",
+            "pan": "",
+            "gstin": "",
+            "industry_sector": "Manufacturing & Services",
+            "vintage_months": 24,
+            "annual_turnover": 5000000.0,
+            "registered_address": "",
+            "city": "",
+            "pincode": "",
+            "is_profile_complete": False,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        db.set("msme_profiles", user.uid, profile)
+    return profile
+
+@router.put("/profile")
+def update_user_msme_profile(data: MSMEProfileUpdateRequest, user: AuthenticatedUser = Depends(get_current_user)):
+    """Updates the MSME business profile for the authenticated user."""
+    from backend.database.firestore_client import db
+    from datetime import datetime, timezone
+    existing = db.get("msme_profiles", user.uid) or {}
+    updated = {**existing, **{k: v for k, v in data.model_dump().items() if v is not None}}
+    updated["user_id"] = user.uid
+    updated["email"] = data.email or user.email or existing.get("email", "")
+    updated["is_profile_complete"] = bool(updated.get("business_name") and updated.get("promoter_name"))
+    updated["updated_at"] = datetime.now(timezone.utc).isoformat()
+    db.set("msme_profiles", user.uid, updated)
+    return updated
+

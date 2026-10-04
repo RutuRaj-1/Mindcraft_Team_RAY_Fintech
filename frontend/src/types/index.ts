@@ -959,3 +959,37 @@ export interface OverrideAnalytics {
   byReasonCode: Record<string, number>;
 }
 
+// -- MSME Business Profile & Document Vault Types ------------------------------
+
+export interface MSMEProfile {
+  user_id: string;
+  email: string;
+  business_name: string;
+  entity_type: string;
+  promoter_name: string;
+  phone: string;
+  pan: string;
+  gstin: string;
+  industry_sector: string;
+  annual_turnover: number;
+  vintage_months: number;
+  registered_address: string;
+  bank_account_no?: string;
+  ifsc_code?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VaultDocument {
+  doc_id: string;
+  user_id: string;
+  doc_type: string;
+  file_name: string;
+  file_url: string;
+  sha256_hash: string;
+  file_size_bytes: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+

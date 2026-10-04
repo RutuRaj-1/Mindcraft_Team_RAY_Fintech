@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { api, actionsApi } from '../../api';
 import {
   DecisionRecord,
@@ -45,7 +46,8 @@ import confetti from 'canvas-confetti';
 
 export const CustomerDecisionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const journeyId = id || 'jrn_priya_001';
+  const { activeJourneyId } = useAuth();
+  const journeyId = id || activeJourneyId || 'jrn_priya_001';
 
   const [decision, setDecision] = useState<DecisionRecord | null>(null);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
@@ -61,6 +63,10 @@ export const CustomerDecisionPage: React.FC = () => {
   const [selectedProvenanceId, setSelectedProvenanceId] = useState<string | null>(null);
 
   const loadData = async () => {
+    if (!journeyId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {

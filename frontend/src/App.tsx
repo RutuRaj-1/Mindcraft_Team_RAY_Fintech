@@ -22,6 +22,7 @@ import { RMQueuePage } from './pages/rm/RMQueuePage';
 import { RMCaseDetailPage } from './pages/rm/RMCaseDetailPage';
 import { RiskConsolePage } from './pages/risk/RiskConsolePage';
 import { RiskCaseDetailPage } from './pages/risk/RiskCaseDetailPage';
+import { CustomerProfileVaultPage } from './pages/customer/CustomerProfileVaultPage';
 
 // Part 51 Performance: Lazy-loaded Heavy Pages
 const CustomerWhatIfPage = React.lazy(() =>
@@ -142,6 +143,16 @@ export default function App() {
                     }
                   />
                   <Route path="/app/customer" element={<Navigate to="/customer" replace />} />
+
+                  <Route
+                    path="/customer/profile"
+                    element={
+                      <ProtectedRoute allowedRoles={['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN', 'SYS_ADMIN']}>
+                        <CustomerProfileVaultPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/app/customer/profile" element={<Navigate to="/customer/profile" replace />} />
 
                   <Route
                     path="/customer/apply"

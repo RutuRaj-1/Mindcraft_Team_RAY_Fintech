@@ -1,5 +1,5 @@
 import { http } from './client';
-import { AuthenticatedUser, UserRole } from '../types';
+import { AuthenticatedUser, UserRole, MSMEProfile } from '../types';
 
 export const authApi = {
   getSession: (role?: UserRole) =>
@@ -7,6 +7,12 @@ export const authApi = {
 
   getProfile: () =>
     http.get<AuthenticatedUser>('/auth/me'),
+
+  getMSMEProfile: () =>
+    http.get<MSMEProfile>('/auth/profile'),
+
+  updateMSMEProfile: (profile: Partial<MSMEProfile>) =>
+    http.put<MSMEProfile>('/auth/profile', profile),
 
   getPersonas: () =>
     http.get<Record<string, unknown>>('/auth/personas'),

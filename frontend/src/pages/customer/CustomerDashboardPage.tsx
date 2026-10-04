@@ -25,13 +25,13 @@ import {
 } from 'lucide-react';
 
 export const CustomerDashboardPage: React.FC = () => {
-  const { persona, activeJourneyId, setActiveJourneyId } = useAuth();
+  const { user, persona, msmeProfile, activeJourneyId, setActiveJourneyId } = useAuth();
   const navigate = useNavigate();
 
   const [accessibleJourneys, setAccessibleJourneys] = useState<JourneyRecord[]>([]);
   const [activeJourney, setActiveJourney] = useState<JourneyRecord | null>(null);
   const [nbaResponse, setNbaResponse] = useState<NextBestActionsResponse | null>(null);
-  const [currentStage, setCurrentStage] = useState<JourneyStage>('EXPLAINABLE_DECISION');
+  const [currentStage, setCurrentStage] = useState<JourneyStage>('INTENT_CAPTURE');
   const [decision, setDecision] = useState<DecisionRecord | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowMetrics | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -44,28 +44,44 @@ export const CustomerDashboardPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [journeysList, nbaData, journeyData, decisionData, cfData, docsData, consistencyData] = await Promise.all([
-        api.listJourneys().catch(() => []),
-        api.getNextBestActions(activeJourneyId, 'CUSTOMER').catch(() => null),
-        api.getJourney(activeJourneyId).catch(() => null),
-        api.getDecision(activeJourneyId).catch(() => null),
-        api.getCashFlowMetrics(activeJourneyId).catch(() => null),
-        api.listDocuments(activeJourneyId).catch(() => []),
-        api.getConsistencyReport(activeJourneyId).catch(() => null),
-      ]);
-
+      const journeysList = await api.listJourneys().catch(() => []);
       if (journeysList && journeysList.length > 0) {
         setAccessibleJourneys(journeysList);
+        // If current activeJourneyId is not in the list, set to the user's first journey
+        const targetId = activeJourneyId && journeysList.some((j) => j.journey_id === activeJourneyId)
+          ? activeJourneyId
+          : journeysList[0].journey_id;
+
+        if (targetId !== activeJourneyId) {
+          setActiveJourneyId(targetId);
+        }
+
+        const [nbaData, journeyData, decisionData, cfData, docsData, consistencyData] = await Promise.all([
+          api.getNextBestActions(targetId, 'CUSTOMER').catch(() => null),
+          api.getJourney(targetId).catch(() => null),
+          api.getDecision(targetId).catch(() => null),
+          api.getCashFlowMetrics(targetId).catch(() => null),
+          api.listDocuments(targetId).catch(() => []),
+          api.getConsistencyReport(targetId).catch(() => null),
+        ]);
+
+        if (journeyData) {
+          setActiveJourney(journeyData);
+          if (journeyData.current_stage) setCurrentStage(journeyData.current_stage);
+        }
+        if (nbaData) setNbaResponse(nbaData);
+        if (decisionData) setDecision(decisionData);
+        if (cfData) setCashFlow(cfData);
+        if (docsData) setDocuments(docsData);
+        if (consistencyData) setConsistency(consistencyData);
+      } else {
+        // No journeys exist for this user yet
+        setAccessibleJourneys([]);
+        setActiveJourney(null);
+        setDecision(null);
+        setCashFlow(null);
+        setDocuments([]);
       }
-      if (journeyData) {
-        setActiveJourney(journeyData);
-        if (journeyData.current_stage) setCurrentStage(journeyData.current_stage);
-      }
-      if (nbaData) setNbaResponse(nbaData);
-      if (decisionData) setDecision(decisionData);
-      if (cfData) setCashFlow(cfData);
-      if (docsData) setDocuments(docsData);
-      if (consistencyData) setConsistency(consistencyData);
     } catch (err: any) {
       console.warn('Dashboard live API fetch error:', err);
       setError(err?.message || 'Failed to sync with live backend');
@@ -98,8 +114,8 @@ export const CustomerDashboardPage: React.FC = () => {
   };
 
   // Derive dynamic metrics strictly from backend API responses
-  const activeBusinessName = activeJourney?.intent?.business_name || (isLoading ? 'Loading Application...' : 'No Active Application');
-  const activeCIN = (activeJourney?.intent as any)?.cin || (activeJourney?.intent as any)?.registration_number || (activeJourney?.intent?.gstin ? `GSTIN: ${activeJourney.intent.gstin}` : 'Registration Pending');
+  const activeBusinessName = msmeProfile?.business_name || activeJourney?.intent?.business_name || (isLoading ? 'Loading Application...' : 'No Active Application');
+  const activeCIN = (activeJourney?.intent as any)?.cin || (activeJourney?.intent as any)?.registration_number || (msmeProfile?.gstin ? `GSTIN: ${msmeProfile.gstin}` : (activeJourney?.intent?.gstin ? `GSTIN: ${activeJourney.intent.gstin}` : 'Registration Pending'));
 
   const approvedAmountNum = decision?.approved_amount || (activeJourney?.intent?.requested_amount ? activeJourney.intent.requested_amount * 0.9 : 0);
   const approvedAmountDisplay = approvedAmountNum > 0 ? `₹${(approvedAmountNum / 100000).toFixed(2)} Lakhs` : (activeJourney ? 'Under Assessment' : '—');
@@ -174,16 +190,16 @@ export const CustomerDashboardPage: React.FC = () => {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--fin-green-bg)] text-[var(--fin-green)] border border-[var(--fin-green)]/30">
-              Active SME Borrower
+              {activeJourney ? 'Active SME Borrower' : 'Registered MSME Account'}
             </span>
             <span className="text-xs text-[var(--text-muted)] font-mono">{activeCIN}</span>
             <span className="text-xs text-[var(--text-muted)]">•</span>
             <span className="text-xs text-[var(--text-muted)]">
-              Ref: <span className="font-mono font-bold text-[var(--brand-900)]">{activeJourneyId}</span>
+              Ref: <span className="font-mono font-bold text-[var(--brand-900)]">{activeJourneyId || 'MSME-PORTAL'}</span>
             </span>
           </div>
           <h1 className="text-2xl font-black text-[var(--brand-950)] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Welcome back, {persona.name}
+            Welcome back, {user.name || persona.name}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
             <span className="font-bold text-[var(--brand-950)]">{activeBusinessName}</span> · Working Capital Facility & Live Underwriting
@@ -210,6 +226,12 @@ export const CustomerDashboardPage: React.FC = () => {
             </div>
           )}
 
+          <Link to="/customer/profile">
+            <Button variant="outline" size="sm" leftIcon={<Building2 className="w-3.5 h-3.5 text-[var(--brand-700)]" />}>
+              Profile & Vault
+            </Button>
+          </Link>
+
           <Button
             variant="outline"
             size="sm"
@@ -234,6 +256,85 @@ export const CustomerDashboardPage: React.FC = () => {
           message={error}
           onRetry={loadDashboardData}
         />
+      )}
+
+      {/* If brand new user with no active application, show Fast-Track Onboarding Launcher */}
+      {!isLoading && !activeJourney && accessibleJourneys.length === 0 && (
+        <div className="p-8 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-6 animate-fadeIn">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-700)]">
+              Fast-Track Borrower Setup
+            </span>
+            <h2 className="text-xl font-black text-[var(--brand-950)] mt-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Welcome to FinFlow AI — Get Started in 3 Simple Steps
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-2xl leading-relaxed">
+              FinFlow AI automates SME credit underwriting using cryptographic evidence and live banking data. Follow these 3 steps to configure your enterprise profile and submit your working capital application.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Step 1 */}
+            <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border-2 border-[var(--brand-950)] flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-white border border-[var(--brand-950)] flex items-center justify-center font-black text-sm text-[var(--brand-900)] shadow-xs">
+                  1
+                </div>
+                <h3 className="text-sm font-black text-[var(--brand-950)]">
+                  Setup MSME Profile
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  Enter your legal trade name, PAN, GSTIN, and authorized signatory details once for all loan requests.
+                </p>
+              </div>
+              <Link to="/customer/profile?tab=profile">
+                <Button variant="outline" size="sm" className="w-full" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
+                  {msmeProfile?.business_name ? 'Edit Profile (Saved)' : 'Complete Profile'}
+                </Button>
+              </Link>
+            </div>
+
+            {/* Step 2 */}
+            <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border-2 border-[var(--brand-950)] flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-white border border-[var(--brand-950)] flex items-center justify-center font-black text-sm text-[var(--fin-green)] shadow-xs">
+                  2
+                </div>
+                <h3 className="text-sm font-black text-[var(--brand-950)]">
+                  Reusable Document Vault
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  Store 12-month Bank Statements & GST filings in your tamper-evident locker. Store once, use repeatedly.
+                </p>
+              </div>
+              <Link to="/customer/profile?tab=vault">
+                <Button variant="outline" size="sm" className="w-full" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
+                  Open Vault & Upload
+                </Button>
+              </Link>
+            </div>
+
+            {/* Step 3 */}
+            <div className="p-5 rounded-2xl bg-[var(--brand-50)] border-2 border-[var(--brand-950)] flex flex-col justify-between space-y-4 shadow-xs">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[var(--brand-950)] text-white flex items-center justify-center font-black text-sm shadow-xs">
+                  3
+                </div>
+                <h3 className="text-sm font-black text-[var(--brand-950)]">
+                  Apply for Working Capital
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Choose facility limits up to ₹2 Crore with instant algorithmic pre-approval and transparent rates.
+                </p>
+              </div>
+              <Link to="/customer/apply">
+                <Button variant="brutal" size="sm" className="w-full" rightIcon={<PlusCircle className="w-3.5 h-3.5" />}>
+                  Apply for Facility
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* KPI Cards — Bound 100% to Live FastAPI Data */}
@@ -282,7 +383,7 @@ export const CustomerDashboardPage: React.FC = () => {
             </h2>
           </div>
           <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[var(--brand-50)] text-[var(--brand-950)] border border-[var(--brand-950)]">
-            Stage: {currentStage}
+            Stage: {activeJourney ? currentStage : 'INTENT_PENDING'}
           </span>
         </div>
 
@@ -295,7 +396,20 @@ export const CustomerDashboardPage: React.FC = () => {
                 <span>WHERE AM I?</span>
               </div>
               <p className="text-[var(--text-secondary)] leading-relaxed">
-                Stage 9 of 13: Underwriting complete. Live explainable sanction generated.
+                {activeJourney ? (
+                  currentStage === 'INTENT_CAPTURE' ? 'Stage 1 of 13: Financing Intent Captured. Please submit supporting documents.' :
+                  currentStage === 'EVIDENCE_COLLECTION' ? 'Stage 2 of 13: Financial evidence and bank statements uploaded.' :
+                  currentStage === 'VERIFICATION' ? 'Stage 3 of 13: Cryptographic verification & multi-source discrepancy check in progress.' :
+                  currentStage === 'RISK_ASSESSMENT' ? 'Stage 4 of 13: Cash flow modeling & machine learning risk tier calculation.' :
+                  currentStage === 'EXPLAINABLE_DECISION' ? 'Stage 9 of 13: Underwriting complete. Live explainable sanction generated.' :
+                  currentStage === 'NEXT_BEST_ACTION' ? 'Stage 10 of 13: Prescriptive actions generated to optimize sanction terms.' :
+                  currentStage === 'HUMAN_REVIEW' ? 'Stage 11 of 13: Underwriter human review & risk officer inspection.' :
+                  currentStage === 'SANCTIONED' ? 'Stage 13 of 13: Facility Approved & Sanction Letter Ready for Acceptance.' :
+                  currentStage === 'REJECTED' ? 'Stage 13 of 13: Facility Declined per credit policy rules.' :
+                  `Stage: ${String(currentStage).replace(/_/g, ' ')}`
+                ) : (
+                  'Step 0: No active loan journey. Complete your MSME profile & apply for financing.'
+                )}
               </p>
             </div>
             <span className="mt-2 text-[10px] font-mono text-[var(--text-muted)] font-bold">Current Milestone</span>

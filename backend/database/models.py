@@ -1197,4 +1197,41 @@ class JourneyFraudSignalsResponse(BaseModel):
     hasSignals: bool = Field(False, alias="has_signals", serialization_alias="hasSignals")
     summary: str = "Potential linked-case risk detected."
 
+# --- MSME User Profile & Reusable Document Vault Models ---
+
+class MSMEProfileModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    userId: str = Field(..., alias="user_id", serialization_alias="userId")
+    email: str
+    businessName: str = Field("My MSME Enterprise", alias="business_name", serialization_alias="businessName")
+    promoterName: str = Field("Business Owner", alias="promoter_name", serialization_alias="promoterName")
+    legalEntityType: str = Field("PRIVATE_LIMITED", alias="legal_entity_type", serialization_alias="legalEntityType")
+    phone: Optional[str] = "+91 98765 43210"
+    pan: Optional[str] = ""
+    gstin: Optional[str] = ""
+    industrySector: Optional[str] = Field("Manufacturing & Services", alias="industry_sector", serialization_alias="industrySector")
+    vintageMonths: Optional[int] = Field(24, alias="vintage_months", serialization_alias="vintageMonths")
+    annualTurnover: Optional[float] = Field(5000000.0, alias="annual_turnover", serialization_alias="annualTurnover")
+    registeredAddress: Optional[str] = Field("", alias="registered_address", serialization_alias="registeredAddress")
+    city: Optional[str] = ""
+    pincode: Optional[str] = ""
+    isProfileComplete: bool = Field(False, alias="is_profile_complete", serialization_alias="isProfileComplete")
+    updatedAt: str = Field(default_factory=now_utc_iso, alias="updated_at", serialization_alias="updatedAt")
+
+class VaultDocumentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    docId: str = Field(..., alias="doc_id", serialization_alias="docId")
+    userId: str = Field(..., alias="user_id", serialization_alias="userId")
+    category: str # BANK_STATEMENT, GST_RETURN, ITR, BUSINESS_REGISTRATION, KYC_PAN_AADHAAR, AUDITED_FINANCIALS, OTHER
+    fileName: str = Field(..., alias="file_name", serialization_alias="fileName")
+    fileUrl: str = Field(..., alias="file_url", serialization_alias="fileUrl")
+    fileSizeBytes: int = Field(0, alias="file_size_bytes", serialization_alias="fileSizeBytes")
+    sha256Hash: str = Field(..., alias="sha256_hash", serialization_alias="sha256Hash")
+    version: int = 1
+    notes: Optional[str] = "Primary Working Document"
+    status: str = "ACTIVE" # ACTIVE, REPLACED, ARCHIVED
+    uploadedAt: str = Field(default_factory=now_utc_iso, alias="uploaded_at", serialization_alias="uploadedAt")
+    updatedAt: str = Field(default_factory=now_utc_iso, alias="updated_at", serialization_alias="updatedAt")
+
+
 

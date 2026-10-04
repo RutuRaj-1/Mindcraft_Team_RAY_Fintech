@@ -154,12 +154,13 @@ export const getRoleNavigation = (
           title: 'SME Working Capital Journey',
           items: [
             { label: 'Customer Portal', path: '/customer', iconName: 'Home', requiredPermission: 'view:own_journey' },
+            { label: 'MSME Profile & Vault', path: '/customer/profile', iconName: 'Building2', requiredPermission: 'view:own_documents' },
             { label: 'Apply for Working Capital', path: '/customer/apply', iconName: 'FilePlus', requiredPermission: 'apply:loan' },
-            { label: 'Live Journey State', path: `/customer/journey/${activeJourneyId}`, iconName: 'GitCommit', requiredPermission: 'view:own_journey' },
-            { label: 'Documents & Verification', path: `/customer/documents/${activeJourneyId}`, iconName: 'FileText', requiredPermission: 'view:own_documents' },
-            { label: 'Cash Flow Intelligence', path: `/customer/cashflow/${activeJourneyId}`, iconName: 'TrendingUp', requiredPermission: 'view:own_cashflow' },
-            { label: 'What-If Simulator', path: `/customer/what-if/${activeJourneyId}`, iconName: 'Sparkles', requiredPermission: 'simulate:what_if' },
-            { label: 'Explainable Decision', path: `/customer/decision/${activeJourneyId}`, iconName: 'Award', requiredPermission: 'view:own_decision' },
+            { label: 'Live Journey State', path: activeJourneyId ? `/customer/journey/${activeJourneyId}` : '/customer', iconName: 'GitCommit', requiredPermission: 'view:own_journey' },
+            { label: 'Documents & Verification', path: activeJourneyId ? `/customer/documents/${activeJourneyId}` : '/customer/profile?tab=vault', iconName: 'FileText', requiredPermission: 'view:own_documents' },
+            { label: 'Cash Flow Intelligence', path: activeJourneyId ? `/customer/cashflow/${activeJourneyId}` : '/customer', iconName: 'TrendingUp', requiredPermission: 'view:own_cashflow' },
+            { label: 'What-If Simulator', path: activeJourneyId ? `/customer/what-if/${activeJourneyId}` : '/customer', iconName: 'Sparkles', requiredPermission: 'simulate:what_if' },
+            { label: 'Explainable Decision', path: activeJourneyId ? `/customer/decision/${activeJourneyId}` : '/customer', iconName: 'Award', requiredPermission: 'view:own_decision' },
           ],
         },
       ];

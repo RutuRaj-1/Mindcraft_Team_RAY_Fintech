@@ -25,7 +25,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { UserRole, AuthenticatedUser, JourneyRecord, ApplicationRecord } from '../types';
+import { UserRole, AuthenticatedUser, JourneyRecord, ApplicationRecord, MSMEProfile } from '../types';
 import {
   api,
   setActiveRole,
@@ -206,6 +206,8 @@ export interface AuthContextType {
   user: AuthenticatedUser;
   /** Rich persona metadata for UI */
   persona: PersonaProfile;
+  /** MSME Business profile for the authenticated borrower */
+  msmeProfile: MSMEProfile | null;
   /** True while the auth state is being resolved on first load */
   loading: boolean;
   /** True once the user is authenticated (Firebase or demo mode) */
@@ -226,6 +228,8 @@ export interface AuthContextType {
   permissions: Record<string, boolean>;
   setSelectedApplicationId: (id: string) => void;
   refreshAppState: () => Promise<void>;
+  loadMsmeProfile: () => Promise<void>;
+  updateMsmeProfileState: (data: Partial<MSMEProfile>) => Promise<MSMEProfile>;
 
   /** Sign in with email/password (Firebase mode or demo fallback) */
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -244,18 +248,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [role, setRoleState] = useState<UserRole>(() => getActiveRole());
   const [loading, setLoading] = useState<boolean>(FIREBASE_ENABLED);
-  const [activeJourneyId, setActiveJourneyId] = useState<string>('jrn_priya_001');
-  const [selectedApplicationId, setSelectedApplicationIdState] = useState<string>('app_priya_001');
+  const [msmeProfile, setMsmeProfile] = useState<MSMEProfile | null>(null);
+  const [activeJourneyId, setActiveJourneyId] = useState<string>(() => {
+    // If real Firebase enabled, wait for user's own journey list
+    return FIREBASE_ENABLED ? '' : 'jrn_priya_001';
+  });
+  const [selectedApplicationId, setSelectedApplicationIdState] = useState<string>(() => {
+    return FIREBASE_ENABLED ? '' : 'app_priya_001';
+  });
   const [selectedApplication, setSelectedApplication] = useState<ApplicationRecord | null>(null);
   const [journey, setJourney] = useState<JourneyRecord | null>(null);
 
   const permissions = React.useMemo(() => computeRolePermissions(role), [role]);
 
   const refreshAppState = useCallback(async () => {
+    if (!activeJourneyId) {
+      setJourney(null);
+      setSelectedApplication(null);
+      return;
+    }
     try {
       const [jrn, app] = await Promise.all([
         api.getJourney(activeJourneyId).catch(() => null),
-        api.getApplication(selectedApplicationId).catch(() => null),
+        api.getApplication(selectedApplicationId || activeJourneyId).catch(() => null),
       ]);
       if (jrn) setJourney(jrn);
       if (app) setSelectedApplication(app);
@@ -288,6 +303,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const tokenRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const loadMsmeProfile = useCallback(async () => {
+    try {
+      const profile = await api.getMSMEProfile();
+      if (profile) {
+        setMsmeProfile(profile);
+      }
+    } catch {
+      // not yet created or non-customer
+    }
+  }, []);
+
+  const updateMsmeProfileState = useCallback(async (data: Partial<MSMEProfile>) => {
+    const updated = await api.updateMSMEProfile(data);
+    setMsmeProfile(updated);
+    return updated;
+  }, []);
+
   // ── Firebase Auth listener ─────────────────────────────────────────────────
   useEffect(() => {
     if (!FIREBASE_ENABLED) return;
@@ -314,10 +346,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Register async token provider
         setTokenProvider(async () => {
-          return fbUser.getIdToken(false); // refresh only when stale
+          return fbUser.getIdToken(false);
         });
+
+        // Load the authenticated user's own profile and active journeys
+        try {
+          const [profileRes, journeysList] = await Promise.all([
+            api.getMSMEProfile().catch(() => null),
+            api.listJourneys().catch(() => []),
+          ]);
+
+          if (profileRes && (profileRes.business_name || profileRes.promoter_name)) {
+            setMsmeProfile(profileRes);
+          }
+
+          if (journeysList && journeysList.length > 0) {
+            setActiveJourneyId(journeysList[0].journey_id);
+            setSelectedApplicationIdState(journeysList[0].application_id || journeysList[0].journey_id);
+          } else {
+            setActiveJourneyId('');
+            setSelectedApplicationIdState('');
+          }
+        } catch (fetchErr) {
+          console.warn('Error loading initial profile or journeys:', fetchErr);
+        }
       } else {
         setFirebaseUser(null);
+        setMsmeProfile(null);
         clearTokenProvider();
       }
       setLoading(false);
@@ -330,27 +385,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // ── Derived values ─────────────────────────────────────────────────────────
-  const persona = PERSONAS[role];
+  const defaultPersona = PERSONAS[role];
   const isAuthenticated = FIREBASE_ENABLED ? Boolean(firebaseUser) : demoAuthenticated;
 
-  const user: AuthenticatedUser = {
+  const persona: PersonaProfile = React.useMemo(() => {
+    if (role === 'CUSTOMER' && (firebaseUser || customDemoUser || msmeProfile)) {
+      const email = firebaseUser?.email || customDemoUser?.email || defaultPersona.email;
+      const emailPrefix = email ? email.split('@')[0].replace(/[._]/g, ' ') : '';
+      const name =
+        msmeProfile?.promoter_name ||
+        firebaseUser?.displayName ||
+        customDemoUser?.name ||
+        (emailPrefix ? emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1) : defaultPersona.name);
+
+      const organization =
+        msmeProfile?.business_name ||
+        (msmeProfile?.entity_type ? `${msmeProfile.entity_type} Enterprise` : 'My MSME Enterprise');
+
+      const initials = name
+        .split(' ')
+        .filter(Boolean)
+        .map((p) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'CU';
+
+      return {
+        role: 'CUSTOMER',
+        name,
+        title: msmeProfile?.entity_type ? `${msmeProfile.entity_type} Owner` : 'Authorized Signatory',
+        email,
+        organization,
+        avatarInitials: initials,
+        badgeColor: 'var(--fin-green)',
+        defaultRoute: '/customer',
+        defaultJourneyId: activeJourneyId || '',
+      };
+    }
+    return defaultPersona;
+  }, [role, firebaseUser, customDemoUser, msmeProfile, defaultPersona, activeJourneyId]);
+
+  const user: AuthenticatedUser = React.useMemo(() => ({
     uid: firebaseUser?.uid ?? `usr_demo_${role.toLowerCase()}`,
-    email: firebaseUser?.email ?? customDemoUser?.email ?? persona.email,
-    name: firebaseUser?.displayName ?? customDemoUser?.name ?? persona.name,
+    email: persona.email,
+    name: persona.name,
     role,
-    business_id: role === 'CUSTOMER' ? 'app_priya_001' : undefined,
-  };
+    business_id: role === 'CUSTOMER' ? (msmeProfile?.user_id || (firebaseUser ? undefined : 'app_priya_001')) : undefined,
+  }), [firebaseUser, role, persona, msmeProfile]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     if (FIREBASE_ENABLED) {
       await signInWithEmailAndPassword(firebaseAuth, email, password);
-      // onAuthStateChanged handles state & claims
       return;
     }
 
     // Demo Mode fallback authentication
-    await new Promise((r) => setTimeout(r, 450)); // simulate network latency
+    await new Promise((r) => setTimeout(r, 450));
     const normalized = email.toLowerCase();
     let detectedRole: UserRole = 'CUSTOMER';
     if (normalized.includes('rm') || normalized.includes('officer')) detectedRole = 'RM';
@@ -373,14 +464,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     name: string,
     requestedRole: UserRole = 'CUSTOMER'
   ) => {
-    // MSME Customer is the safe public default
     const safeRole: UserRole = requestedRole === 'CUSTOMER' ? 'CUSTOMER' : 'CUSTOMER';
 
     if (FIREBASE_ENABLED) {
       const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
       if (cred.user) {
         await updateProfile(cred.user, { displayName: name });
-        // Attempt saving profile document in Firestore
         try {
           await setDoc(doc(firestoreDb, 'users', cred.user.uid), {
             uid: cred.user.uid,
@@ -417,7 +506,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const switchRole = useCallback((newRole: UserRole) => {
-    if (FIREBASE_ENABLED) return; // role is determined by Firebase claims
+    if (FIREBASE_ENABLED) return;
     setRoleState(newRole);
     setActiveRole(newRole);
     setStoredToken(ROLE_DEMO_TOKEN[newRole]);
@@ -433,11 +522,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTokenProvider();
       setFirebaseUser(null);
     }
-    // Clear demo persistence
     localStorage.removeItem('finflow_auth_status');
     localStorage.removeItem('finflow_demo_user');
     setCustomDemoUser(null);
     setDemoAuthenticated(false);
+    setMsmeProfile(null);
+    setActiveJourneyId('');
+    setSelectedApplicationIdState('');
     switchRole('CUSTOMER');
   }, [firebaseUser, switchRole]);
 
@@ -447,6 +538,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         user,
         persona,
+        msmeProfile,
         loading,
         isAuthenticated,
         firebaseUser,
@@ -459,6 +551,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         permissions,
         setSelectedApplicationId,
         refreshAppState,
+        loadMsmeProfile,
+        updateMsmeProfileState,
         signInWithEmail,
         signUpWithEmail,
         resetPassword,

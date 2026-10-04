@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { NormalizedIntent, IntentSubmitResponse } from '../../types';
 import { Card } from '../../components/ui/Card';
@@ -64,6 +65,7 @@ const JOURNEY_STAGES = [
 
 export const ApplyLoanPage: React.FC = () => {
   const navigate = useNavigate();
+  const { msmeProfile, setActiveJourneyId } = useAuth();
 
   // Active input mode: "natural" | "guided"
   const [activeTab, setActiveTab] = useState<'natural' | 'guided'>('natural');
@@ -79,6 +81,19 @@ export const ApplyLoanPage: React.FC = () => {
     obligations: "None",
     business_name: "Sharma Textiles & Weaving Mill",
   });
+
+  // Pre-fill from MSME Profile if available
+  useEffect(() => {
+    if (msmeProfile) {
+      setAnswers((prev) => ({
+        ...prev,
+        business_name: msmeProfile.business_name || prev.business_name,
+        business_type: msmeProfile.industry_sector || prev.business_type,
+        vintage: msmeProfile.vintage_months ? `${(msmeProfile.vintage_months / 12).toFixed(0)} years` : prev.vintage,
+        revenue: msmeProfile.annual_turnover ? `₹${(msmeProfile.annual_turnover / 1200000).toFixed(1)} Lakh / month` : prev.revenue,
+      }));
+    }
+  }, [msmeProfile]);
 
   // Parsing & Submission state
   const [isParsing, setIsParsing] = useState(false);
@@ -149,6 +164,9 @@ export const ApplyLoanPage: React.FC = () => {
         business_name: answers.business_name || preview.business_type || "MSME Enterprise",
       });
       setSubmissionResult(response);
+      if (response.journey_id) {
+        setActiveJourneyId(response.journey_id);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setSubmitError(err.message || "Submission failed. Please try again.");
