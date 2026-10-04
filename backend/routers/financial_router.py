@@ -47,3 +47,45 @@ def rebuild_trust_graph(journey_id: str, user: AuthenticatedUser = Depends(get_c
     else:
         app_id = journey.get("application_id", journey_id)
     return TrustGraphService.build_and_save_graph(app_id)
+
+
+@router.get("/financial-trust-score")
+def get_financial_trust_score(journey_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+    """
+    Returns the adapted 7-pillar Financial Trust Score (0-100, 300-850 CIBIL, 0-1000 FinFlow),
+    component sub-scores, mathematical formulas, and metric-backed explainable factors.
+    """
+    from backend.modules.module3_risk.financial_trust_score import FinancialTrustScoreEngine
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        app = db.get("applications", journey_id)
+        if not app:
+            raise HTTPException(status_code=404, detail="Journey not found")
+        app_id = journey_id
+    else:
+        app_id = journey.get("application_id", journey_id)
+
+    res = FinancialTrustScoreEngine.evaluate_for_application(app_id)
+    return {
+        "applicationId": app_id,
+        "journeyId": journey_id,
+        "trustScore": res.trust_score,
+        "cibilScore": res.cibil_scaled_score,
+        "finflowScore": res.finflow_score,
+        "riskBand": res.risk_band,
+        "components": res.components,
+        "positiveFactors": res.positive_factors,
+        "negativeFactors": res.negative_factors,
+        "detailedFactors": [
+            {
+                "name": f.name,
+                "description": f.description,
+                "metricName": f.metric_name,
+                "metricValue": f.metric_value,
+                "impact": f.impact,
+            }
+            for f in res.detailed_factors
+        ],
+        "features": res.features,
+        "formulaSummary": res.formula_summary,
+    }

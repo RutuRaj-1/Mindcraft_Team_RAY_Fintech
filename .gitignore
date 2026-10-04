@@ -139,3 +139,6 @@ Icon?
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# ── 9. External Reference Repositories ────────────────────────────────────────
+Hack2Ignite/
