@@ -179,30 +179,31 @@ class MSMEProfileUpdateRequest(BaseModel):
 
 @router.get("/profile")
 def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
-    """Returns the MSME profile for the authenticated user, or a personalized default."""
+    """Returns the MSME profile for the authenticated user, or a clean editable profile."""
     from backend.database.firestore_client import db
     from datetime import datetime, timezone
     profile = db.get("msme_profiles", user.uid)
-    if not profile:
-        email = user.email or "borrower@enterprise.com"
-        is_ruturaj = "bhomeruturaj" in email.lower() or "ruturaj" in (user.name or "").lower()
-        derived_name = user.name or ("Ruturaj Bhome" if is_ruturaj else email.split("@")[0].replace(".", " ").title())
-        biz_name = "SkillBridge Enterprises" if is_ruturaj else f"{derived_name} Enterprises"
+    email = user.email or ""
+    is_ruturaj = "bhomeruturaj" in email.lower() or "ruturaj" in (user.name or "").lower()
+
+    if not profile or profile.get("business_name") in ("Rohan Mehta Enterprises", "borrower@enterprise.com Enterprises"):
+        derived_name = "Ruturaj Bhome" if is_ruturaj else (user.name or email.split("@")[0].replace(".", " ").title() if email else "")
+        biz_name = "SkillBridge Enterprises" if is_ruturaj else (f"{derived_name} Enterprises" if derived_name else "")
         profile = {
             "user_id": user.uid,
             "email": email,
             "promoter_name": derived_name,
             "business_name": biz_name,
             "legal_entity_type": "PRIVATE_LIMITED",
-            "phone": "8468812201" if is_ruturaj else "+91 98765 43210",
+            "phone": "8468812201" if is_ruturaj else "",
             "pan": "SKLBR1234A" if is_ruturaj else "",
             "gstin": "27SKLBR1234A1Z5" if is_ruturaj else "",
             "industry_sector": "Information Technology & Software" if is_ruturaj else "Manufacturing & Services",
-            "vintage_months": 48 if is_ruturaj else 24,
-            "annual_turnover": 30000000.0 if is_ruturaj else 5000000.0,
-            "registered_address": "",
+            "vintage_months": 48 if is_ruturaj else 0,
+            "annual_turnover": 30000000.0 if is_ruturaj else 0.0,
+            "registered_address": "Plot 12, Tech Park, Andheri East, Mumbai, Maharashtra 400069" if is_ruturaj else "",
             "city": "Mumbai",
-            "pincode": "400001",
+            "pincode": "400069",
             "is_profile_complete": bool(is_ruturaj),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
@@ -216,7 +217,7 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
         ):
             profile["email"] = user.email
             db.set("msme_profiles", user.uid, profile)
-        if "bhomeruturaj" in (user.email or "").lower() and not profile.get("business_name"):
+        if is_ruturaj and (not profile.get("business_name") or profile.get("business_name") == "Rohan Mehta Enterprises"):
             profile["business_name"] = "SkillBridge Enterprises"
             profile["promoter_name"] = "Ruturaj Bhome"
             db.set("msme_profiles", user.uid, profile)
@@ -224,10 +225,17 @@ def get_user_msme_profile(user: AuthenticatedUser = Depends(get_current_user)):
 
 @router.put("/profile")
 def update_user_msme_profile(data: MSMEProfileUpdateRequest, user: AuthenticatedUser = Depends(get_current_user)):
-    """Updates the MSME business profile for the authenticated user and syncs related applications."""
+    """Updates the MSME business profile with the exact data submitted by the user."""
     from backend.database.firestore_client import db
     from datetime import datetime, timezone
     existing = db.get("msme_profiles", user.uid) or {}
+    
+    # Strip away any legacy demo placeholders
+    if existing.get("business_name") == "Rohan Mehta Enterprises":
+        existing["business_name"] = ""
+    if existing.get("promoter_name") == "Rohan Mehta":
+        existing["promoter_name"] = ""
+
     updated = {**existing, **{k: v for k, v in data.model_dump().items() if v is not None}}
     updated["user_id"] = user.uid
 
@@ -239,6 +247,7 @@ def update_user_msme_profile(data: MSMEProfileUpdateRequest, user: Authenticated
     updated["is_profile_complete"] = bool(updated.get("business_name") and updated.get("promoter_name"))
     updated["updated_at"] = datetime.now(timezone.utc).isoformat()
     db.set("msme_profiles", user.uid, updated)
+
 
     # Cascade business name updates to all user journeys and applications
     new_biz = updated.get("business_name")

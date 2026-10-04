@@ -89,19 +89,19 @@ DEMO_USERS: dict[str, AuthenticatedUser] = {
         delegated_limit_inr=0.0,
         claims={"role": "AUDIT_OFFICER"}
     ),
-    # 8. System Administrator (Purely Technical Infrastructure Custodian)
+    # 8. System Administrator (Master Infrastructure & Demonstration Controller)
     "demo-admin": AuthenticatedUser(
-        uid="usr_amit_008",
-        email="admin@finflow.ai",
-        name="Amit Verma",
+        uid="usr_admin_master",
+        email="bhomeruturaj@gmail.com",
+        name="Ruturaj Bhome",
         role=UserRole.SYS_ADMIN,
         delegated_limit_inr=0.0,
         claims={"role": "SYS_ADMIN"}
     ),
     "demo-sys-admin": AuthenticatedUser(
-        uid="usr_amit_008",
-        email="admin@finflow.ai",
-        name="Amit Verma",
+        uid="usr_admin_master",
+        email="bhomeruturaj@gmail.com",
+        name="Ruturaj Bhome",
         role=UserRole.SYS_ADMIN,
         delegated_limit_inr=0.0,
         claims={"role": "SYS_ADMIN"}
@@ -168,18 +168,25 @@ def verify_token(token: str) -> AuthenticatedUser:
         try:
             from firebase_admin import auth as fb_auth
             decoded = fb_auth.verify_id_token(clean_token)
-            role_claim = decoded.get("role", "CUSTOMER").upper()
-            if role_claim == "ADMIN":
-                role_claim = "SYS_ADMIN"
-            try:
-                user_role = UserRole(role_claim)
-            except ValueError:
-                user_role = UserRole.CUSTOMER
+            email = decoded.get("email", "").lower()
+            role_claim = decoded.get("role", "").upper()
+
+            # Master Administrator Grant: bhomeruturaj@gmail.com has end-to-end control
+            if email == "bhomeruturaj@gmail.com":
+                user_role = UserRole.SYS_ADMIN
+                decoded["role"] = "SYS_ADMIN"
+            elif role_claim in ("ADMIN", "SYS_ADMIN"):
+                user_role = UserRole.SYS_ADMIN
+            else:
+                try:
+                    user_role = UserRole(role_claim) if role_claim else UserRole.CUSTOMER
+                except ValueError:
+                    user_role = UserRole.CUSTOMER
 
             return AuthenticatedUser(
                 uid=decoded.get("uid"),
                 email=decoded.get("email", ""),
-                name=decoded.get("name", decoded.get("email", "User")),
+                name=decoded.get("name", "Ruturaj Bhome" if email == "bhomeruturaj@gmail.com" else decoded.get("email", "User")),
                 role=user_role,
                 business_id=decoded.get("business_id"),
                 team_id=decoded.get("team_id"),

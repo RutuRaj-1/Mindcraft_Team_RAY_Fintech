@@ -127,19 +127,31 @@ export const CustomerProfileVaultPage: React.FC = () => {
 
     const effectiveEmail = registeredAccountEmail || cleanMsmeEmail || '';
 
+    const isRuturaj = (firebaseUser?.email || user?.email || '').toLowerCase().includes('bhomeruturaj');
+
+    const cleanBizName =
+      msmeProfile?.business_name && msmeProfile.business_name !== 'Rohan Mehta Enterprises'
+        ? msmeProfile.business_name
+        : (isRuturaj ? 'SkillBridge Enterprises' : '');
+
+    const cleanPromoterName =
+      msmeProfile?.promoter_name && msmeProfile.promoter_name !== 'Rohan Mehta'
+        ? msmeProfile.promoter_name
+        : (isRuturaj ? 'Ruturaj Bhome' : user.name || firebaseUser?.displayName || '');
+
     if (msmeProfile) {
       setProfileForm({
-        business_name: msmeProfile.business_name || '',
+        business_name: cleanBizName,
         entity_type: msmeProfile.entity_type || 'Private Limited Company (Pvt. Ltd.)',
-        promoter_name: msmeProfile.promoter_name || user.name || firebaseUser?.displayName || '',
-        phone: msmeProfile.phone || '',
+        promoter_name: cleanPromoterName,
+        phone: msmeProfile.phone || (isRuturaj ? '8468812201' : ''),
         email: effectiveEmail,
-        pan: msmeProfile.pan || '',
-        gstin: msmeProfile.gstin || '',
+        pan: msmeProfile.pan || (isRuturaj ? 'SKLBR1234A' : ''),
+        gstin: msmeProfile.gstin || (isRuturaj ? '27SKLBR1234A1Z5' : ''),
         industry_sector: msmeProfile.industry_sector || 'Information Technology & Software',
-        annual_turnover: msmeProfile.annual_turnover || 0,
-        vintage_months: msmeProfile.vintage_months || 36,
-        registered_address: msmeProfile.registered_address || '',
+        annual_turnover: msmeProfile.annual_turnover ?? (isRuturaj ? 30000000 : 0),
+        vintage_months: msmeProfile.vintage_months ?? (isRuturaj ? 48 : 0),
+        registered_address: msmeProfile.registered_address || (isRuturaj ? 'Plot 12, Tech Park, Andheri East, Mumbai, Maharashtra 400069' : ''),
         bank_account_no: msmeProfile.bank_account_no || '',
         ifsc_code: msmeProfile.ifsc_code || '',
       });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
@@ -14,8 +14,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  const { role, persona, switchRole, loading, isAuthenticated } = useAuth();
+  const { role, persona, loading, isAuthenticated, isMasterAdmin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // ── Auth state not yet resolved (Firebase is initialising) ─────────────────
   if (loading) {
@@ -69,14 +70,25 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           </p>
 
           <div className="mt-6 flex flex-col gap-2">
-            <Button
-              variant="brutal"
-              size="sm"
-              onClick={() => switchRole(recommendedRole)}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
-            >
-              Switch to {recommendedRole} Persona
-            </Button>
+            {isMasterAdmin ? (
+              <Button
+                variant="brutal"
+                size="sm"
+                onClick={() => navigate('/admin')}
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Go to Admin Dashboard (Module Emulation Hub)
+              </Button>
+            ) : (
+              <Button
+                variant="brutal"
+                size="sm"
+                onClick={() => navigate(persona.defaultRoute)}
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Return to My Dashboard ({role})
+              </Button>
+            )}
 
             <Button
               variant="ghost"

@@ -171,25 +171,25 @@ export const PERSONAS: Record<UserRole, PersonaProfile> = {
   },
   SYS_ADMIN: {
     role: 'SYS_ADMIN',
-    name: 'Amit Verma',
-    title: 'Platform Infrastructure Lead',
-    email: 'admin@finflow.ai',
-    organization: 'FinFlow AI Core Engine (Technical Custodian)',
-    avatarInitials: 'AV',
-    badgeColor: '#64748b',
+    name: 'Ruturaj Bhome',
+    title: 'Master System Administrator & Architecture Lead',
+    email: 'bhomeruturaj@gmail.com',
+    organization: 'FinFlow AI Core Engine (Master Infrastructure & Controls)',
+    avatarInitials: 'RB',
+    badgeColor: '#0f172a',
     defaultRoute: '/admin',
-    defaultJourneyId: 'jrn_priya_001',
+    defaultJourneyId: '',
   },
   ADMIN: {
     role: 'ADMIN',
-    name: 'Amit Verma',
-    title: 'Platform Infrastructure Lead',
-    email: 'admin@finflow.ai',
-    organization: 'FinFlow AI Core Engine (Technical Custodian)',
-    avatarInitials: 'AV',
-    badgeColor: '#64748b',
+    name: 'Ruturaj Bhome',
+    title: 'Master System Administrator & Architecture Lead',
+    email: 'bhomeruturaj@gmail.com',
+    organization: 'FinFlow AI Core Engine (Master Infrastructure & Controls)',
+    avatarInitials: 'RB',
+    badgeColor: '#0f172a',
     defaultRoute: '/admin',
-    defaultJourneyId: 'jrn_priya_001',
+    defaultJourneyId: '',
   },
 };
 
@@ -214,6 +214,15 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   /** Raw Firebase user object — null in demo mode */
   firebaseUser: FirebaseUser | null;
+
+  /** Master System Administrator status */
+  isMasterAdmin: boolean;
+  /** Currently emulated role from Admin Hub, null if running standard session */
+  adminEmulatedRole: UserRole | null;
+  /** 1-Click Emulation launch from Admin Dashboard to explain modules to judges */
+  emulateRoleAsAdmin: (role: UserRole) => void;
+  /** Restore Master System Administrator session and return to Admin Dashboard */
+  exitAdminEmulation: () => void;
 
   /** Switch persona (demo mode) or N/A in Firebase mode */
   switchRole: (newRole: UserRole) => void;
@@ -258,6 +267,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [selectedApplication, setSelectedApplication] = useState<ApplicationRecord | null>(null);
   const [journey, setJourney] = useState<JourneyRecord | null>(null);
+
+  const [adminEmulatedRole, setAdminEmulatedRole] = useState<UserRole | null>(() => {
+    const stored = localStorage.getItem('finflow_admin_emulation');
+    return stored ? (stored as UserRole) : null;
+  });
 
   const permissions = React.useMemo(() => computeRolePermissions(role), [role]);
 
@@ -328,20 +342,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fbUser) {
         setFirebaseUser(fbUser);
 
-        // Extract role from custom claims
-        try {
-          const idTokenResult = await fbUser.getIdTokenResult(true);
-          const claimedRole = (idTokenResult.claims['role'] as string | undefined)?.toUpperCase();
-          const resolvedRole: UserRole =
-            claimedRole && ['CUSTOMER', 'RM', 'RISK_OFFICER', 'ADMIN'].includes(claimedRole)
-              ? (claimedRole as UserRole)
-              : 'CUSTOMER';
+        const userEmail = (fbUser.email || '').toLowerCase().trim();
+        const isMaster = userEmail === 'bhomeruturaj@gmail.com';
 
+        let resolvedRole: UserRole = 'CUSTOMER';
+        if (isMaster) {
+          resolvedRole = 'SYS_ADMIN';
+        } else {
+          try {
+            const idTokenResult = await fbUser.getIdTokenResult(true);
+            const claimedRole = (idTokenResult.claims['role'] as string | undefined)?.toUpperCase();
+            if (
+              claimedRole &&
+              [
+                'CUSTOMER',
+                'RM',
+                'RM_SUPERVISOR',
+                'RISK_OFFICER',
+                'RISK_MANAGER',
+                'CREDIT_APPROVER',
+                'AUDIT_OFFICER',
+                'SYS_ADMIN',
+                'ADMIN',
+              ].includes(claimedRole)
+            ) {
+              resolvedRole = claimedRole as UserRole;
+            }
+          } catch {
+            resolvedRole = 'CUSTOMER';
+          }
+        }
+
+        // Honor existing admin emulation if active
+        const storedEmulation = localStorage.getItem('finflow_admin_emulation') as UserRole | null;
+        if (isMaster && storedEmulation && PERSONAS[storedEmulation]) {
+          setRoleState(storedEmulation);
+          setActiveRole(storedEmulation);
+          setAdminEmulatedRole(storedEmulation);
+        } else {
           setRoleState(resolvedRole);
           setActiveRole(resolvedRole);
-        } catch {
-          setRoleState('CUSTOMER');
-          setActiveRole('CUSTOMER');
+          setAdminEmulatedRole(null);
+          localStorage.removeItem('finflow_admin_emulation');
         }
 
         // Register async token provider
@@ -517,6 +559,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const isMasterAdmin = React.useMemo(() => {
+    if (firebaseUser?.email?.toLowerCase() === 'bhomeruturaj@gmail.com') return true;
+    if (customDemoUser?.email?.toLowerCase() === 'bhomeruturaj@gmail.com') return true;
+    if (adminEmulatedRole !== null) return true;
+    return role === 'SYS_ADMIN' || role === 'ADMIN';
+  }, [firebaseUser, customDemoUser, role, adminEmulatedRole]);
+
+  const emulateRoleAsAdmin = useCallback((targetRole: UserRole) => {
+    localStorage.setItem('finflow_admin_emulation', targetRole);
+    setAdminEmulatedRole(targetRole);
+    setRoleState(targetRole);
+    setActiveRole(targetRole);
+    setStoredToken(ROLE_DEMO_TOKEN[targetRole]);
+    const targetPersona = PERSONAS[targetRole];
+    if (targetPersona.defaultJourneyId) {
+      setActiveJourneyId(targetPersona.defaultJourneyId);
+    }
+  }, []);
+
+  const exitAdminEmulation = useCallback(() => {
+    localStorage.removeItem('finflow_admin_emulation');
+    setAdminEmulatedRole(null);
+    setRoleState('SYS_ADMIN');
+    setActiveRole('SYS_ADMIN');
+    setStoredToken(ROLE_DEMO_TOKEN['SYS_ADMIN']);
+  }, []);
+
   const switchRole = useCallback((newRole: UserRole) => {
     if (FIREBASE_ENABLED) return;
     setRoleState(newRole);
@@ -529,6 +598,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async () => {
+    localStorage.removeItem('finflow_admin_emulation');
+    setAdminEmulatedRole(null);
     if (FIREBASE_ENABLED && firebaseUser) {
       await signOut(firebaseAuth);
       clearTokenProvider();
@@ -554,6 +625,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         isAuthenticated,
         firebaseUser,
+        isMasterAdmin,
+        adminEmulatedRole,
+        emulateRoleAsAdmin,
+        exitAdminEmulation,
         switchRole,
         activeJourneyId,
         setActiveJourneyId,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../types';
 import { dashboardApi, authApi, auditApi, analyticsApi, systemApi, SystemDiagnostics, StorageTestResult } from '../../api';
 import { MetricCard } from '../../components/fintech/MetricCard';
 import { Button } from '../../components/ui/Button';
@@ -9,11 +10,138 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import {
   Cpu, Users, Shield, Activity, Server, Lock, Settings,
   Layers, Terminal, Sparkles, RefreshCw, CheckCircle2,
-  AlertTriangle, ArrowRight, Database, Check, X, HardDrive
+  AlertTriangle, ArrowRight, Database, Check, X, HardDrive,
+  FileSearch, Award, UserCheck
 } from 'lucide-react';
 
+const DEMO_ROLES: {
+  role: UserRole;
+  name: string;
+  title: string;
+  email: string;
+  department: string;
+  route: string;
+  badgeColor: string;
+  accentBg: string;
+  icon: any;
+  capabilities: string[];
+}[] = [
+  {
+    role: 'CUSTOMER',
+    name: 'MSME Borrower Portal',
+    title: 'Self-Service Borrower Experience',
+    email: 'bhomeruturaj@gmail.com',
+    department: 'SkillBridge Enterprises (Borrower)',
+    route: '/customer',
+    badgeColor: '#10b981',
+    accentBg: '#ecfdf5',
+    icon: UserCheck,
+    capabilities: [
+      'Self-Service Loan Application Intake',
+      'Immutable Reusable Document Vault',
+      'Real-Time Status & Transparent Sanction Tracking',
+    ],
+  },
+  {
+    role: 'RM',
+    name: 'Rohan Mehta',
+    title: 'Senior Relationship Manager',
+    email: 'rohan.mehta@finflowbank.com',
+    department: 'First-Line Commercial SME Lending',
+    route: '/rm',
+    badgeColor: '#0ea5e9',
+    accentBg: '#f0f9ff',
+    icon: Shield,
+    capabilities: [
+      'Active Deal Pipeline & Case Intake Management',
+      'Pre-Underwriting Verification Dispatch',
+      'Borrower KYC & Compliance Gathering Desk',
+    ],
+  },
+  {
+    role: 'RM_SUPERVISOR',
+    name: 'Vikram Malhotra',
+    title: 'Credit Operations Manager & RM Supervisor',
+    email: 'vikram.malhotra@finflowbank.com',
+    department: 'First-Line Credit Operations',
+    route: '/operations',
+    badgeColor: '#059669',
+    accentBg: '#ecfdf5',
+    icon: Layers,
+    capabilities: [
+      'Operations Command & Load Balancing',
+      'RM Caseload & Exception Re-allocation',
+      'Document Ingestion Quality SLAs & Queue Monitoring',
+    ],
+  },
+  {
+    role: 'RISK_OFFICER',
+    name: 'Ananya Iyer',
+    title: 'Chief Credit Risk & Fraud Officer',
+    email: 'ananya.iyer@finflowbank.com',
+    department: 'Second-Line Risk & Fraud Analytics',
+    route: '/risk',
+    badgeColor: '#f59e0b',
+    accentBg: '#fffbeb',
+    icon: AlertTriangle,
+    capabilities: [
+      '5-Pillar Credit Radar & Fraud Signals',
+      'GST vs Bank Statement Forensic Cross-Check',
+      'Interactive What-If Sensitivity Simulator',
+    ],
+  },
+  {
+    role: 'RISK_MANAGER',
+    name: 'Meera Krishnan',
+    title: 'Supervisory Risk Manager',
+    email: 'meera.krishnan@finflowbank.com',
+    department: 'Second-Line Model Governance',
+    route: '/risk-manager',
+    badgeColor: '#f97316',
+    accentBg: '#fff7ed',
+    icon: Shield,
+    capabilities: [
+      'Model Bias & Algorithmic Drift Oversight',
+      'Underwriter Override Auditing & Challenge',
+      'Portfolio Concentration Thresholds & Stress Testing',
+    ],
+  },
+  {
+    role: 'CREDIT_APPROVER',
+    name: 'Rajesh Singhania',
+    title: 'Chief Credit Officer / Committee Chair',
+    email: 'rajesh.singhania@finflowbank.com',
+    department: 'Sanction Authority & Credit Committee',
+    route: '/approvals',
+    badgeColor: '#dc2626',
+    accentBg: '#fef2f2',
+    icon: Award,
+    capabilities: [
+      'Four-Eyes Principle Sanction Chamber',
+      'High-Value Delegated Limit Sanctioning',
+      'Legally Binding Digital Sanction Letter Generation',
+    ],
+  },
+  {
+    role: 'AUDIT_OFFICER',
+    name: 'Sunita Rao',
+    title: 'Director of Internal Audit & Governance',
+    email: 'sunita.rao@finflowbank.com',
+    department: 'Third-Line Sovereign Assurance',
+    route: '/audit',
+    badgeColor: '#8b5cf6',
+    accentBg: '#f5f3ff',
+    icon: FileSearch,
+    capabilities: [
+      'Independent Read-Heavy Model Audit Desk',
+      'Immutable SHA-256 Decision Replay Audit Trail',
+      'RBI Algorithmic Explainability Inspection Pack',
+    ],
+  },
+];
+
 export const AdminPage: React.FC = () => {
-  const { persona } = useAuth();
+  const { persona, emulateRoleAsAdmin, adminEmulatedRole, exitAdminEmulation } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'users';
@@ -167,6 +295,124 @@ export const AdminPage: React.FC = () => {
           <p className="text-zinc-300 leading-relaxed">
             The System Administrator role has comprehensive access to technical infrastructure, users, API health, and logging. By institutional charter, this role has <strong>ZERO loan sanction or decision modification authority</strong>. Any attempt by an administrator to approve or alter loans is blocked by FastAPI backend invariants (HTTP 403 Forbidden).
           </p>
+        </div>
+      </div>
+
+      {/* Master Presentation & 7-Role Emulation Hub */}
+      <div className="p-6 rounded-3xl bg-white border-2 border-[var(--brand-950)] shadow-[4px_4px_0px_#0A1F20] space-y-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-200 border border-indigo-700/50 flex items-center gap-1.5 shadow-xs">
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                Master Defense & Presentation Hub
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                End-to-End Module Explainer
+              </span>
+            </div>
+            <h2 className="text-xl font-black text-[var(--brand-950)]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Institutional 7-Role Emulation Deck
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Launch directly into any of the 7 business, risk, and audit roles from this master admin console. 
+              Explain each module end-to-end and use the top banner anytime to return here.
+            </p>
+          </div>
+
+          {adminEmulatedRole && (
+            <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-2xl border-2 border-amber-400">
+              <span className="text-xs font-bold text-amber-950">
+                Active Session: <strong className="underline">{adminEmulatedRole}</strong>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exitAdminEmulation}
+              >
+                Exit to Master Admin
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {DEMO_ROLES.map((roleCard) => {
+            const isCurrentlyActive = adminEmulatedRole === roleCard.role;
+            const Icon = roleCard.icon;
+            return (
+              <div
+                key={roleCard.role}
+                className={`flex flex-col justify-between p-4 rounded-2xl border-2 transition-all ${
+                  isCurrentlyActive
+                    ? 'border-indigo-600 bg-indigo-50/50 shadow-[4px_4px_0px_#4338ca]'
+                    : 'border-[var(--brand-950)] bg-white hover:bg-[var(--surface-subtle)] shadow-[2px_2px_0px_#0A1F20]'
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-xs shrink-0"
+                      style={{ backgroundColor: roleCard.badgeColor }}
+                    >
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <span
+                      className="text-[9px] font-black uppercase px-2 py-0.5 rounded border"
+                      style={{
+                        backgroundColor: roleCard.accentBg,
+                        color: roleCard.badgeColor,
+                        borderColor: roleCard.badgeColor + '50',
+                      }}
+                    >
+                      {roleCard.role}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-black text-[var(--brand-950)] leading-snug">
+                      {roleCard.name}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
+                      {roleCard.title}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)] font-medium">
+                      {roleCard.department}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+                      Demonstrable Workflows
+                    </p>
+                    <ul className="space-y-1">
+                      {roleCard.capabilities.map((cap, idx) => (
+                        <li key={idx} className="text-[10px] text-[var(--brand-950)] flex items-start gap-1.5">
+                          <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="leading-tight">{cap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-3 border-t border-[var(--border)]">
+                  <Button
+                    variant={isCurrentlyActive ? 'outline' : 'brutal'}
+                    size="sm"
+                    className="w-full justify-between"
+                    onClick={() => {
+                      emulateRoleAsAdmin(roleCard.role);
+                      navigate(roleCard.route);
+                    }}
+                    rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                  >
+                    <span>{isCurrentlyActive ? 'Viewing (Open Desk)' : `Launch ${roleCard.role}`}</span>
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

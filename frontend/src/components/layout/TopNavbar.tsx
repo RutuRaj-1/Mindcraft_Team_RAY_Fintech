@@ -116,7 +116,23 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       .then((res: any[]) => {
         if (!isMounted) return;
         if (res && res.length > 0) {
-          const mapped = res.map((j) => {
+          // For CUSTOMER: filter strictly to their own journey, NEVER show bank benchmark cases
+          const customerOwned = role === 'CUSTOMER'
+            ? res.filter((j) => {
+                const name = (j.intent?.business_name || j.business_name || '').toLowerCase();
+                const isBankBenchmark = [
+                  'sharma textiles',
+                  'kavita electronics',
+                  'apex logistics',
+                  'swifttrans',
+                  'zenith cargo',
+                  'omkar'
+                ].some(b => name.includes(b));
+                return !isBankBenchmark;
+              })
+            : res;
+
+          const mapped = customerOwned.map((j) => {
             const rawLabel = j.intent?.business_name || j.business_name || j.journey_id;
             const isTestName = rawLabel.includes('GreenTech') || rawLabel.toLowerCase().includes('sample');
             const label = (role === 'CUSTOMER' && (isTestName || customerEnterprise))
@@ -130,19 +146,38 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 : (j.status || 'ACTIVE'),
             };
           });
-          setCases(mapped);
+
+          // If role is CUSTOMER and no customer journeys exist yet, provide their profile's active application
+          if (role === 'CUSTOMER' && mapped.length === 0 && customerEnterprise) {
+            setCases([{
+              id: activeJourneyId || 'app_skillbridge_active',
+              label: customerEnterprise,
+              tier: 'ACTIVE PROFILE',
+            }]);
+          } else {
+            setCases(mapped);
+          }
         } else if (role !== 'CUSTOMER') {
           // For internal/demo roles, fall back to benchmark cases when no real data
           setCases(BENCHMARK_CASES);
         } else {
-          setCases([]);
+          setCases(customerEnterprise ? [{
+            id: activeJourneyId || 'app_skillbridge_active',
+            label: customerEnterprise,
+            tier: 'ACTIVE PROFILE',
+          }] : []);
         }
       })
       .catch(() => {
         if (role !== 'CUSTOMER') setCases(BENCHMARK_CASES);
+        else setCases(customerEnterprise ? [{
+          id: activeJourneyId || 'app_skillbridge_active',
+          label: customerEnterprise,
+          tier: 'ACTIVE PROFILE',
+        }] : []);
       });
     return () => { isMounted = false; };
-  }, [role, customerEnterprise]);
+  }, [role, customerEnterprise, activeJourneyId]);
 
   // Close picker on outside click
   React.useEffect(() => {

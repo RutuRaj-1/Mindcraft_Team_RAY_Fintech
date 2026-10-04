@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, PERSONAS } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import { 
@@ -20,7 +20,17 @@ import {
 } from 'lucide-react';
 
 export const UserProfileMenu: React.FC = () => {
-  const { role, persona, switchRole, logout, firebaseUser, msmeProfile } = useAuth();
+  const {
+    role,
+    persona,
+    logout,
+    firebaseUser,
+    msmeProfile,
+    isMasterAdmin,
+    adminEmulatedRole,
+    exitAdminEmulation,
+  } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -130,43 +140,38 @@ export const UserProfileMenu: React.FC = () => {
             </div>
           )}
 
-          {/* Persona Switcher Section (Demo Mode only) */}
-          {!firebaseUser && (
-            <div className="p-2 border-b border-[var(--border)]">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                <ArrowRightLeft className="w-3 h-3" /> Switch Persona (Demo Mode)
-              </p>
-              <div className="space-y-1 mt-1 max-h-48 overflow-y-auto">
-                {(Object.keys(PERSONAS) as UserRole[]).map((r) => {
-                  const p = PERSONAS[r];
-                  const isSelected = r === role;
-                  return (
-                    <button
-                      key={r}
-                      onClick={() => {
-                        switchRole(r);
-                        setIsOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-[var(--brand-50)] text-[var(--brand-900)] font-bold'
-                          : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {roleIcons[r]}
-                        <div className="text-left">
-                          <p className="text-xs font-semibold leading-tight">{p.name}</p>
-                          <p className="text-[10px] text-[var(--text-muted)]">{p.role}</p>
-                        </div>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[var(--brand-700)]" />}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Admin Emulation / Hub Navigation */}
+          {adminEmulatedRole ? (
+            <div className="p-2 border-b border-[var(--border)] bg-amber-50/50">
+              <button
+                onClick={() => {
+                  exitAdminEmulation();
+                  setIsOpen(false);
+                  navigate('/admin');
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-colors cursor-pointer border border-amber-300"
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span className="leading-tight">Exit Emulation & Return to Admin Hub</span>
+                </div>
+              </button>
             </div>
-          )}
+          ) : isMasterAdmin ? (
+            <div className="p-2 border-b border-[var(--border)] bg-slate-50">
+              <Link
+                to="/admin"
+                onClick={() => setIsOpen(false)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <Settings className="w-4 h-4 text-slate-700 shrink-0" />
+                <div>
+                  <p className="leading-tight">System Admin Console</p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-normal">7-Role Emulation Hub & System Controls</p>
+                </div>
+              </Link>
+            </div>
+          ) : null}
 
           {/* Quick logout / reset */}
           <div className="p-2">

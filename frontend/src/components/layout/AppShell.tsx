@@ -1,17 +1,55 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { TopNavbar } from './TopNavbar';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { NotificationDrawer } from './NotificationDrawer';
-import { Zap } from 'lucide-react';
+import { Zap, ShieldCheck, ArrowLeft, ExternalLink } from 'lucide-react';
 
 export const AppShell: React.FC = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { adminEmulatedRole, persona, exitAdminEmulation } = useAuth();
+  const navigate = useNavigate();
+
+  const handleReturnToAdmin = () => {
+    exitAdminEmulation();
+    navigate('/admin');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
+      {/* Master Admin Explainer Mode Sticky Banner */}
+      {adminEmulatedRole && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-700 text-white px-4 py-2 shadow-lg flex items-center justify-between border-b-2 border-black/30 animate-fadeInDown">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-wider border border-white/20 shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+              Master Admin Explainer Mode
+            </span>
+            <span className="text-xs font-medium truncate">
+              Currently presenting as{' '}
+              <strong className="font-extrabold text-white">{persona.name}</strong> ({persona.title} ·{' '}
+              <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-[11px] font-bold">
+                {adminEmulatedRole}
+              </span>
+              )
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleReturnToAdmin}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white text-zinc-950 hover:bg-amber-50 active:scale-95 font-black text-xs rounded-xl shadow-[2px_2px_0px_#000] border-2 border-black transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Admin Hub</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top App Bar */}
       <TopNavbar
         onToggleSidebar={() => setIsSidebarCollapsed(prev => !prev)}

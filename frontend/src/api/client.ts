@@ -169,6 +169,10 @@ export const clearTokenProvider = (): void => {
 };
 
 export async function resolveAuthToken(): Promise<string> {
+  const emulatedRole = localStorage.getItem('finflow_admin_emulation');
+  if (emulatedRole && ROLE_DEMO_TOKEN[emulatedRole as UserRole]) {
+    return ROLE_DEMO_TOKEN[emulatedRole as UserRole];
+  }
   if (_tokenProvider) {
     try {
       const token = await _tokenProvider();
