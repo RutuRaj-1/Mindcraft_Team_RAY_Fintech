@@ -13,7 +13,7 @@ Authoritative REST endpoints for:
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Union
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request, status
 from pydantic import BaseModel, ConfigDict
 
 from backend.auth.firebase_auth import get_current_user, AuthenticatedUser
@@ -256,24 +256,56 @@ class AttachVaultDocumentRequest(BaseModel):
     description="Retrieves all reusable documents stored in the user's permanent MSME Document Locker."
 )
 def list_vault_documents(
+    request: Request,
     journey_id: Optional[str] = None,
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
-    jrn = (journey_id or "").lower()
+    effective_journey_id = (
+        journey_id or
+        request.query_params.get("journey_id") or
+        request.headers.get("X-Journey-Id") or
+        ""
+    )
+    jrn = effective_journey_id.lower()
     user_email = (user.email or "").lower()
 
     if "lifeline" in jrn or "rashi" in user_email or user.uid == "usr_lifeline_002":
-        return db.list("document_vault", {"user_id": "usr_lifeline_002"})
+        target_uid = "usr_lifeline_002"
+        target_jrn = "jrn_lifeline_002"
     elif "safeera" in jrn or "aditya" in user_email or "wakchaure" in user_email or user.uid == "usr_safeera_003":
-        return db.list("document_vault", {"user_id": "usr_safeera_003"})
+        target_uid = "usr_safeera_003"
+        target_jrn = "jrn_safeera_003"
     elif "skillbridge" in jrn or "bhomeruturaj17" in user_email or user.uid in ("usr_skillbridge_001", "usr_demo_customer", "demo-customer"):
-        return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
+        target_uid = "usr_skillbridge_001"
+        target_jrn = "jrn_skillbridge_001"
+    elif user_email == "bhomeruturaj@gmail.com":
+        target_uid = "usr_skillbridge_001"
+        target_jrn = "jrn_skillbridge_001"
+    else:
+        target_uid = user.uid
+        target_jrn = effective_journey_id
 
-    items = db.list("document_vault", {"user_id": user.uid})
-    if items:
-        return items
+    # 1. Fetch by owner user_id
+    target_docs = db.list("document_vault", {"user_id": target_uid})
+    # 2. Fetch by journey_id (either explicit or resolved)
+    jrn_docs = db.list("document_vault", {"journey_id": target_jrn}) if target_jrn else []
+    # 3. Fetch any uploaded with owner_user_id == current user AND matching journey
+    user_owned_docs = [
+        d for d in db.list("document_vault", {"owner_user_id": user.uid})
+        if (d.get("journey_id") == target_jrn or d.get("user_id") == target_uid)
+    ]
 
-    return db.list("document_vault", {"user_id": "usr_skillbridge_001"})
+    seen = set()
+    result = []
+    for d in target_docs + jrn_docs + user_owned_docs:
+        doc_id = d.get("doc_id", "")
+        if doc_id and doc_id not in seen:
+            seen.add(doc_id)
+            result.append(d)
+
+    # Sort newest first
+    result.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
+    return result
 
 
 @router.post(
@@ -284,12 +316,20 @@ def list_vault_documents(
     description="Uploads a reusable document to the user's permanent Document Vault with automatic SHA-256 fingerprinting."
 )
 async def upload_vault_document(
+    request: Request,
     category: Optional[str] = Form(None),
     doc_type: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    journey_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
     user: AuthenticatedUser = Depends(get_current_user)
 ) -> Dict[str, Any]:
+    effective_journey_id = (
+        journey_id or
+        request.query_params.get("journey_id") or
+        request.headers.get("X-Journey-Id") or
+        ""
+    )
     resolved_category = category or doc_type or "OTHER"
     content = await file.read()
     if not content or len(content) == 0:
@@ -304,9 +344,32 @@ async def upload_vault_document(
     )
 
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    jrn = effective_journey_id.lower()
+    user_email = (user.email or "").lower()
+    if "lifeline" in jrn or "rashi" in user_email or user.uid == "usr_lifeline_002":
+        owner_id = "usr_lifeline_002"
+        canonical_jrn = "jrn_lifeline_002"
+    elif "safeera" in jrn or "aditya" in user_email or "wakchaure" in user_email or user.uid == "usr_safeera_003":
+        owner_id = "usr_safeera_003"
+        canonical_jrn = "jrn_safeera_003"
+    elif "skillbridge" in jrn or "bhomeruturaj17" in user_email or user.uid in ("usr_skillbridge_001", "usr_demo_customer", "demo-customer"):
+        owner_id = "usr_skillbridge_001"
+        canonical_jrn = "jrn_skillbridge_001"
+    elif user_email == "bhomeruturaj@gmail.com":
+        owner_id = "usr_skillbridge_001"
+        canonical_jrn = "jrn_skillbridge_001"
+    else:
+        owner_id = user.uid
+        canonical_jrn = effective_journey_id or "jrn_skillbridge_001"
+
+    final_journey_id = effective_journey_id or canonical_jrn
+
     vault_record = {
         "doc_id": doc_id,
-        "user_id": user.uid,
+        "user_id": owner_id,
+        "owner_user_id": user.uid,
+        "journey_id": final_journey_id,
         "category": resolved_category,
         "doc_type": resolved_category,
         "file_name": file.filename or f"{resolved_category.lower()}.pdf",
@@ -321,6 +384,7 @@ async def upload_vault_document(
         "updated_at": now_iso,
     }
     db.set("document_vault", doc_id, vault_record)
+
     return vault_record
 
 

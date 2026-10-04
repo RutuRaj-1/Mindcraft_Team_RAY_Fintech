@@ -415,5 +415,13 @@ service cloud.firestore {
       allow read, write, delete: if isSysAdmin() || isAuthenticated();
     }
 
+    // =========================================================================
+    // 20. MSME REUSABLE DOCUMENT VAULT
+    // =========================================================================
+    match /document_vault/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
   }
 }

@@ -112,6 +112,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
   const [uploadDocType, setUploadDocType] = useState('BANK_STATEMENT');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadModalError, setUploadModalError] = useState<string | null>(null);
 
   // Updating / Replacing specific document
   const [replacingDocId, setReplacingDocId] = useState<string | null>(null);
@@ -265,9 +266,18 @@ export const CustomerProfileVaultPage: React.FC = () => {
     if (!selectedFile) return;
 
     setIsUploading(true);
+    setUploadModalError(null);
     setVaultError(null);
+    const targetJrn = activeJourneyId || persona?.defaultJourneyId || 'jrn_skillbridge_001';
+
     try {
-      const docRecord = await api.uploadVaultDocument(selectedFile, uploadDocType);
+      const docRecord = await api.uploadVaultDocument(selectedFile, uploadDocType, uploadDocType, targetJrn);
+      if (docRecord) {
+        setVaultDocs((prev) => {
+          const exists = prev.some((d) => d.doc_id === docRecord.doc_id);
+          return exists ? prev : [docRecord, ...prev];
+        });
+      }
       if (firebaseUser && docRecord) {
         try {
           await setDoc(
@@ -275,19 +285,22 @@ export const CustomerProfileVaultPage: React.FC = () => {
             {
               ...docRecord,
               user_id: firebaseUser.uid,
+              journey_id: targetJrn,
               updated_at: new Date().toISOString(),
             },
             { merge: true }
           );
         } catch (fbErr) {
-          console.warn('Firestore vault sync error:', fbErr);
+          console.warn('Firestore vault sync error (non-fatal):', fbErr);
         }
       }
       setIsUploadModalOpen(false);
       setSelectedFile(null);
-      await loadVault();
+      await loadVault(targetJrn);
     } catch (err: any) {
-      setVaultError(err?.message || 'Failed to upload document to vault.');
+      const msg = err?.message || 'Failed to upload document to vault.';
+      setUploadModalError(msg);
+      setVaultError(msg);
     } finally {
       setIsUploading(false);
     }
@@ -315,6 +328,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
             {
               ...updated,
               user_id: firebaseUser.uid,
+              journey_id: activeJourneyId,
               updated_at: new Date().toISOString(),
             },
             { merge: true }
@@ -323,7 +337,7 @@ export const CustomerProfileVaultPage: React.FC = () => {
           console.warn('Firestore vault update error:', fbErr);
         }
       }
-      await loadVault();
+      await loadVault(activeJourneyId);
     } catch (err: any) {
       setVaultError(err?.message || 'Failed to update document with new version.');
     } finally {
@@ -346,7 +360,8 @@ export const CustomerProfileVaultPage: React.FC = () => {
           console.warn('Firestore vault delete error:', fbErr);
         }
       }
-      await loadVault();
+      setVaultDocs((prev) => prev.filter((d) => d.doc_id !== docId));
+      await loadVault(activeJourneyId);
     } catch (err: any) {
       setVaultError(err?.message || 'Failed to delete vault document.');
     } finally {
@@ -1003,12 +1018,23 @@ export const CustomerProfileVaultPage: React.FC = () => {
                 </span>
               </div>
 
+              {uploadModalError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-center gap-2 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{uploadModalError}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsUploadModalOpen(false)}
+                  onClick={() => {
+                    setIsUploadModalOpen(false);
+                    setUploadModalError(null);
+                  }}
+                  disabled={isUploading}
                 >
                   Cancel
                 </Button>
@@ -1017,10 +1043,10 @@ export const CustomerProfileVaultPage: React.FC = () => {
                   variant="brutal"
                   size="sm"
                   isLoading={isUploading}
-                  disabled={!selectedFile}
+                  disabled={!selectedFile || isUploading}
                   leftIcon={<Upload className="w-3.5 h-3.5" />}
                 >
-                  Secure in Vault
+                  {isUploading ? 'Securing in Vault...' : 'Secure in Vault'}
                 </Button>
               </div>
             </form>
