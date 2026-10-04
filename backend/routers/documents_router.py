@@ -12,7 +12,7 @@ Authoritative REST endpoints for:
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from pydantic import BaseModel, ConfigDict
 
@@ -240,141 +240,6 @@ def list_journey_documents(
     return [serialize_doc(d) for d in raw_docs]
 
 
-@router.get(
-    "/api/v1/documents/{document_id}",
-    response_model=Dict[str, Any],
-    summary="Get Document by ID",
-    description="Retrieves metadata, storage path, verification status, and extracted evidence items for a single document."
-)
-def get_document_by_id(
-    document_id: str,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> Dict[str, Any]:
-    # Check repository
-    doc = document_repo.get(document_id)
-    if not doc:
-        raw = db.get("documents", document_id)
-        if not raw:
-            raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found")
-        doc_data = serialize_doc(raw)
-    else:
-        doc_data = serialize_doc(doc)
-
-    # Attach associated evidence items
-    try:
-        evidence = evidence_repo.list_by_document(document_id)
-        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
-        doc_data["evidence_items"] = [serialize_evidence(e) for e in evidence]
-    except Exception:
-        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
-        doc_data["evidence_items"] = [serialize_evidence(e) for e in db.list("evidence_ledger", {"document_id": document_id})]
-
-    return doc_data
-
-
-@router.get(
-    "/api/v1/journeys/{journey_id}/evidence",
-    response_model=List[Dict[str, Any]],
-    summary="Get Versioned Evidence Ledger",
-    description="Returns the chronological, tamper-proof Evidence Ledger with version numbers and extraction confidence."
-)
-def get_journey_evidence_ledger(
-    journey_id: str,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    journey = db.get("journeys", journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-    app_id = journey.get("application_id", journey_id)
-    return EvidenceLedgerService.get_ledger(app_id)
-
-
-@router.get(
-    "/api/v1/journeys/{journey_id}/consistency",
-    response_model=Dict[str, Any],
-    summary="Get Cross-Document Consistency Report",
-    description="Runs consistency rules across verified GST, ITR, and Bank evidence."
-)
-def get_journey_consistency_report(
-    journey_id: str,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> Dict[str, Any]:
-    journey = db.get("journeys", journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-    app_id = journey.get("application_id", journey_id)
-    rep = ConsistencyEngine.verify_consistency(app_id)
-    return rep.model_dump() if hasattr(rep, "model_dump") else rep
-
-
-@router.get(
-    "/api/v1/evidence/{evidence_id}/provenance",
-    response_model=Dict[str, Any],
-    summary="Get Evidence Provenance & Cross-Checks",
-    description="Traces any financial number or evidence ID back to source document, page, field, confidence, and cross-checks."
-)
-def get_evidence_provenance(
-    evidence_id: str,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> Dict[str, Any]:
-    trace = EvidenceProvenanceService.get_provenance_by_id(evidence_id)
-    if not trace:
-        raise HTTPException(status_code=404, detail=f"Provenance trace for '{evidence_id}' not found")
-    return trace
-
-
-
-# ── DigiLocker Ecosystem Endpoints ───────────────────────────────────────────
-
-@router.get(
-    "/api/v1/journeys/{journey_id}/digilocker/available",
-    response_model=List[Dict[str, Any]],
-    summary="List Available DigiLocker Credentials",
-    description="Lists government credentials available in the official DigiLocker ecosystem for instant 1-click import."
-)
-def list_available_digilocker_credentials(
-    journey_id: str,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    journey = db.get("journeys", journey_id) or {}
-    business_name = journey.get("business_name", "Sharma Textiles Private Limited")
-    return DigiLockerService.list_available(business_name=business_name)
-
-
-@router.post(
-    "/api/v1/journeys/{journey_id}/digilocker/import",
-    response_model=Dict[str, Any],
-    status_code=status.HTTP_201_CREATED,
-    summary="Import DigiLocker Credential",
-    description="Imports verified government credentials (UIDAI Aadhaar, CBDT PAN, GSTN 3B, MoMSME Udyam) into the lifelong vault and Evidence Ledger."
-)
-def import_digilocker_credential(
-    journey_id: str,
-    req: DigiLockerImportRequest,
-    user: AuthenticatedUser = Depends(get_current_user)
-) -> Dict[str, Any]:
-    journey = db.get("journeys", journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail="Journey not found")
-
-    app_id = journey.get("application_id", journey_id)
-    business_name = journey.get("business_name") or req.business_name or "Sharma Textiles Private Limited"
-
-    imported_doc = DigiLockerService.import_credential(
-        journey_id=journey_id,
-        application_id=app_id,
-        credential_type=req.credential_type,
-        business_name=business_name
-    )
-
-    try:
-        ConsistencyEngine.verify_consistency(app_id)
-    except Exception:
-        pass
-
-    return imported_doc
-
-
 # ==============================================================================
 # MSME REUSABLE DOCUMENT VAULT / STORAGE APIS
 # Store once, update working versions, delete, and reuse across applications
@@ -511,6 +376,147 @@ def delete_vault_document(
     
     db.delete("document_vault", doc_id)
     return {"status": "SUCCESS", "message": f"Document '{doc_id}' deleted from vault successfully."}
+
+
+@router.get(
+    "/api/v1/documents/{document_id}",
+    response_model=Union[Dict[str, Any], List[Dict[str, Any]]],
+    summary="Get Document by ID",
+    description="Retrieves metadata, storage path, verification status, and extracted evidence items for a single document."
+)
+def get_document_by_id(
+    document_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    # Guard against accidental route shadowing of /documents/vault
+    if document_id == "vault":
+        return list_vault_documents(user)
+
+    # Check repository
+    doc = document_repo.get(document_id)
+    if not doc:
+        raw = db.get("documents", document_id)
+        if not raw:
+            raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found")
+        doc_data = serialize_doc(raw)
+    else:
+        doc_data = serialize_doc(doc)
+
+    # Attach associated evidence items
+    try:
+        evidence = evidence_repo.list_by_document(document_id)
+        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
+        doc_data["evidence_items"] = [serialize_evidence(e) for e in evidence]
+    except Exception:
+        from backend.modules.module3_financial.evidence_ledger_service import serialize_evidence
+        doc_data["evidence_items"] = [serialize_evidence(e) for e in db.list("evidence_ledger", {"document_id": document_id})]
+
+    return doc_data
+
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/evidence",
+    response_model=List[Dict[str, Any]],
+    summary="Get Versioned Evidence Ledger",
+    description="Returns the chronological, tamper-proof Evidence Ledger with version numbers and extraction confidence."
+)
+def get_journey_evidence_ledger(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+    return EvidenceLedgerService.get_ledger(app_id)
+
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/consistency",
+    response_model=Dict[str, Any],
+    summary="Get Cross-Document Consistency Report",
+    description="Runs consistency rules across verified GST, ITR, and Bank evidence."
+)
+def get_journey_consistency_report(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    app_id = journey.get("application_id", journey_id)
+    rep = ConsistencyEngine.verify_consistency(app_id)
+    return rep.model_dump() if hasattr(rep, "model_dump") else rep
+
+
+@router.get(
+    "/api/v1/evidence/{evidence_id}/provenance",
+    response_model=Dict[str, Any],
+    summary="Get Evidence Provenance & Cross-Checks",
+    description="Traces any financial number or evidence ID back to source document, page, field, confidence, and cross-checks."
+)
+def get_evidence_provenance(
+    evidence_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    trace = EvidenceProvenanceService.get_provenance_by_id(evidence_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail=f"Provenance trace for '{evidence_id}' not found")
+    return trace
+
+
+
+# ── DigiLocker Ecosystem Endpoints ───────────────────────────────────────────
+
+@router.get(
+    "/api/v1/journeys/{journey_id}/digilocker/available",
+    response_model=List[Dict[str, Any]],
+    summary="List Available DigiLocker Credentials",
+    description="Lists government credentials available in the official DigiLocker ecosystem for instant 1-click import."
+)
+def list_available_digilocker_credentials(
+    journey_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    journey = db.get("journeys", journey_id) or {}
+    business_name = journey.get("business_name", "Sharma Textiles Private Limited")
+    return DigiLockerService.list_available(business_name=business_name)
+
+
+@router.post(
+    "/api/v1/journeys/{journey_id}/digilocker/import",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Import DigiLocker Credential",
+    description="Imports verified government credentials (UIDAI Aadhaar, CBDT PAN, GSTN 3B, MoMSME Udyam) into the lifelong vault and Evidence Ledger."
+)
+def import_digilocker_credential(
+    journey_id: str,
+    req: DigiLockerImportRequest,
+    user: AuthenticatedUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    journey = db.get("journeys", journey_id)
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+
+    app_id = journey.get("application_id", journey_id)
+    business_name = journey.get("business_name") or req.business_name or "Sharma Textiles Private Limited"
+
+    imported_doc = DigiLockerService.import_credential(
+        journey_id=journey_id,
+        application_id=app_id,
+        credential_type=req.credential_type,
+        business_name=business_name
+    )
+
+    try:
+        ConsistencyEngine.verify_consistency(app_id)
+    except Exception:
+        pass
+
+    return imported_doc
+
+
 
 
 @router.post(
